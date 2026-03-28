@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "docker:up": "sh scripts/docker-up.sh up --build -d",
+    "docker:build": "sh scripts/docker-up.sh build",
+    "docker:down": "docker compose down"
   },
   "dependencies": {
     "react": "^19.0.0",

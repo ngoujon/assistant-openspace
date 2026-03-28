@@ -61,6 +61,10 @@ Exécuter l’app dans un conteneur, **accessible sur le port 3004**, avec relai
 
 - `Dockerfile`, `nginx.conf`, `docker-compose.yml`, `.dockerignore`, `docs/docker.md`
 
+### Complément — exFAT / `._.cursor`
+
+Docker lit les xattr sur tous les chemins du contexte : les fichiers `._*` sur exFAT provoquent `operation not permitted`. Script `scripts/docker-up.sh` + `npm run docker:up` suppriment ces fichiers avant `docker compose`.
+
 ---
 
 ## 2026-03-28 — Équipe dynamique + génération de seed

@@ -32,11 +32,19 @@ Le port **3004** est configuré pour `npm run dev` et `npm run preview`.
 
 ## Docker (port 3004)
 
+Depuis un volume **exFAT** (ex. disque externe), préfère :
+
 ```bash
-docker compose up --build
+npm run docker:up
 ```
 
-Puis ouvre **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le conteneur s’y connecte via `host.docker.internal:11434`). Détails et cas Linux : `docs/docker.md`.
+Sinon :
+
+```bash
+docker compose up --build -d
+```
+
+Puis ouvre **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le conteneur s’y connecte via `host.docker.internal:11434`). Détails, Linux et dépannage `._.cursor` : `docs/docker.md`.
 
 ## Fonctionnalités principales
 
