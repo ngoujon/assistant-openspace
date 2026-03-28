@@ -1,6 +1,9 @@
 import { useCallback, useRef, useState } from "react";
+import { MissionWorkspace } from "@/components/MissionWorkspace";
 import { streamOllamaChat } from "@/lib/ollama";
 import type { ChatMessage, Conversation } from "@/types";
+
+type ChatMode = "mission" | "free";
 
 interface ChatPanelProps {
   conversation: Conversation;
@@ -23,6 +26,7 @@ export function ChatPanel({
   onRetryOllama,
   setMessages,
 }: ChatPanelProps) {
+  const [mode, setMode] = useState<ChatMode>("mission");
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,98 +101,131 @@ export function ChatPanel({
 
   return (
     <div className="chat-panel">
-      <header className="chat-toolbar">
-        <label className="model-label">
-          Modèle Ollama
-          <select
-            className="model-select"
-            value={model}
-            onChange={(e) => onModelChange(e.target.value)}
-            disabled={!models.length}
+      <header className="chat-toolbar chat-toolbar-stack">
+        <div
+          className="chat-mode-switch"
+          role="tablist"
+          aria-label="Mode du chat"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "mission"}
+            className={mode === "mission" ? "chat-mode-tab active" : "chat-mode-tab"}
+            onClick={() => setMode("mission")}
           >
-            {models.length === 0 ? (
-              <option value="">—</option>
-            ) : (
-              models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
-        {ollamaError && (
-          <div className="banner banner-warn">
-            {ollamaError}
-            <button type="button" className="btn-link" onClick={onRetryOllama}>
-              Réessayer
-            </button>
-          </div>
-        )}
-      </header>
-
-      <div className="chat-messages" role="log" aria-live="polite">
-        {conversation.messages.length === 0 && (
-          <p className="chat-empty">
-            Écris un message pour parler au modèle via Ollama (localhost).
-          </p>
-        )}
-        {conversation.messages.map((m, i) => {
-          const isPendingAssistant =
-            streaming &&
-            m.role === "assistant" &&
-            !m.content &&
-            i === conversation.messages.length - 1;
-          return (
-            <article
-              key={m.id}
-              className={`bubble bubble-${m.role}`}
+            Mission équipe
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "free"}
+            className={mode === "free" ? "chat-mode-tab active" : "chat-mode-tab"}
+            onClick={() => setMode("free")}
+          >
+            Discussion
+          </button>
+        </div>
+        <div className="chat-toolbar-row">
+          <label className="model-label">
+            Modèle Ollama
+            <select
+              className="model-select"
+              value={model}
+              onChange={(e) => onModelChange(e.target.value)}
+              disabled={!models.length}
             >
-              <span className="bubble-role">
-                {m.role === "user" ? "Toi" : "Assistant"}
-              </span>
-              <div className="bubble-content">
-                {m.content || (isPendingAssistant ? "…" : "")}
-              </div>
-            </article>
-          );
-        })}
-      </div>
-
-      {error && <div className="banner banner-error">{error}</div>}
-
-      <footer className="chat-input-row">
-        <textarea
-          className="chat-input"
-          rows={3}
-          placeholder="Message…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-          disabled={streaming}
-        />
-        <div className="chat-actions">
-          {streaming ? (
-            <button type="button" className="btn-secondary" onClick={stop}>
-              Arrêter
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => void send()}
-              disabled={!input.trim()}
-            >
-              Envoyer
-            </button>
+              {models.length === 0 ? (
+                <option value="">—</option>
+              ) : (
+                models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+          {ollamaError && (
+            <div className="banner banner-warn">
+              {ollamaError}
+              <button type="button" className="btn-link" onClick={onRetryOllama}>
+                Réessayer
+              </button>
+            </div>
           )}
         </div>
-      </footer>
+      </header>
+
+      {mode === "mission" ? (
+        <MissionWorkspace model={model} />
+      ) : (
+        <>
+          <div className="chat-messages" role="log" aria-live="polite">
+            {conversation.messages.length === 0 && (
+              <p className="chat-empty">
+                Mode discussion : messages directs avec le modèle Ollama.                 Pour le rapport d’équipe (orchestrateur + agents), passe en mode « Mission équipe »
+                ci-dessus.
+              </p>
+            )}
+            {conversation.messages.map((m, i) => {
+              const isPendingAssistant =
+                streaming &&
+                m.role === "assistant" &&
+                !m.content &&
+                i === conversation.messages.length - 1;
+              return (
+                <article
+                  key={m.id}
+                  className={`bubble bubble-${m.role}`}
+                >
+                  <span className="bubble-role">
+                    {m.role === "user" ? "Toi" : "Assistant"}
+                  </span>
+                  <div className="bubble-content">
+                    {m.content || (isPendingAssistant ? "…" : "")}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {error && <div className="banner banner-error">{error}</div>}
+
+          <footer className="chat-input-row">
+            <textarea
+              className="chat-input"
+              rows={3}
+              placeholder="Message…"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              disabled={streaming}
+            />
+            <div className="chat-actions">
+              {streaming ? (
+                <button type="button" className="btn-secondary" onClick={stop}>
+                  Arrêter
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void send()}
+                  disabled={!input.trim()}
+                >
+                  Envoyer
+                </button>
+              )}
+            </div>
+          </footer>
+        </>
+      )}
     </div>
   );
 }

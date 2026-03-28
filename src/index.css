@@ -312,6 +312,51 @@ body {
   gap: 0.75rem;
 }
 
+.chat-toolbar-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
+}
+
+.chat-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.chat-mode-switch {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  gap: 2px;
+}
+
+.chat-mode-tab {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.4rem 0.85rem;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.chat-mode-tab:hover {
+  color: var(--text);
+}
+
+.chat-mode-tab.active {
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
 .model-label {
   display: flex;
   align-items: center;
@@ -458,6 +503,177 @@ body {
 .chat-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+/* ——— Mission équipe (orchestration) ——— */
+.mission-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mission-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.mission-lead {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.mission-lead strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mission-label {
+  display: block;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  margin-bottom: 0.4rem;
+}
+
+.mission-context {
+  margin-bottom: 1rem;
+}
+
+.mission-files-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.mission-file-input {
+  position: absolute;
+  width: 0.1px;
+  height: 0.1px;
+  opacity: 0;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.mission-file-chips {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.mission-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.65rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+}
+
+.mission-file-name {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-file-remove {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  border-radius: 4px;
+}
+
+.mission-file-remove:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.mission-actions {
+  margin: 0.5rem 0 1rem;
+}
+
+.mission-progress-wrap {
+  margin-bottom: 1.25rem;
+}
+
+.mission-progress-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.mission-progress-log {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.mission-result {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.mission-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.mission-result-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.mission-md-preview {
+  margin: 0;
+  padding: 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: min(50vh, 28rem);
+  overflow-y: auto;
 }
 
 /* ——— Équipe ——— */

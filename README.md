@@ -1,6 +1,6 @@
 # OpenSpace Localhost
 
-Interface web locale pour dialoguer avec **Ollama** (Mac Mini ou machine de dev), avec une feuille de route vers une **équipe virtuelle** d’agents.
+Interface web locale branchée sur **Ollama** : **mission d’équipe virtuelle** (orchestrateur, directeurs, sous-agents) qui produit un **README Markdown** téléchargeable, plus un mode **discussion** libre avec le modèle.
 
 ## Prérequis
 
@@ -30,23 +30,40 @@ npm run preview
 
 Le port **3004** est configuré pour `npm run dev` et `npm run preview`.
 
-## Fonctionnalités actuelles
+## Fonctionnalités principales
 
-- **Colonne gauche** : liste des conversations (titres dérivés du premier message, tri par dernière activité, stockage `localStorage`).
-- **Centre** : onglet **Chat** (flux SSE vers Ollama via proxy Vite) et onglet **Équipe** (placeholder pour agents multiples).
-- **Colonne droite** : réservée pour de futurs panneaux (contexte, outils, etc.).
+### Mission équipe (onglet Chat, mode par défaut)
+
+- Saisie d’un **contexte** et ajout de **fichiers texte** (.txt, .md).
+- Enchaînement **Orchestrateur → 3 directeurs → 3 sous-agents → synthèses → document final**, chaque étape via Ollama en local.
+- Les **personas** sont ceux définis dans l’onglet **Équipe** (clic sur un rôle → texte « âme et rôle », stocké dans le navigateur).
+- **Télécharger le .md** une fois la mission terminée.
+
+### Discussion
+
+- Même onglet **Chat**, mode **Discussion** : conversation directe avec le modèle (streaming).
+
+### Équipe
+
+- Arbre hiérarchique et édition des **âmes / rôles** par agent (seeds + `localStorage`).
+
+### Autres
+
+- **Colonne gauche** : conversations (mode Discussion), persistance `localStorage`.
+- **Colonne droite** : réservée pour extensions.
 
 ## Ollama et proxy
 
-Le navigateur appelle `/api/ollama/...` ; Vite redirige vers `http://127.0.0.1:11434`. Ainsi pas besoin d’exposer Ollama en CORS côté navigateur pendant le développement. Détails dans `docs/ollama.md`.
+Le navigateur appelle `/api/ollama/...` ; Vite redirige vers `http://127.0.0.1:11434`. Détails dans `docs/ollama.md`. Le mode mission utilise des appels **non stream** (`completeOllamaChat`) ; la discussion utilise le **stream** classique.
 
 ## Documentation
 
 | Fichier | Rôle |
 |--------|------|
-| `docs/DEVBOOK.md` | Journal technique, décisions, changelog à tenir à jour |
-| `docs/ollama.md` | Intégration API et dépannage |
-| `docs/architecture.md` | Structure du code et flux de données |
+| `docs/DEVBOOK.md` | Journal technique et changelog |
+| `docs/mission-orchestration.md` | Pipeline mission, limites, fichiers concernés |
+| `docs/ollama.md` | API et dépannage |
+| `docs/architecture.md` | Structure du code |
 
 ## Licence
 

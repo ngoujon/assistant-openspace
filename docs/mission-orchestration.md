@@ -1,0 +1,35 @@
+# Mission équipe — orchestration Ollama
+
+## Flux utilisateur
+
+1. Onglet **Chat** → mode **Mission équipe** (par défaut).
+2. Saisir un **contexte** et/ou joindre des fichiers **.txt** / **.md**.
+3. **Lancer la mission** : enchaînement d’appels Ollama en local (`stream: false`).
+4. À la fin : aperçu du **README Markdown** généré et bouton **Télécharger le .md**.
+
+## Pipeline (ordre)
+
+| Étape | Acteur | Rôle |
+|-------|--------|------|
+| 1 | Orchestrateur | Analyse contexte + fichiers, brief par pôle (Artistique, Technique, Juridique). |
+| 2 | Chaque directeur | Découpe pour son sous-agent (consignes). |
+| 3 | Chaque sous-agent | Travail spécialisé (extrait du contexte/fichiers, tronqué si très long). |
+| 4 | Chaque directeur | Synthèse / ajustements après retour du sous-agent. |
+| 5 | Orchestrateur | Document unique type **README.md** pour lecteur externe. |
+
+Les **textes « âme et rôle »** configurés dans l’onglet **Équipe** (modale par nœud) sont injectés comme **system prompts** pour chaque appel correspondant.
+
+## Fichiers code
+
+- `src/orchestration/pipeline.ts` — `runMissionPipeline`.
+- `src/lib/ollama.ts` — `completeOllamaChat` (réponse complète, pas de SSE).
+- `src/components/MissionWorkspace.tsx` — UI contexte, fichiers, progression, téléchargement.
+
+## Coût / performance
+
+Environ **11** requêtes modèle par mission (1 + 3×3 + 1). Prévoir un modèle raisonnablement rapide sur machine locale ; le bouton **Arrêter la mission** annule via `AbortController`.
+
+## Limites
+
+- Pas de serveur backend : tout s’exécute dans le navigateur.
+- Très gros fichiers : le rappel côté sous-agent est tronqué (~12k caractères) pour limiter la taille des prompts.

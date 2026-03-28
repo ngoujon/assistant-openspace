@@ -14,6 +14,34 @@ export interface OllamaChatMessage {
   content: string;
 }
 
+/** Réponse complète (sans stream) — pour enchaînements orchestration. */
+export async function completeOllamaChat(
+  model: string,
+  messages: OllamaChatMessage[],
+  signal?: AbortSignal,
+  options?: { temperature?: number },
+): Promise<string> {
+  const res = await fetch(`${BASE}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: false,
+      options: options?.temperature != null ? { temperature: options.temperature } : undefined,
+    }),
+    signal,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Erreur HTTP ${res.status}`);
+  }
+  const data = (await res.json()) as { message?: { content?: string } };
+  const content = data.message?.content?.trim() ?? "";
+  if (!content) throw new Error("Réponse Ollama vide.");
+  return content;
+}
+
 export async function streamOllamaChat(
   model: string,
   messages: OllamaChatMessage[],

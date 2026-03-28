@@ -39,6 +39,31 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-03-28 | Équipe : libellés des sous-agents (Designer UI/UX, Développeur, DPO) |
 | 2026-03-28 | Équipe : modale « âme et rôle » par nœud, seeds, persistance `openspace-team-souls-v1` |
 | 2026-03-28 | UI : thème sombre minimal (zinc), chat type assistant avec bandeau d’accent, compositeur centré |
+| 2026-03-28 | Mission équipe : pipeline orchestrateur → agents → sous-agents → README.md + téléchargement |
+
+---
+
+## 2026-03-28 — Mission équipe (orchestration Ollama)
+
+### Objectif
+
+À partir d’un **contexte** et de **fichiers texte**, exécuter dans le navigateur un pipeline multi-étapes : orchestrateur, trois directeurs avec délégation aux sous-agents, synthèses, puis **document Markdown** type README, **téléchargeable**.
+
+### Décisions
+
+- **`completeOllamaChat`** (`stream: false`) pour enchaîner les étapes sans parser plusieurs streams.
+- Prompts **system** = textes « âme et rôle » (`loadAgentSouls` + seeds).
+- **~11 appels** modèle par mission ; annulation via **`AbortController`**.
+- UI : mode **Mission équipe** (défaut) vs **Discussion** dans l’onglet Chat ; `docs/mission-orchestration.md` décrit le flux.
+
+### Fichiers touchés
+
+- `src/orchestration/pipeline.ts`, `src/lib/ollama.ts`, `src/components/MissionWorkspace.tsx`, `src/components/ChatPanel.tsx`, `src/index.css`, `docs/mission-orchestration.md`, `README.md`, `docs/architecture.md`
+
+### Suivi / dette
+
+- Troncature du payload pour les sous-agents (~12k caractères) si contexte énorme.
+- Pas de parallélisation des branches (séquentiel pour simplicité et charge machine).
 
 ---
 
