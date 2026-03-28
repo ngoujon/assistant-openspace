@@ -59,6 +59,19 @@ function childrenOf(
     .sort((a, b) => a.order - b.order);
 }
 
+/** Nombre d’appels `completeOllamaChat` (chaque étape peut durer longtemps en local). */
+export function countMissionModelCalls(teamMembers: TreeMember[]): number {
+  const leads = leadsOf(teamMembers);
+  let n = 1;
+  for (const lead of leads) {
+    const subs = childrenOf(lead.id, teamMembers);
+    if (subs.length === 0) n += 1;
+    else n += subs.length * 2 + 1;
+  }
+  n += 1;
+  return n;
+}
+
 const TEMP = 0.35;
 
 /**
@@ -78,11 +91,18 @@ export async function runMissionPipeline(
     );
   }
 
+  const totalSteps = countMissionModelCalls(teamMembers);
+  let stepIndex = 0;
+  const prog = (label: string) => {
+    stepIndex += 1;
+    onProgress(`Étape ${stepIndex} / ${totalSteps} — ${label}`);
+  };
+
   const poleHeaders = leads
     .map((l) => `## Pôle ${l.label}`)
     .join("\n");
 
-  onProgress("Orchestrateur — analyse du contexte et des fichiers…");
+  prog("Orchestrateur — analyse du contexte et des fichiers…");
   const orchestratorBrief = await completeOllamaChat(
     model,
     [
@@ -102,7 +122,7 @@ export async function runMissionPipeline(
     const subs = childrenOf(lead.id, teamMembers);
 
     if (subs.length === 0) {
-      onProgress(`${lead.label} — analyse directe (sans sous-agent)…`);
+      prog(`${lead.label} — analyse directe (sans sous-agent)…`);
       const synthesis = await completeOllamaChat(
         model,
         [
@@ -122,7 +142,7 @@ export async function runMissionPipeline(
     const subBlocks: string[] = [];
 
     for (const sub of subs) {
-      onProgress(`${lead.label} → ${sub.label} — consignes…`);
+      prog(`${lead.label} → ${sub.label} — consignes au sous-agent…`);
       const delegation = await completeOllamaChat(
         model,
         [
@@ -136,7 +156,7 @@ export async function runMissionPipeline(
         { temperature: TEMP },
       );
 
-      onProgress(`${sub.label} — travail spécialisé…`);
+      prog(`${sub.label} — travail spécialisé…`);
       const subWork = await completeOllamaChat(
         model,
         [
@@ -155,7 +175,7 @@ export async function runMissionPipeline(
 
     const combined = subBlocks.join("\n\n---\n\n");
 
-    onProgress(`${lead.label} — synthèse et ajustements…`);
+    prog(`${lead.label} — synthèse et ajustements du pôle…`);
     const synthesis = await completeOllamaChat(
       model,
       [
@@ -172,7 +192,7 @@ export async function runMissionPipeline(
     branchOutputs.push({ title: lead.label, synthesis });
   }
 
-  onProgress("Orchestrateur — rédaction du document final (README)…");
+  prog("Orchestrateur — rédaction du document final (README)…");
   const branchesBlock = branchOutputs
     .map((o) => `### ${o.title}\n\n${o.synthesis}`)
     .join("\n\n---\n\n");
@@ -190,6 +210,6 @@ export async function runMissionPipeline(
     { temperature: 0.45 },
   );
 
-  onProgress("Terminé.");
+  onProgress("Terminé — document prêt ci-dessous.");
   return readme;
 }

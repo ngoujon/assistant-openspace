@@ -1,4 +1,12 @@
-import { useCallback, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import { ActivitySidebar } from "@/components/ActivitySidebar";
 import { MissionWorkspace } from "@/components/MissionWorkspace";
 import {
   routeDiscussionMessage,
@@ -6,6 +14,7 @@ import {
 } from "@/lib/discussionTeamChat";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
 import { loadTeamMembers } from "@/lib/teamTreeStorage";
+import type { RightActivityState } from "@/types/activity";
 import type { ChatMessage, Conversation } from "@/types";
 
 type ChatMode = "mission" | "free";
@@ -20,6 +29,8 @@ interface ChatPanelProps {
   setMessages: (
     fn: (prev: ChatMessage[]) => ChatMessage[],
   ) => void;
+  activityState: RightActivityState;
+  setRightActivity: Dispatch<SetStateAction<RightActivityState>>;
 }
 
 export function ChatPanel({
@@ -30,6 +41,8 @@ export function ChatPanel({
   ollamaError,
   onRetryOllama,
   setMessages,
+  activityState,
+  setRightActivity,
 }: ChatPanelProps) {
   const [mode, setMode] = useState<ChatMode>("mission");
   const [input, setInput] = useState("");
@@ -37,6 +50,52 @@ export function ChatPanel({
   const [isRouting, setIsRouting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    setInput("");
+    setError(null);
+  }, [conversation.id]);
+
+  const reportMissionActivity = useCallback(
+    (payload: {
+      running: boolean;
+      progress: string[];
+      elapsedSec: number;
+    }) => {
+      setRightActivity({
+        kind: "mission",
+        ...payload,
+      });
+    },
+    [setRightActivity],
+  );
+
+  useEffect(() => {
+    if (mode === "mission") {
+      return;
+    }
+    const msgs = conversation.messages;
+    const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
+    const streamingSpeaker =
+      streaming && lastAssistant?.speakerLabel
+        ? lastAssistant.speakerLabel
+        : null;
+    setRightActivity({
+      kind: "discussion",
+      isRouting,
+      streaming,
+      panelError: error,
+      streamingSpeaker,
+    });
+  }, [
+    mode,
+    isRouting,
+    streaming,
+    error,
+    conversation.messages,
+    conversation.id,
+    setRightActivity,
+  ]);
 
   const sendDiscussion = useCallback(async () => {
     const text = input.trim();
@@ -193,15 +252,17 @@ export function ChatPanel({
         </div>
       </header>
 
+      <div className="activity-inline-wrap" aria-hidden={false}>
+        <ActivitySidebar state={activityState} variant="inline" />
+      </div>
+
       {mode === "mission" ? (
-        <MissionWorkspace model={model} />
+        <MissionWorkspace
+          model={model}
+          onActivityReport={reportMissionActivity}
+        />
       ) : (
         <>
-          {isRouting && (
-            <p className="discussion-routing-hint" role="status">
-              L’orchestrateur choisit le membre le plus qualifié pour répondre…
-            </p>
-          )}
           <div className="chat-messages" role="log" aria-live="polite">
             {conversation.messages.length === 0 && (
               <p className="chat-empty">

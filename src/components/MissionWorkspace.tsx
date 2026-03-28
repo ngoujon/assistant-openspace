@@ -1,10 +1,20 @@
-import { useCallback, useRef, useState } from "react";
-import { runMissionPipeline, type MissionFile } from "@/orchestration/pipeline";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  countMissionModelCalls,
+  runMissionPipeline,
+  type MissionFile,
+} from "@/orchestration/pipeline";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
-import { loadTeamMembers } from "@/lib/teamTreeStorage";
+import { ORCHESTRATOR_ID, loadTeamMembers } from "@/lib/teamTreeStorage";
 
 interface MissionWorkspaceProps {
   model: string;
+  /** Alimente la colonne droite (et la bande mobile) avec la progression. */
+  onActivityReport?: (payload: {
+    running: boolean;
+    progress: string[];
+    elapsedSec: number;
+  }) => void;
 }
 
 function unwrapMarkdownFence(s: string): string {
@@ -29,7 +39,10 @@ function downloadMarkdown(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function MissionWorkspace({ model }: MissionWorkspaceProps) {
+export function MissionWorkspace({
+  model,
+  onActivityReport,
+}: MissionWorkspaceProps) {
   const [context, setContext] = useState("");
   const [files, setFiles] = useState<
     { id: string; name: string; content: string }[]
@@ -38,8 +51,25 @@ export function MissionWorkspace({ model }: MissionWorkspaceProps) {
   const [progress, setProgress] = useState<string[]>([]);
   const [resultMd, setResultMd] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [elapsedSec, setElapsedSec] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!running) {
+      setElapsedSec(0);
+      return;
+    }
+    const t0 = Date.now();
+    const id = window.setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - t0) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [running]);
+
+  useEffect(() => {
+    onActivityReport?.({ running, progress, elapsedSec });
+  }, [running, progress, elapsedSec, onActivityReport]);
 
   const addFiles = useCallback(async (list: FileList | null) => {
     if (!list?.length) return;
@@ -92,6 +122,21 @@ export function MissionWorkspace({ model }: MissionWorkspaceProps) {
       content,
     }));
 
+    const leads = teamMembers.filter((m) => m.parentId === ORCHESTRATOR_ID);
+    if (leads.length === 0) {
+      setError(
+        "Aucun membre sous l’orchestrateur. Ajoute au moins un pilier dans l’onglet Équipe.",
+      );
+      setRunning(false);
+      abortRef.current = null;
+      return;
+    }
+
+    const planned = countMissionModelCalls(teamMembers);
+    setProgress([
+      `Démarrage — ${planned} requête(s) vers le modèle « ${model} » (une par une). Tant qu’une étape tourne chez Ollama, la liste ne grossit pas : c’est normal (plusieurs minutes possibles).`,
+    ]);
+
     try {
       const md = await runMissionPipeline({
         model,
@@ -132,7 +177,9 @@ export function MissionWorkspace({ model }: MissionWorkspaceProps) {
           Décris ton contexte et ajoute des fichiers texte.{" "}
           <strong>L’orchestrateur</strong> analyse le tout, sollicite les{" "}
           <strong>directeurs</strong> et leurs <strong>sous-agents</strong> via Ollama,
-          puis produit un <strong>README Markdown</strong> consolidé.
+          puis produit un <strong>README Markdown</strong> consolidé. La{" "}
+          <strong>progression</strong> s’affiche dans la colonne de droite (bandeau en
+          haut sur mobile).
         </p>
 
         <label className="mission-label" htmlFor="mission-context">
@@ -141,7 +188,7 @@ export function MissionWorkspace({ model }: MissionWorkspaceProps) {
         <textarea
           id="mission-context"
           className="chat-input mission-context"
-          rows={5}
+          rows={10}
           placeholder="Objectifs, contraintes, public visé, ce que tu attends du document…"
           value={context}
           onChange={(e) => setContext(e.target.value)}
@@ -205,13 +252,6 @@ export function MissionWorkspace({ model }: MissionWorkspaceProps) {
             </button>
           )}
         </div>
-
-        {progress.length > 0 && (
-          <div className="mission-progress-wrap">
-            <h3 className="mission-progress-title">Progression</h3>
-            <pre className="mission-progress-log">{progress.join("\n")}</pre>
-          </div>
-        )}
 
         {resultMd && (
           <section className="mission-result" aria-label="Résultat">

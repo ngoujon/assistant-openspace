@@ -95,6 +95,47 @@ export function canReparent(
   return true;
 }
 
+/**
+ * Cibles pour « Rattaché sous » : parent actuel (toujours) + autres parents autorisés.
+ * Le parent actuel reste listé même si `canReparent` l’exclurait (cas limite déjà en place).
+ */
+export function validParentTargetsForMember(
+  memberId: string,
+  members: TreeMember[],
+): { id: string; label: string }[] {
+  if (memberId === ORCHESTRATOR_ID) return [];
+  const cur = members.find((m) => m.id === memberId);
+  const out: { id: string; label: string }[] = [];
+  const seen = new Set<string>();
+  const add = (id: string, label: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push({ id, label });
+  };
+
+  if (cur?.parentId) {
+    const p = members.find((m) => m.id === cur.parentId);
+    if (p) add(cur.parentId, p.label);
+  }
+
+  if (canReparent(memberId, ORCHESTRATOR_ID, members)) {
+    const o = members.find((m) => m.id === ORCHESTRATOR_ID);
+    add(ORCHESTRATOR_ID, o?.label ?? "Orchestrateur");
+  }
+  const agents = members
+    .filter(
+      (m) =>
+        m.id !== ORCHESTRATOR_ID && depthOf(m.id, members) === 1,
+    )
+    .sort((a, b) => a.order - b.order);
+  for (const m of agents) {
+    if (canReparent(memberId, m.id, members)) {
+      add(m.id, m.label);
+    }
+  }
+  return out;
+}
+
 export function reparentMember(
   members: TreeMember[],
   dragId: string,

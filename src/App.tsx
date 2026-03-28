@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivitySidebar } from "@/components/ActivitySidebar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Layout } from "@/components/Layout";
 import { Sidebar } from "@/components/Sidebar";
 import { TeamPanel } from "@/components/TeamPanel";
 import { fetchOllamaModels } from "@/lib/ollama";
 import { loadConversations, saveConversations } from "@/lib/storage";
+import type { RightActivityState } from "@/types/activity";
 import type { Conversation, MainTab } from "@/types";
 
 function newConversation(): Conversation {
@@ -27,6 +29,15 @@ export default function App() {
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState("");
   const [ollamaError, setOllamaError] = useState<string | null>(null);
+  const [rightActivity, setRightActivity] = useState<RightActivityState>({
+    kind: "idle",
+  });
+
+  useEffect(() => {
+    if (mainTab === "team") {
+      setRightActivity({ kind: "team" });
+    }
+  }, [mainTab]);
 
   useEffect(() => {
     fetchOllamaModels()
@@ -112,6 +123,7 @@ export default function App() {
           onDelete={handleDeleteConversation}
         />
       }
+      rightAside={<ActivitySidebar state={rightActivity} />}
       main={
         <>
           <nav className="main-tabs" aria-label="Zones principales">
@@ -150,6 +162,8 @@ export default function App() {
                     .catch((e: Error) => setOllamaError(e.message));
                 }}
                 setMessages={setActiveMessages}
+                activityState={rightActivity}
+                setRightActivity={setRightActivity}
               />
             ) : (
               <TeamPanel model={model} />

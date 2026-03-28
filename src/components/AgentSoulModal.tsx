@@ -19,9 +19,16 @@ interface AgentSoulModalProps {
   initialLabel: string;
   parentId: string | null;
   parentLabel: string | null;
+  /** Vide pour l’orchestrateur ; sinon liste pour le sélecteur « Rattaché sous ». */
+  parentOptions: { id: string; label: string }[];
   model: string;
   onClose: () => void;
-  onSave: (text: string, agentId: string, label: string) => void;
+  onSave: (
+    text: string,
+    agentId: string,
+    label: string,
+    newParentId?: string,
+  ) => void;
 }
 
 export function AgentSoulModal({
@@ -30,6 +37,7 @@ export function AgentSoulModal({
   initialLabel,
   parentId,
   parentLabel,
+  parentOptions,
   model,
   onClose,
   onSave,
@@ -42,18 +50,20 @@ export function AgentSoulModal({
   const [nameDraft, setNameDraft] = useState(initialLabel);
   const [genError, setGenError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [parentChoice, setParentChoice] = useState<string | null>(parentId);
 
   useEffect(() => {
     if (node) {
       setDraft(initialText);
       setNameDraft(initialLabel);
+      setParentChoice(parentId);
       setGenError(null);
       queueMicrotask(() => {
         if (node.kind === "master") textareaRef.current?.focus();
         else nameInputRef.current?.focus();
       });
     }
-  }, [node, initialText, initialLabel]);
+  }, [node, initialText, initialLabel, parentId]);
 
   useEffect(() => {
     if (!node) return;
@@ -75,7 +85,12 @@ export function AgentSoulModal({
 
   const save = () => {
     const label = nameDraft.trim() || node.label;
-    if (node) onSave(draft, node.id, label);
+    if (node.kind === "master") {
+      onSave(draft, node.id, label);
+    } else {
+      const pid = parentChoice ?? parentId;
+      onSave(draft, node.id, label, pid ?? undefined);
+    }
     onClose();
   };
 
@@ -89,6 +104,11 @@ export function AgentSoulModal({
   const canGenerateSeed =
     !!model && nameDraft.trim().length > 0 && !generating;
 
+  const effectiveParentId = parentChoice ?? parentId;
+  const seedParentLabel =
+    parentOptions.find((o) => o.id === effectiveParentId)?.label ??
+    parentLabel;
+
   const handleGenerateSeed = async () => {
     if (!canGenerateSeed) return;
     setGenError(null);
@@ -97,8 +117,8 @@ export function AgentSoulModal({
       const text = await generateMemberSoulSeed({
         model,
         memberLabel: nameDraft.trim(),
-        parentId,
-        parentLabel,
+        parentId: effectiveParentId,
+        parentLabel: seedParentLabel,
       });
       setDraft(text);
     } catch (e) {
@@ -155,6 +175,29 @@ export function AgentSoulModal({
             disabled={node.kind === "master"}
             autoComplete="off"
           />
+          {node.kind !== "master" && parentOptions.length > 0 && (
+            <div className="modal-field-block modal-field-tight">
+              <label className="modal-field-label" htmlFor="soul-parent-select">
+                Rattaché sous (hiérarchie)
+              </label>
+              <select
+                id="soul-parent-select"
+                className="modal-parent-select"
+                value={parentChoice ?? parentId ?? ""}
+                onChange={(e) => setParentChoice(e.target.value)}
+              >
+                {parentOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <p className="modal-parent-hint">
+                Tu peux aussi glisser toute la ligne du membre dans l’arbre. Un membre avec des
+                subordonnés ne peut pas devenir sous-agent.
+              </p>
+            </div>
+          )}
           {node.kind !== "master" && (
             <div className="modal-seed-row">
               <button
@@ -168,7 +211,7 @@ export function AgentSoulModal({
               <span className="modal-seed-hint">
                 Utilise Ollama ({model || "aucun modèle"}) selon le nom et la place
                 dans l’équipe
-                {parentLabel ? ` (sous « ${parentLabel} »)` : ""}.
+                {seedParentLabel ? ` (sous « ${seedParentLabel} »)` : ""}.
               </span>
             </div>
           )}

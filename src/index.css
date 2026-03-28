@@ -25,7 +25,7 @@
   --radius-lg: 14px;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --sidebar-w: 260px;
-  --right-w: 180px;
+  --right-w: minmax(220px, 17rem);
   --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
@@ -86,6 +86,129 @@ body {
 .shell-right {
   border-left: 1px solid var(--border);
   background: var(--bg);
+  overflow: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.activity-sidebar {
+  padding: 1rem 0.85rem 1.25rem;
+  min-height: 100%;
+}
+
+.activity-sidebar-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.activity-sidebar-muted {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.activity-sidebar-muted strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.activity-sidebar-status {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.activity-sidebar-error {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--danger);
+}
+
+.activity-sidebar-timer {
+  margin: 0 0 0.45rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.activity-sidebar-current {
+  margin: 0 0 0.5rem;
+  padding: 0.45rem 0.5rem;
+  background: var(--accent-muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.activity-sidebar-current-label {
+  font-size: 0.5625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  font-weight: 700;
+}
+
+.activity-sidebar-current-text {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.activity-sidebar-wait-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.activity-sidebar-log {
+  margin: 0.35rem 0 0;
+  padding: 0.5rem 0.55rem;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: min(42vh, 18rem);
+  overflow-y: auto;
+}
+
+.activity-inline-wrap {
+  display: none;
+}
+
+.activity-inline {
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.activity-inline .activity-sidebar-title {
+  margin-bottom: 0.35rem;
+}
+
+.sidebar-storage-hint {
+  margin: 0 0 0.65rem;
+  padding: 0 0.25rem;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
 }
 
 .sidebar-inner {
@@ -564,6 +687,11 @@ body {
 }
 
 .mission-context {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 11rem;
+  max-height: min(52vh, 34rem);
   margin-bottom: 1rem;
 }
 
@@ -632,15 +760,67 @@ body {
 
 .mission-progress-wrap {
   margin-bottom: 1.25rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.mission-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .mission-progress-title {
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-tertiary);
   font-weight: 600;
+}
+
+.mission-progress-timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.mission-progress-current {
+  margin: 0 0 0.55rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--accent-muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mission-progress-current-label {
+  font-size: 0.5625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  font-weight: 700;
+}
+
+.mission-progress-current-text {
+  color: var(--text);
+}
+
+.mission-progress-wait-hint {
+  margin: 0 0 0.55rem;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  line-height: 1.45;
 }
 
 .mission-progress-log {
@@ -649,12 +829,12 @@ body {
   font-size: 0.75rem;
   line-height: 1.5;
   color: var(--text-secondary);
-  background: var(--bg-surface);
+  background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 10rem;
+  max-height: 14rem;
   overflow-y: auto;
 }
 
@@ -697,7 +877,7 @@ body {
 /* ——— Équipe ——— */
 .team-panel {
   padding: 1.5rem 1.25rem 2rem;
-  max-width: 42rem;
+  max-width: 52rem;
   margin: 0 auto;
 }
 
@@ -773,11 +953,56 @@ body {
   margin-left: 0.625rem;
 }
 
+/* Branches type arbre généalogique (ligne verticale + raccord vers chaque nœud) */
+.team-tree-children.team-tree-lineage-children {
+  margin-left: 0.65rem;
+  padding-left: 1.125rem;
+  border-left: 2px solid rgba(125, 211, 252, 0.2);
+  position: relative;
+}
+
+.team-tree-lineage-children > .team-tree-lineage-node {
+  position: relative;
+}
+
+.team-tree-lineage-children > .team-tree-lineage-node::before {
+  content: "";
+  position: absolute;
+  left: -1.125rem;
+  top: 1.4rem;
+  width: 0.8rem;
+  height: 2px;
+  background: rgba(125, 211, 252, 0.38);
+  border-radius: 1px;
+}
+
+.team-tree-lineage-children > .team-tree-lineage-node:last-child::after {
+  content: "";
+  position: absolute;
+  left: calc(-1.125rem - 2px);
+  top: calc(1.4rem + 1px);
+  bottom: -0.2rem;
+  width: 8px;
+  background: var(--bg-surface);
+}
+
 .team-tree-row {
   display: flex;
   align-items: stretch;
   gap: 0.35rem;
   margin-bottom: 0.3rem;
+}
+
+.team-tree-row-draggable {
+  cursor: grab;
+}
+
+.team-tree-row-draggable:active {
+  cursor: grabbing;
+}
+
+.team-tree-row--dragging {
+  opacity: 0.52;
 }
 
 .team-tree-children > .team-tree-item:last-child > .team-tree-row {
@@ -794,20 +1019,40 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.65rem;
+  width: 2.875rem;
+  min-width: 2.875rem;
   flex-shrink: 0;
-  cursor: grab;
+  align-self: stretch;
+  min-height: 2.875rem;
   user-select: none;
+  pointer-events: none;
   color: var(--text-tertiary);
-  font-size: 0.75rem;
-  line-height: 1;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 
-.team-drag-handle:active {
-  cursor: grabbing;
+.team-tree-row-draggable:hover .team-drag-handle {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.team-drag-dots {
+  display: grid;
+  grid-template-columns: repeat(2, 5px);
+  gap: 5px 6px;
+  place-items: center;
+  pointer-events: none;
+}
+
+.team-drag-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
 }
 
 .team-tree-delete {
@@ -995,6 +1240,37 @@ body {
   cursor: not-allowed;
 }
 
+.modal-field-tight {
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.modal-parent-select {
+  width: 100%;
+  font: inherit;
+  font-size: 0.875rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.35rem;
+  cursor: pointer;
+}
+
+.modal-parent-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.modal-parent-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  line-height: 1.45;
+}
+
 .modal-seed-row {
   display: flex;
   flex-wrap: wrap;
@@ -1072,6 +1348,10 @@ body {
 
   .shell-right {
     display: none;
+  }
+
+  .activity-inline-wrap {
+    display: block;
   }
 
   .chat-panel {

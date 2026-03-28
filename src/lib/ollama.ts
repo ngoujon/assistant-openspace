@@ -1,11 +1,14 @@
 const BASE = "/api/ollama";
 
-/** Heuristique rapide (évite un appel /api/show inutile pour nomic-embed-text, etc.). */
+/**
+ * Heuristique rapide : modèles embedding / rerank (souvent exclus si /api/show
+ * ne renvoie pas de capabilities ; on évite `\bembed` seul, fragile selon le nom).
+ */
 function isLikelyNonChatModelName(name: string): boolean {
   const lower = name.toLowerCase();
-  if (/\bembed/i.test(lower)) return true;
-  if (/\brerank/i.test(lower)) return true;
-  if (/\btext-embedding\b/i.test(lower)) return true;
+  if (lower.includes("embed")) return true;
+  if (lower.includes("rerank")) return true;
+  if (lower.includes("text-embedding")) return true;
   return false;
 }
 
@@ -20,16 +23,28 @@ async function modelSupportsChat(model: string): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model }),
     });
-    if (!res.ok) return true;
+    if (!res.ok) return !isLikelyNonChatModelName(model);
     const data = (await res.json()) as { capabilities?: string[] };
     const caps = data.capabilities;
-    if (!caps?.length) return true;
+    if (!caps?.length) return !isLikelyNonChatModelName(model);
     if (caps.includes("embedding") && !caps.includes("completion")) {
       return false;
     }
     return true;
   } catch {
-    return true;
+    return !isLikelyNonChatModelName(model);
+  }
+}
+
+/** Garde synchrone avant /api/chat (évite une erreur JSON peu claire côté Ollama). */
+export function assertChatModel(model: string): void {
+  if (!model.trim()) {
+    throw new Error("Aucun modèle sélectionné.");
+  }
+  if (isLikelyNonChatModelName(model)) {
+    throw new Error(
+      `Le modèle « ${model} » ne prend pas en charge le chat (embedding / rerank). Choisis un modèle de conversation dans la liste déroulante.`,
+    );
   }
 }
 
@@ -57,6 +72,7 @@ export async function completeOllamaChat(
   signal?: AbortSignal,
   options?: { temperature?: number },
 ): Promise<string> {
+  assertChatModel(model);
   const res = await fetch(`${BASE}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -84,6 +100,7 @@ export async function streamOllamaChat(
   onToken: (chunk: string) => void,
   signal?: AbortSignal,
 ): Promise<void> {
+  assertChatModel(model);
   const res = await fetch(`${BASE}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
