@@ -37,6 +37,25 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-03-28 | Initialisation projet, UI, chat Ollama, docs, règles Cursor |
 | 2026-03-28 | Onglet Équipe : arbre Orchestrateur → agents → sous-agents |
 | 2026-03-28 | Équipe : libellés des sous-agents (Designer UI/UX, Développeur, DPO) |
+| 2026-03-28 | Équipe : modale « âme et rôle » par nœud, seeds, persistance `openspace-team-souls-v1` |
+
+---
+
+## 2026-03-28 — Modale « âme et rôle » + seeds agents
+
+### Objectif
+
+Éditer par clic sur chaque nœud de l’arbre une zone de texte décrivant **rôle** et **âme** (prompt métier). Fermeture **Échap** sans enregistrer ; **Entrée** enregistre et ferme ; **Maj+Entrée** = saut de ligne dans la zone.
+
+### Décisions
+
+- Seeds par identifiant de nœud dans `src/data/teamSeeds.ts` (`AGENT_SOUL_SEEDS`).
+- Persistance `localStorage` via `src/lib/teamSoulsStorage.ts` (clé `openspace-team-souls-v1`), fusion avec les seeds pour les ids connus.
+- Composant `AgentSoulModal.tsx` : `role="dialog"`, raccourcis documentés dans le pied de modale ; clic sur le fond = fermer (comme annuler).
+
+### Fichiers touchés
+
+- `src/components/TeamPanel.tsx`, `src/components/AgentSoulModal.tsx`, `src/data/teamSeeds.ts`, `src/lib/teamSoulsStorage.ts`, `src/index.css`
 
 ---
 

@@ -21,9 +21,12 @@ flowchart LR
 | `components/Layout.tsx` | Grille trois colonnes |
 | `components/Sidebar.tsx` | Liste conversations + actions |
 | `components/ChatPanel.tsx` | Messages, saisie, streaming |
-| `components/TeamPanel.tsx` | Arbre hiérarchique (Orchestrateur, agents, sous-agents) — logique Ollama à venir |
+| `components/TeamPanel.tsx` | Arbre cliquable ; état des textes « âme et rôle » par agent |
+| `components/AgentSoulModal.tsx` | Modale d’édition (Échap / Entrée / Maj+Entrée) |
+| `data/teamSeeds.ts` | Textes initiaux (seeds) par id de nœud |
+| `lib/teamSoulsStorage.ts` | Lecture / écriture `openspace-team-souls-v1` |
 | `lib/ollama.ts` | Client API Ollama (tags + chat stream) |
-| `lib/storage.ts` | Sérialisation `localStorage` |
+| `lib/storage.ts` | Sérialisation conversations `localStorage` |
 | `types.ts` | Types partagés |
 
 ## Flux Chat
@@ -35,5 +38,6 @@ flowchart LR
 
 ## Évolutions prévues (non codées)
 
-- Agents multiples dans l’onglet Équipe, routage vers plusieurs appels modèle ou prompts système distincts.
+- Brancher les textes « âme et rôle » sur des appels Ollama (system prompt par nœud).
+- Agents multiples dans l’onglet Équipe, routage orchestré.
 - Colonne droite : contexte, pièces jointes, état d’exécution des agents.

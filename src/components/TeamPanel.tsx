@@ -1,6 +1,10 @@
+import { useCallback, useEffect, useState } from "react";
+import { AgentSoulModal, type SoulModalNode } from "@/components/AgentSoulModal";
+import { loadAgentSouls, saveAgentSouls } from "@/lib/teamSoulsStorage";
+
 type NodeKind = "master" | "agent" | "sub";
 
-interface TeamNode {
+export interface TeamNode {
   id: string;
   label: string;
   kind: NodeKind;
@@ -36,25 +40,37 @@ const TEAM_HIERARCHY: TeamNode = {
   ],
 };
 
-function TeamBranch({ node }: { node: TeamNode }) {
+function toSoulModalNode(node: TeamNode): SoulModalNode {
+  return { id: node.id, label: node.label, kind: node.kind };
+}
+
+function TeamBranch({
+  node,
+  onOpen,
+}: {
+  node: TeamNode;
+  onOpen: (n: TeamNode) => void;
+}) {
   const hasChildren = Boolean(node.children?.length);
 
   return (
     <li className={`team-tree-item team-tree-item-${node.kind}`}>
-      <div
+      <button
+        type="button"
         className={`team-tree-node team-tree-node-${node.kind}`}
         role="treeitem"
         aria-expanded={hasChildren ? true : undefined}
+        onClick={() => onOpen(node)}
       >
         {node.kind !== "master" && (
           <span className="team-tree-badge">{labelForKind(node.kind)}</span>
         )}
         <span className="team-tree-label">{node.label}</span>
-      </div>
+      </button>
       {hasChildren && (
         <ul className="team-tree-children" role="group">
           {node.children!.map((child) => (
-            <TeamBranch key={child.id} node={child} />
+            <TeamBranch key={child.id} node={child} onOpen={onOpen} />
           ))}
         </ul>
       )}
@@ -76,12 +92,32 @@ function labelForKind(kind: NodeKind): string {
 }
 
 export function TeamPanel() {
+  const [souls, setSouls] = useState(loadAgentSouls);
+  const [editing, setEditing] = useState<TeamNode | null>(null);
+
+  useEffect(() => {
+    saveAgentSouls(souls);
+  }, [souls]);
+
+  const handleOpen = useCallback((n: TeamNode) => {
+    setEditing(n);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setEditing(null);
+  }, []);
+
+  const handleSaveSoul = useCallback((text: string, agentId: string) => {
+    setSouls((prev) => ({ ...prev, [agentId]: text }));
+  }, []);
+
   return (
     <div className="team-panel">
       <h2 className="team-heading">Équipe virtuelle</h2>
       <p className="team-copy">
-        Hiérarchie cible : l’orchestrateur coordonne les agents métiers, chacun pouvant
-        déléguer à des sous-agents spécialisés (comportement Ollama à brancher plus tard).
+        Clique sur un rôle pour ouvrir son <strong>âme et rôle</strong> (texte éditable,
+        enregistré localement). Échap ferme la fenêtre ; Entrée enregistre ;
+        Maj+Entrée insère un saut de ligne.
       </p>
       <div className="team-tree-wrap">
         <h3 className="team-tree-title">Organisation</h3>
@@ -90,9 +126,16 @@ export function TeamPanel() {
           role="tree"
           aria-label="Hiérarchie des agents"
         >
-          <TeamBranch node={TEAM_HIERARCHY} />
+          <TeamBranch node={TEAM_HIERARCHY} onOpen={handleOpen} />
         </ul>
       </div>
+
+      <AgentSoulModal
+        node={editing ? toSoulModalNode(editing) : null}
+        initialText={editing ? souls[editing.id] ?? "" : ""}
+        onClose={handleCloseModal}
+        onSave={handleSaveSoul}
+      />
     </div>
   );
 }
