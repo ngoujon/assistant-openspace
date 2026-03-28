@@ -450,12 +450,30 @@ body {
   box-shadow: inset 3px 0 0 0 var(--assistant-accent);
 }
 
+.discussion-routing-hint {
+  margin: 0 0 0.65rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  background: var(--accent-muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
 .bubble-role {
   font-size: 0.625rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 600;
   color: var(--text-tertiary);
+}
+
+.bubble-routing-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 .bubble-content {

@@ -24,7 +24,8 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 | `App.tsx` | État global : conversations, conversation active, onglet principal, modèle Ollama |
 | `components/Layout.tsx` | Grille trois colonnes |
 | `components/Sidebar.tsx` | Liste conversations + actions |
-| `components/ChatPanel.tsx` | Modes Mission équipe / Discussion ; barre modèle |
+| `components/ChatPanel.tsx` | Mission équipe ; Discussion orchestrée (`discussionTeamChat`) |
+| `lib/discussionTeamChat.ts` | Routage orchestrateur + stream du membre choisi |
 | `components/MissionWorkspace.tsx` | Contexte, fichiers, pipeline, aperçu MD, téléchargement |
 | `components/TeamPanel.tsx` | Arbre dynamique (ajout, DnD), modale âme/rôle + génération de seed |
 | `lib/teamTreeStorage.ts` | Membres, reparentage, profondeur max 3 (`openspace-team-tree-v1`) |
@@ -40,10 +41,10 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 
 ## Flux Chat (mode Discussion)
 
-1. L’utilisateur envoie un message → ajout message `user` + bulle `assistant` vide.
-2. `streamOllamaChat` lit le corps NDJSON ligne par ligne et concatène `message.content`.
-3. À chaque chunk, mise à jour immuable des messages de la conversation active.
-4. En cas d’erreur, suppression de la bulle assistant vide et affichage d’une bannière.
+1. L’utilisateur envoie un message → enregistrement du message `user`.
+2. **`routeDiscussionMessage`** (`src/lib/discussionTeamChat.ts`) : appel non stream avec prompt **orchestrateur** + liste des membres (`loadTeamMembers`) + fil ; réponse JSON `responderId`, `brief`, `userNote`.
+3. Création d’une bulle `assistant` avec `speakerLabel` et `routingNote`.
+4. **`streamDiscussionReply`** : `system` = âme du membre choisi + consigne orchestrateur ; historique user/assistant en contexte ; streaming des tokens.
 
 ## Flux Mission équipe
 

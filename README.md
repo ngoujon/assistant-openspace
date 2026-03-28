@@ -1,6 +1,6 @@
 # OpenSpace Localhost
 
-Interface web locale branchée sur **Ollama** : **mission d’équipe virtuelle** (orchestrateur, directeurs, sous-agents) qui produit un **README Markdown** téléchargeable, plus un mode **discussion** libre avec le modèle.
+Interface web locale branchée sur **Ollama** : **mission d’équipe virtuelle** (orchestrateur, directeurs, sous-agents) qui produit un **README Markdown** téléchargeable, plus un mode **Discussion** orchestré par l’équipe (routage via l’orchestrateur).
 
 ## Prérequis
 
@@ -57,7 +57,7 @@ Puis ouvre **http://localhost:3004**. Ollama doit être **lancé sur l’hôte**
 
 ### Discussion
 
-- Même onglet **Chat**, mode **Discussion** : conversation directe avec le modèle (streaming).
+- Même onglet **Chat**, mode **Discussion** : message à **toute l’équipe** ; l’**orchestrateur** désigne le **membre le plus qualifié** (ou répond lui-même pour synthèse / compte rendu si pertinent ou demandé), puis réponse en streaming avec l’âme de ce membre.
 
 ### Équipe
 

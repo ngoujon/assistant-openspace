@@ -43,6 +43,19 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-03-28 | Équipe : arbre éditable (ajout, DnD), seeds Ollama depuis la modale, pipeline aligné sur l’arbre |
 | 2026-03-28 | Docker : image nginx + build Vite, port 3004, proxy Ollama vers hôte |
 | 2026-03-28 | Ollama : liste de modèles filtrée (exclut embedding, ex. nomic-embed-text) |
+| 2026-03-28 | Discussion : routage par orchestrateur, réponse du membre le plus qualifié |
+
+---
+
+## 2026-03-28 — Discussion orchestrée
+
+### Objectif
+
+Le mode **Discussion** ne parle plus au modèle de façon anonyme : l’utilisateur s’adresse à **l’équipe**, l’**orchestrateur** choisit **qui répond** (ou répond pour synthèse / compte rendu), avec textes « âme » depuis l’onglet Équipe.
+
+### Fichiers
+
+- `src/lib/discussionTeamChat.ts`, `src/components/ChatPanel.tsx`, `src/types.ts`, `src/index.css`, docs.
 
 ---
 

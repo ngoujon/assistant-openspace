@@ -1,6 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 import { MissionWorkspace } from "@/components/MissionWorkspace";
-import { streamOllamaChat } from "@/lib/ollama";
+import {
+  routeDiscussionMessage,
+  streamDiscussionReply,
+} from "@/lib/discussionTeamChat";
+import { loadAgentSouls } from "@/lib/teamSoulsStorage";
+import { loadTeamMembers } from "@/lib/teamTreeStorage";
 import type { ChatMessage, Conversation } from "@/types";
 
 type ChatMode = "mission" | "free";
@@ -29,12 +34,13 @@ export function ChatPanel({
   const [mode, setMode] = useState<ChatMode>("mission");
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [isRouting, setIsRouting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const send = useCallback(async () => {
+  const sendDiscussion = useCallback(async () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    if (!text || streaming || isRouting) return;
     if (!model) {
       setError("Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2");
       return;
@@ -45,30 +51,52 @@ export function ChatPanel({
       role: "user",
       content: text,
     };
+    const historyWithUser = [...conversation.messages, userMsg];
     setInput("");
     setError(null);
+    setMessages(() => historyWithUser);
 
-    const history = [...conversation.messages, userMsg];
-    const assistantId = crypto.randomUUID();
-    setMessages(() => [
-      ...history,
-      { id: assistantId, role: "assistant", content: "" },
-    ]);
-
-    setStreaming(true);
     const ac = new AbortController();
     abortRef.current = ac;
-
-    const apiMessages = history.map((m) => ({
-      role: m.role as "user" | "assistant" | "system",
-      content: m.content,
-    }));
+    setIsRouting(true);
+    let assistantId: string | undefined;
 
     try {
-      await streamOllamaChat(
+      const members = loadTeamMembers();
+      const souls = loadAgentSouls();
+
+      const routing = await routeDiscussionMessage({
         model,
-        apiMessages,
-        (chunk) => {
+        souls,
+        members,
+        historyWithLatestUser: historyWithUser,
+        signal: ac.signal,
+      });
+
+      const speakerLabel =
+        members.find((m) => m.id === routing.responderId)?.label ??
+        routing.responderId;
+
+      assistantId = crypto.randomUUID();
+      const assistantShell: ChatMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        speakerLabel,
+        routingNote: routing.userNote,
+      };
+
+      setMessages(() => [...historyWithUser, assistantShell]);
+      setIsRouting(false);
+      setStreaming(true);
+
+      await streamDiscussionReply({
+        model,
+        souls,
+        responderId: routing.responderId,
+        brief: routing.brief,
+        historyWithLatestUser: historyWithUser,
+        onToken: (chunk) => {
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
@@ -77,19 +105,25 @@ export function ChatPanel({
             ),
           );
         },
-        ac.signal,
-      );
+        signal: ac.signal,
+      });
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
       setError((e as Error).message || "Erreur réseau");
-      setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+      setMessages((prev) =>
+        prev.filter(
+          (m) => m.id !== userMsg.id && m.id !== assistantId,
+        ),
+      );
     } finally {
+      setIsRouting(false);
       setStreaming(false);
       abortRef.current = null;
     }
   }, [
     input,
     streaming,
+    isRouting,
     model,
     conversation.messages,
     setMessages,
@@ -98,6 +132,8 @@ export function ChatPanel({
   const stop = useCallback(() => {
     abortRef.current?.abort();
   }, []);
+
+  const busy = streaming || isRouting;
 
   return (
     <div className="chat-panel">
@@ -161,11 +197,19 @@ export function ChatPanel({
         <MissionWorkspace model={model} />
       ) : (
         <>
+          {isRouting && (
+            <p className="discussion-routing-hint" role="status">
+              L’orchestrateur choisit le membre le plus qualifié pour répondre…
+            </p>
+          )}
           <div className="chat-messages" role="log" aria-live="polite">
             {conversation.messages.length === 0 && (
               <p className="chat-empty">
-                Mode discussion : messages directs avec le modèle Ollama.                 Pour le rapport d’équipe (orchestrateur + agents), passe en mode « Mission équipe »
-                ci-dessus.
+                Tu t’adresses à <strong>toute l’équipe</strong>. L’
+                <strong>orchestrateur</strong> route chaque message vers le membre le
+                plus pertinent (ou répond lui-même pour une synthèse, un compte rendu
+                ou une vision globale si tu le demandes). Configure les rôles dans
+                l’onglet <strong>Équipe</strong>.
               </p>
             )}
             {conversation.messages.map((m, i) => {
@@ -174,14 +218,21 @@ export function ChatPanel({
                 m.role === "assistant" &&
                 !m.content &&
                 i === conversation.messages.length - 1;
+              const roleLine =
+                m.role === "user"
+                  ? "Toi"
+                  : m.speakerLabel
+                    ? `Équipe · ${m.speakerLabel}`
+                    : "Assistant";
               return (
                 <article
                   key={m.id}
                   className={`bubble bubble-${m.role}`}
                 >
-                  <span className="bubble-role">
-                    {m.role === "user" ? "Toi" : "Assistant"}
-                  </span>
+                  <span className="bubble-role">{roleLine}</span>
+                  {m.routingNote && (
+                    <p className="bubble-routing-note">{m.routingNote}</p>
+                  )}
                   <div className="bubble-content">
                     {m.content || (isPendingAssistant ? "…" : "")}
                   </div>
@@ -196,19 +247,19 @@ export function ChatPanel({
             <textarea
               className="chat-input"
               rows={3}
-              placeholder="Message…"
+              placeholder="Message à toute l’équipe…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  void send();
+                  void sendDiscussion();
                 }
               }}
-              disabled={streaming}
+              disabled={busy}
             />
             <div className="chat-actions">
-              {streaming ? (
+              {busy ? (
                 <button type="button" className="btn-secondary" onClick={stop}>
                   Arrêter
                 </button>
@@ -216,7 +267,7 @@ export function ChatPanel({
                 <button
                   type="button"
                   className="btn-primary"
-                  onClick={() => void send()}
+                  onClick={() => void sendDiscussion()}
                   disabled={!input.trim()}
                 >
                   Envoyer
