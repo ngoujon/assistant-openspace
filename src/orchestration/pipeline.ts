@@ -72,7 +72,90 @@ export function countMissionModelCalls(teamMembers: TreeMember[]): number {
   return n;
 }
 
-const TEMP = 0.35;
+const TEMP = 0.38;
+const TEMP_FINAL = 0.42;
+
+/** Rappel contexte/fichiers par étape (augmenter si le modèle le supporte). */
+const MAX_PAYLOAD_SLICE = 24_000;
+
+interface BranchOutput {
+  leadLabel: string;
+  /** Synthèse directeur (niveau pôle). */
+  synthesis: string;
+  /** Travail brut des sous-agents, pour intégration au README (évite de tout perdre à la compression). */
+  subContributionsMarkdown?: string;
+}
+
+function buildFinalDocumentPrompt(
+  orchestratorBrief: string,
+  branches: BranchOutput[],
+): string {
+  const poleSyntheses = branches
+    .map((b) => `### Pôle : ${b.leadLabel}\n\n${b.synthesis}`)
+    .join("\n\n---\n\n");
+
+  const detailParts: string[] = [];
+  for (const b of branches) {
+    if (b.subContributionsMarkdown?.trim()) {
+      detailParts.push(
+        `### Pôle ${b.leadLabel} — contributions des spécialistes\n\n${b.subContributionsMarkdown.trim()}`,
+      );
+    }
+  }
+  const specialistBlock =
+    detailParts.length > 0
+      ? detailParts.join("\n\n---\n\n")
+      : "(Aucun sous-agent : chaque pôle a travaillé en directeur seul.)";
+
+  return `Tu as piloté une équipe virtuelle. Les **âmes et rôles** de chaque membre ont guidé leurs réponses.
+
+---
+
+## Cadre initial (orchestrateur — ne pas substituer au travail des pôles)
+
+${orchestratorBrief}
+
+---
+
+## Textes « directeur » par pôle (peuvent ajouter arbitrages ; le détail vient surtout des spécialistes)
+
+${poleSyntheses}
+
+---
+
+## Matière brute prioritaire — travail détaillé des spécialistes
+
+**C’est la source la plus riche.** Le document final doit **la conserver** (reprendre listes, arguments, exemples, risques, chiffres). Ne pas la remplacer par une phrase de synthèse.
+
+${specialistBlock}
+
+---
+
+**Tâche finale — document unique en Markdown**
+
+Objectif : un **dossier long et exploitable**, pas un résumé de résumés. Les lecteurs doivent sentir que **chaque membre** est allé **en profondeur**.
+
+Règles anti-perte :
+
+1. **Interdit** de « tout tasser » dans une synthèse globale qui efface les sous-sections : le corps du document doit contenir **beaucoup de texte repris ou étroitement dérivé** des blocs spécialistes ci-dessus.
+2. **Priorité** au bloc « Matière brute prioritaire » : pour chaque spécialiste, le lecteur doit retrouver **plusieurs paragraphes ou listes** issues de son travail (tu peux réorganiser et clarifier, mais **une idée = au moins une phrase ou une puce**, pas une fusion vague).
+3. **Cadre initial orchestrateur** : t’en sers pour l’intro et l’articulation, **pas** pour remplacer les analyses des pôles.
+
+Structure **obligatoire** (titres adaptés au sujet) :
+
+- \`# …\` titre principal.
+- \`## Vue d’ensemble\` : 1–2 pages équivalent **maximum** (intro + enjeux) — reste **court** pour laisser la place au détail.
+- \`## Analyses détaillées par domaine\` : pour **chaque pôle**, une section \`### [nom du pôle]\` **longue** : enchaîne (a) rappel du cadre directeur si utile, puis (b) **développement dense** des apports (sous-\`####\` par spécialiste si besoin). Vise **plusieurs écrans de contenu** par pôle lorsque les sources sont fournies.
+- \`## Synthèse transversale\` : liens entre pôles, tensions, arbitrages (sans répéter tout le détail, mais sans banalités vides).
+- \`## Recommandations et plan d’action\` : actions concrètes, priorités, critères de succès.
+- \`## Annexes — contributions par membre\` : pour **chaque personne** ayant produit du texte dans les blocs ci-dessus, une sous-section \`### [rôle]\` de **15–35 lignes utiles** (rappel fidèle des positions, listes, risques), pas un simple qualificatif.
+
+**Volume** : document **très fourni** ; si les sources sont longues, le livrable doit **croître** en conséquence (plusieurs milliers de mots acceptables).
+
+**Forme** : \`#\` à \`####\`, listes, tableaux si utile ; pas de fence englobant tout le document.
+
+Renvoie **uniquement** le markdown du document.`;
+}
 
 /**
  * Orchestrateur → chaque pilier (sous-orchestrateur) → sous-agents optionnels → README.
@@ -109,14 +192,14 @@ export async function runMissionPipeline(
       { role: "system", content: soul(souls, ORCHESTRATOR_ID) },
       {
         role: "user",
-        content: `${payload}\n\n---\nTâche : en tant qu’orchestrateur, analyse ce contenu. Rédige une synthèse opérationnelle puis, **pour chaque pôle listé ci-dessous**, un **brief ciblé** (8–15 lignes chacun) que le responsable du pôle pourra exécuter.\n\nUtilise exactement ces en-têtes markdown :\n\n## Synthèse globale\n${poleHeaders}\n\nSois concret et actionnable.`,
+        content: `${payload}\n\n---\nTâche : en tant qu’orchestrateur, pose un **cadre** pour l’équipe — **sans** réaliser toi tout l’analyse à leur place (sinon les pôles copient une synthèse courte et perdent en profondeur).\n\n1) **## Synthèse globale** : **10–18 lignes maximum** — enjeux, périmètre, risques transverses, hypothèses. Pas de liste exhaustive : les détails seront produits par chaque pôle.\n\n2) Pour **chaque pôle** ci-dessous, un brief **## Pôle …** de **6–12 lignes** : questions à trancher, livrables attendus, contraintes, liens avec d’autres pôles — style **briefing**, pas rapport final.\n\nEn-têtes obligatoires :\n\n## Synthèse globale\n${poleHeaders}\n\nSois précis mais **bref** : chaque membre doit encore **développer** largement.`,
       },
     ],
     signal,
     { temperature: TEMP },
   );
 
-  const branchOutputs: { title: string; synthesis: string }[] = [];
+  const branchOutputs: BranchOutput[] = [];
 
   for (const lead of leads) {
     const subs = childrenOf(lead.id, teamMembers);
@@ -129,13 +212,16 @@ export async function runMissionPipeline(
           { role: "system", content: soul(souls, lead.id) },
           {
             role: "user",
-            content: `Vision de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nContexte et fichiers (rappel) :\n\n${payload.slice(0, 12000)}${payload.length > 12000 ? "\n\n[… tronqué …]" : ""}\n\n---\nTu es **${lead.label}**, seul sur ce pôle. Produis une synthèse directrice claire pour l’orchestrateur (15–25 lignes ou sections markdown courtes). Pas de méta-discussion sur le processus.`,
+            content: `Vision de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nContexte et fichiers (rappel) :\n\n${payload.slice(0, MAX_PAYLOAD_SLICE)}${payload.length > MAX_PAYLOAD_SLICE ? "\n\n[… tronqué …]" : ""}\n\n---\nTu es **${lead.label}**, seul sur ce pôle. Tu es responsable d’une **analyse approfondie** (pas un résumé de l’orchestrateur).\n\nExige-toi :\n- **Au moins 5 sous-sections \`###\`** sur des angles différents de ton domaine.\n- **Listes, risques, recommandations, critères, exemples** : chaque \`###\` contient plusieurs paragraphes **ou** 5–12 puces utiles.\n- Vise **l’équivalent d’environ 55–95 lignes** de contenu dense (si le sujet est riche, va au-delà).\n- Cite ou paraphrase le **contexte et fichiers** quand c’est pertinent.\n\nPas de méta-discussion sur le processus.`,
           },
         ],
         signal,
         { temperature: TEMP },
       );
-      branchOutputs.push({ title: lead.label, synthesis });
+      branchOutputs.push({
+        leadLabel: lead.label,
+        synthesis,
+      });
       continue;
     }
 
@@ -149,7 +235,7 @@ export async function runMissionPipeline(
           { role: "system", content: soul(souls, lead.id) },
           {
             role: "user",
-            content: `Vision globale de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nEn tant que **${lead.label}**, rédige des **consignes précises** uniquement pour ton sous-agent **${sub.label}** : objectifs, contraintes, livrables, vigilance. 12–18 lignes maximum.`,
+            content: `Vision globale de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nEn tant que **${lead.label}**, rédige des **consignes exigeantes** pour **${sub.label}** : objectifs, périmètre, angles d’analyse **obligatoires**, livrables (sous-parties attendues), contraintes, critères de qualité, questions ouvertes à traiter. **22–36 lignes** utiles — tu veux un rapport **long et argumenté** de sa part.`,
           },
         ],
         signal,
@@ -163,7 +249,7 @@ export async function runMissionPipeline(
           { role: "system", content: soul(souls, sub.id) },
           {
             role: "user",
-            content: `Consignes de **${lead.label}** :\n\n${delegation}\n\n---\nContexte et fichiers initiaux (rappel) :\n\n${payload.slice(0, 12000)}${payload.length > 12000 ? "\n\n[… tronqué …]" : ""}\n\n---\nExécute ta mission : analyse, recommandations et éléments concrets. Réponse structurée en sections courtes.`,
+            content: `Consignes de **${lead.label}** :\n\n${delegation}\n\n---\nContexte et fichiers initiaux (rappel) :\n\n${payload.slice(0, MAX_PAYLOAD_SLICE)}${payload.length > MAX_PAYLOAD_SLICE ? "\n\n[… tronqué …]" : ""}\n\n---\nTu es **${sub.label}**. Tu dois produire une **analyse de référence** sur ton périmètre : ce texte alimentera directement le rapport final — **ne te limite pas** à une synthèse courte.\n\n- **Minimum 6 sous-sections \`###\`** (thèmes distincts).\n- Chaque \`###\` : plusieurs paragraphes **et/ou** listes détaillées (risques, options, recommandations, exemples, critères mesurables).\n- Vise **l’équivalent d’environ 60–100 lignes** de contenu utile ; si le sujet l’exige, **dépasse** ce volume.\n- T’appuyer explicitement sur le **contexte et les fichiers** (citations courtes, renvois).\n\nPas de méta sur les « agents ».`,
           },
         ],
         signal,
@@ -182,20 +268,25 @@ export async function runMissionPipeline(
         { role: "system", content: soul(souls, lead.id) },
         {
           role: "user",
-          content: `Retours des sous-agents de ton pôle :\n\n${combined}\n\n---\nSynthétise au niveau **directeur** : intègre, ajuste si nécessaire. Livrable clair pour l’orchestrateur (pas de méta sur le processus), 15–30 lignes ou sections markdown courtes.`,
+          content: `Retours des sous-agents de ton pôle :\n\n${combined}\n\n---\nTu es **${lead.label}**. **Ne produis pas une synthèse courte qui jette le détail** : le rapport final doit pouvoir **retrouver** presque tout ce que chaque sous-agent a écrit.\n\nProduit un document structuré en deux parties :\n\n**### Cadre directeur (arbitrage)** — 10–18 lignes : vision, priorités, tensions entre sous-agents, décisions tranchées.\n\n**### Intégration détaillée des apports** — pour **chaque** sous-agent, une sous-partie \`#### [son nom]\` où tu **reprends** ses arguments importants : **minimum 8–15 puces ou 3–6 paragraphes** par personne, en reprenant listes, risques, chiffres ou exemples qu’il a mentionnés (reformulation autorisée, **pas** réduction à une phrase).\n\nSi un sous-agent a écrit long, **garde la matière** : mieux vaut un texte long qu’une synthèse pauvre.`,
         },
       ],
       signal,
       { temperature: TEMP },
     );
 
-    branchOutputs.push({ title: lead.label, synthesis });
+    branchOutputs.push({
+      leadLabel: lead.label,
+      synthesis,
+      subContributionsMarkdown: combined,
+    });
   }
 
   prog("Orchestrateur — rédaction du document final (README)…");
-  const branchesBlock = branchOutputs
-    .map((o) => `### ${o.title}\n\n${o.synthesis}`)
-    .join("\n\n---\n\n");
+  const finalUserPrompt = buildFinalDocumentPrompt(
+    orchestratorBrief,
+    branchOutputs,
+  );
 
   const readme = await completeOllamaChat(
     model,
@@ -203,11 +294,11 @@ export async function runMissionPipeline(
       { role: "system", content: soul(souls, ORCHESTRATOR_ID) },
       {
         role: "user",
-        content: `Tu as piloté une équipe virtuelle. Voici ta **première analyse** :\n\n${orchestratorBrief}\n\n---\nVoici les **synthèses finales des responsables de pôle** :\n\n${branchesBlock}\n\n---\n**Tâche finale :** produis **un seul document Markdown**, prêt à être enregistré comme \`README.md\` de projet. Il doit :\n- intégrer **toutes** les informations pertinentes remontées ;\n- être lisible pour un lecteur externe (pas de jargon sur « agents » ou « orchestration ») ;\n- utiliser \`#\` \`##\` \`###\`, listes et paragraphes clairs ;\n- commencer par un titre de niveau 1 adapté au sujet.\n\nNe rajoute pas de bloc de code fence autour du document entier ; renvoie uniquement le markdown.`,
+        content: finalUserPrompt,
       },
     ],
     signal,
-    { temperature: 0.45 },
+    { temperature: TEMP_FINAL },
   );
 
   onProgress("Terminé — document prêt ci-dessous.");

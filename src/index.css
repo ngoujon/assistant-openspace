@@ -25,7 +25,7 @@
   --radius-lg: 14px;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --sidebar-w: 260px;
-  --right-w: minmax(220px, 17rem);
+  --right-w: minmax(280px, 34rem);
   --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
@@ -84,6 +84,8 @@ body {
 }
 
 .shell-right {
+  display: flex;
+  flex-direction: column;
   border-left: 1px solid var(--border);
   background: var(--bg);
   overflow: auto;
@@ -92,9 +94,27 @@ body {
   scrollbar-color: var(--border-strong) transparent;
 }
 
+.shell-right > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
 .activity-sidebar {
   padding: 1rem 0.85rem 1.25rem;
   min-height: 100%;
+}
+
+/* Mission : le journal occupe toute la hauteur restante de la colonne */
+.activity-sidebar.activity-sidebar--mission {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.activity-sidebar--mission > :not(.mission-step-panel) {
+  flex-shrink: 0;
 }
 
 .activity-sidebar-title {
@@ -116,6 +136,11 @@ body {
 .activity-sidebar-muted strong {
   color: var(--text);
   font-weight: 600;
+}
+
+.activity-sidebar-muted--success {
+  color: #86efac;
+  opacity: 0.92;
 }
 
 .activity-sidebar-status {
@@ -140,31 +165,6 @@ body {
   color: var(--accent);
 }
 
-.activity-sidebar-current {
-  margin: 0 0 0.5rem;
-  padding: 0.45rem 0.5rem;
-  background: var(--accent-muted);
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(125, 211, 252, 0.2);
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.activity-sidebar-current-label {
-  font-size: 0.5625rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-tertiary);
-  font-weight: 700;
-}
-
-.activity-sidebar-current-text {
-  font-size: 0.75rem;
-  line-height: 1.4;
-  color: var(--text);
-}
-
 .activity-sidebar-wait-hint {
   margin: 0 0 0.5rem;
   font-size: 0.7rem;
@@ -172,19 +172,217 @@ body {
   color: var(--text-tertiary);
 }
 
-.activity-sidebar-log {
+/* ——— Mission : chronologie d’étapes ——— */
+.mission-step-panel {
   margin: 0.35rem 0 0;
-  padding: 0.5rem 0.55rem;
-  font-size: 0.68rem;
-  line-height: 1.45;
-  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 0;
+}
+
+.activity-sidebar--mission > .mission-step-panel {
+  flex: 1 1 auto;
+  margin-top: 0.35rem;
+}
+
+.mission-step-panel--compact .mission-step-desc {
+  font-size: 0.72rem;
+}
+
+.mission-step-panel--compact .mission-step-card {
+  padding: 0.4rem 0.5rem;
+}
+
+.mission-progress-bar-wrap {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.mission-progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #a78bfa, #4ade80);
+  background-size: 140% 100%;
+  transition: width 0.35s ease-out;
+}
+
+.mission-progress-bar-wrap--indeterminate .mission-progress-bar-fill {
+  width: 38%;
+  animation: mission-progress-slide 1.15s ease-in-out infinite;
+}
+
+@keyframes mission-progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.mission-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.mission-step {
+  --step-accent: #a1a1aa;
+  display: grid;
+  grid-template-columns: 1.35rem 1fr;
+  gap: 0.5rem 0.65rem;
+  align-items: stretch;
+}
+
+.mission-step--orchestrator {
+  --step-accent: #7dd3fc;
+}
+
+.mission-step--final-doc {
+  --step-accent: #86efac;
+}
+
+.mission-step--done {
+  --step-accent: #4ade80;
+}
+
+.mission-step--delegation {
+  --step-accent: #c4b5fd;
+}
+
+.mission-step--specialist {
+  --step-accent: #fcd34d;
+}
+
+.mission-step--synthesis {
+  --step-accent: #5eead4;
+}
+
+.mission-step--pole-solo {
+  --step-accent: #94a3b8;
+}
+
+.mission-step--active .mission-step-dot {
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+  animation: mission-step-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes mission-step-pulse {
+  50% {
+    box-shadow: 0 0 0 5px rgba(125, 211, 252, 0.2);
+  }
+}
+
+.mission-step-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100%;
+}
+
+.mission-step-dot-wrap {
+  flex-shrink: 0;
+  padding-top: 0.35rem;
+}
+
+.mission-step-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--step-accent);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+
+.mission-step--done .mission-step-dot {
+  background: var(--step-accent);
+}
+
+.mission-step-connector {
+  flex: 1 1 auto;
+  width: 2px;
+  min-height: 0.65rem;
+  margin: 2px 0;
+  border-radius: 1px;
+  background: linear-gradient(
+    180deg,
+    var(--step-accent),
+    rgba(255, 255, 255, 0.08)
+  );
+  opacity: 0.65;
+}
+
+.mission-step-card {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  white-space: pre-wrap;
+  border-left: 3px solid var(--step-accent);
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 0.35rem;
+}
+
+.mission-step-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.mission-step-num {
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--step-accent);
+  letter-spacing: 0.02em;
+}
+
+.mission-step-num-sep {
+  opacity: 0.55;
+  font-weight: 500;
+  margin: 0 0.05rem;
+}
+
+.mission-step-num--check {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.mission-step-num--dot {
+  opacity: 0.4;
+}
+
+.mission-step-pill {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--step-accent) 22%, transparent);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--step-accent) 45%, transparent);
+}
+
+.mission-step-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text);
   word-break: break-word;
-  max-height: min(42vh, 18rem);
-  overflow-y: auto;
 }
 
 .activity-inline-wrap {
@@ -201,6 +399,10 @@ body {
 
 .activity-inline .activity-sidebar-title {
   margin-bottom: 0.35rem;
+}
+
+.activity-inline-mission .mission-step-list {
+  max-height: min(36vh, 14rem);
 }
 
 .sidebar-storage-hint {
@@ -284,6 +486,11 @@ body {
 .btn-secondary:hover {
   background: var(--bg-surface);
   color: var(--text);
+}
+
+.btn-compact {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8125rem;
 }
 
 .btn-link {
@@ -581,6 +788,57 @@ body {
   background: var(--accent-muted);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+}
+
+.discussion-artifact-bar {
+  margin: 0 0 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+}
+
+.discussion-artifact-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.discussion-artifact-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.discussion-artifact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.discussion-artifact-preview {
+  margin: 0;
+  max-height: 9rem;
+  overflow: auto;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  scrollbar-width: thin;
+}
+
+.bubble-artifact-patch {
+  box-shadow: inset 3px 0 0 0 #22c55e;
 }
 
 .bubble-role {

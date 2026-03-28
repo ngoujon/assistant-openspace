@@ -35,7 +35,7 @@ function formatRoster(members: TreeMember[]): string {
   return lines.join("\n");
 }
 
-function formatHistoryForRouting(
+export function formatHistoryForRouting(
   messages: ChatMessage[],
   maxChars = 8000,
 ): string {
@@ -91,14 +91,52 @@ function validateResponderId(id: string, members: TreeMember[]): string {
   return ORCHESTRATOR_ID;
 }
 
+export function buildDirectMentionBrief(
+  responderId: string,
+  members: TreeMember[],
+): string {
+  const m = members.find((x) => x.id === responderId);
+  if (responderId === ORCHESTRATOR_ID || !m) {
+    return `L’utilisateur t’a ciblé avec une **@mention** (orchestrateur). Réponds : synthèse, arbitrage, ou mise en cohérence avec le reste de l’équipe. Si un **livrable Markdown** a été évoqué, tu peux indiquer comment tes briefs s’y appliquent.`;
+  }
+  const subs = members.filter((c) => c.parentId === responderId);
+  if (subs.length > 0) {
+    const names = subs.map((s) => s.label).join(", ");
+    return `L’utilisateur t’a **mentionné·e directement** (@). Tu es **${m.label}** (directeur·rice de pôle). Réponds en profondeur sous ton angle. Tu peux indiquer comment **${names}** (ton équipe) préciserait certains points ou quels aspects ils traiteraient — reste bref sur les dialogues fictifs, concret sur le fond.`;
+  }
+  return `L’utilisateur t’a **mentionné·e directement** (@). Tu es **${m.label}**. Réponds de façon complète et personnelle au message.`;
+}
+
 export async function routeDiscussionMessage(opts: {
   model: string;
   souls: Record<string, string>;
   members: TreeMember[];
   historyWithLatestUser: ChatMessage[];
   signal?: AbortSignal;
+  /** Si défini (ex. @mention résolue), pas d’appel LLM pour le routage. */
+  forcedResponderId?: string | null;
 }): Promise<DiscussionRouting> {
-  const { model, souls, members, historyWithLatestUser, signal } = opts;
+  const {
+    model,
+    souls,
+    members,
+    historyWithLatestUser,
+    signal,
+    forcedResponderId,
+  } = opts;
+
+  if (forcedResponderId) {
+    const id = validateResponderId(forcedResponderId, members);
+    const label =
+      members.find((m) => m.id === id)?.label ??
+      (id === ORCHESTRATOR_ID ? "Orchestrateur" : id);
+    return {
+      responderId: id,
+      brief: buildDirectMentionBrief(id, members),
+      userNote: `Message adressé à **${label}** (@mention).`,
+    };
+  }
+
   const roster = formatRoster(members);
   const hist = formatHistoryForRouting(historyWithLatestUser);
   const orchSoul = soul(souls, ORCHESTRATOR_ID);
@@ -162,5 +200,117 @@ export async function streamDiscussionReply(opts: {
     messages,
     opts.onToken,
     opts.signal,
+  );
+}
+
+function sanitizeConversationTitle(raw: string): string {
+  let t = raw.trim();
+  t = t.replace(/^["'#*\s]+|["'#*\s]+$/g, "");
+  t = t.split(/\r?\n/)[0]?.trim() ?? "";
+  t = t.replace(/^[\s\-–—]+/, "").replace(/\s+/g, " ");
+  if (t.length > 72) t = t.slice(0, 69).trimEnd() + "…";
+  return t;
+}
+
+/**
+ * Titre court pour la liste des conversations (orchestrateur, après un échange).
+ */
+export async function generateDiscussionConversationTitle(opts: {
+  model: string;
+  souls: Record<string, string>;
+  /** Fil récent (markdown libre), déjà formaté. */
+  recentTranscript: string;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const orchSoul = soul(opts.souls, ORCHESTRATOR_ID);
+  const raw = await completeOllamaChat(
+    opts.model,
+    [
+      { role: "system", content: orchSoul },
+      {
+        role: "user",
+        content: `Tu coordonnes l’équipe. Choisis un **titre très court** pour nommer cette conversation dans un menu latéral (comme un titre d’e-mail ou de ticket).
+
+Contraintes :
+- **Une seule ligne**, sans guillemets ni préfixe du type « Titre : »
+- **Maximum 8 mots** (idéalement 4 à 7)
+- En français, concret, orienté sujet (pas « Conversation » ni « Discussion » vides)
+- Pas de ponctuation finale inutile (point, deux-points)
+
+Fil récent à résumer pour le nom :
+
+---
+${opts.recentTranscript.slice(0, 4500)}
+---
+
+Réponds par **le titre uniquement**, rien d’autre.`,
+      },
+    ],
+    opts.signal,
+    { temperature: 0.25 },
+  );
+  return sanitizeConversationTitle(raw);
+}
+
+const MAX_ARTIFACT = 120_000;
+const MAX_DISCUSS_FOR_PATCH = 48_000;
+
+/**
+ * L’orchestrateur fusionne la discussion dans le livrable Markdown existant.
+ */
+export async function applyDiscussionToArtifact(opts: {
+  model: string;
+  souls: Record<string, string>;
+  discussionMessages: ChatMessage[];
+  artifactMarkdown: string;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const { model, souls, discussionMessages, artifactMarkdown, signal } = opts;
+  const orchSoul = soul(souls, ORCHESTRATOR_ID);
+  const discussion = formatHistoryForRouting(
+    discussionMessages,
+    MAX_DISCUSS_FOR_PATCH,
+  );
+  let doc = artifactMarkdown;
+  if (doc.length > MAX_ARTIFACT) {
+    doc = doc.slice(0, MAX_ARTIFACT) + "\n\n[… document tronqué pour le contexte …]";
+  }
+
+  const userBlock = `Tu es l’**orchestrateur**. L’utilisateur a discuté avec l’équipe pour **ajuster** un livrable Markdown déjà produit (mission / rapport).
+
+---
+
+## Fil de discussion (consignes, corrections, précisions demandées)
+
+${discussion}
+
+---
+
+## Document Markdown actuel (à réviser)
+
+\`\`\`markdown
+${doc}
+\`\`\`
+
+---
+
+**Tâche**
+
+1. Synthétise **implicitement** les demandes de la discussion dans le document révisé (pas besoin de répéter toute la conversation dans le fichier).
+2. **Modifie le Markdown** aux bons endroits : sections concernées, ajouts, suppressions, reformulations, listes, tableaux.
+3. **Conserve** la structure générale (\`#\` \`##\` \`###\`) sauf si la discussion impose une réorganisation claire.
+4. **Ne mets pas** le document dans un bloc de code : renvoie **uniquement** le Markdown final, prêt à enregistrer en \`.md\`.
+5. Si la discussion est floue, fais au mieux et reste cohérent avec le ton du document.
+
+Réponds par **le document Markdown complet révisé**, sans préambule ni post-scriptum.`;
+
+  return completeOllamaChat(
+    model,
+    [
+      { role: "system", content: orchSoul },
+      { role: "user", content: userBlock },
+    ],
+    signal,
+    { temperature: 0.35 },
   );
 }

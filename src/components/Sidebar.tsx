@@ -23,7 +23,7 @@ export function Sidebar({
         <h1 className="sidebar-title">OpenSpace</h1>
         <p className="sidebar-sub">Local · Ollama</p>
         <button type="button" className="btn-primary sidebar-new" onClick={onNew}>
-          Nouvelle conversation
+          Nouveau projet
         </button>
       </header>
       <nav className="sidebar-nav" aria-label="Conversations">

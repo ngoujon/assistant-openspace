@@ -1,4 +1,108 @@
+import {
+  missionProgressPercent,
+  parseMissionProgressLine,
+  type MissionStepVisualKind,
+} from "@/lib/parseMissionProgressLine";
 import type { RightActivityState } from "@/types/activity";
+
+const STEP_KIND_LABELS: Record<MissionStepVisualKind, string | null> = {
+  done: "Terminé",
+  "final-doc": "Document final",
+  orchestrator: "Orchestrateur",
+  delegation: "Brief",
+  specialist: "Spécialiste",
+  synthesis: "Synthèse",
+  "pole-solo": "Pôle",
+  default: null,
+};
+
+function MissionStepTimeline({
+  progress,
+  running,
+  compact,
+}: {
+  progress: string[];
+  running: boolean;
+  compact?: boolean;
+}) {
+  const pct = missionProgressPercent(progress);
+  const showBar = progress.length > 0;
+  const indeterminate = running && pct === null && progress.length > 0;
+
+  return (
+    <div
+      className={
+        compact
+          ? "mission-step-panel mission-step-panel--compact"
+          : "mission-step-panel"
+      }
+    >
+      {showBar && (
+        <div
+          className={`mission-progress-bar-wrap${indeterminate ? " mission-progress-bar-wrap--indeterminate" : ""}`}
+          role="progressbar"
+          aria-valuenow={indeterminate ? undefined : pct ?? 0}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Avancement de la mission"
+        >
+          <div
+            className="mission-progress-bar-fill"
+            style={
+              !indeterminate && pct != null
+                ? { width: `${pct}%` }
+                : undefined
+            }
+          />
+        </div>
+      )}
+      <ol className="mission-step-list" aria-label="Étapes de la mission">
+        {progress.map((line, i) => {
+          const p = parseMissionProgressLine(line);
+          const isLast = i === progress.length - 1;
+          const isActive = running && isLast && p.kind !== "done";
+          const kindLabel = STEP_KIND_LABELS[p.kind];
+          return (
+            <li
+              key={`${i}-${line.slice(0, 48)}`}
+              className={`mission-step mission-step--${p.kind}${isActive ? " mission-step--active" : ""}`}
+            >
+              <div className="mission-step-track" aria-hidden>
+                <span className="mission-step-dot-wrap">
+                  <span className="mission-step-dot" />
+                </span>
+                {i < progress.length - 1 ? (
+                  <span className="mission-step-connector" />
+                ) : null}
+              </div>
+              <div className="mission-step-card">
+                <div className="mission-step-card-head">
+                  {p.step != null && p.total != null ? (
+                    <span className="mission-step-num">
+                      {p.step}
+                      <span className="mission-step-num-sep">/</span>
+                      {p.total}
+                    </span>
+                  ) : p.kind === "done" ? (
+                    <span className="mission-step-num mission-step-num--check" title="Terminé">
+                      ✓
+                    </span>
+                  ) : (
+                    <span className="mission-step-num mission-step-num--dot">·</span>
+                  )}
+                  {kindLabel ? (
+                    <span className="mission-step-pill">{kindLabel}</span>
+                  ) : null}
+                </div>
+                <p className="mission-step-desc">{p.description}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
 
 interface ActivitySidebarProps {
   state: RightActivityState;
@@ -81,7 +185,6 @@ export function ActivitySidebar({
   }
 
   const { running, progress, elapsedSec } = state;
-  const last = progress.length > 0 ? progress[progress.length - 1] : null;
   const fmt =
     elapsedSec >= 60
       ? `${Math.floor(elapsedSec / 60)} min ${(elapsedSec % 60).toString().padStart(2, "0")} s`
@@ -90,7 +193,9 @@ export function ActivitySidebar({
   return (
     <div
       className={
-        isInline ? "activity-inline activity-inline-mission" : "activity-sidebar"
+        isInline
+          ? "activity-inline activity-inline-mission"
+          : "activity-sidebar activity-sidebar--mission"
       }
       role="status"
       aria-live="polite"
@@ -102,15 +207,9 @@ export function ActivitySidebar({
           Durée : {fmt}
         </p>
       )}
-      {running && last && (
-        <div className="activity-sidebar-current">
-          <span className="activity-sidebar-current-label">Étape</span>
-          <span className="activity-sidebar-current-text">{last}</span>
-        </div>
-      )}
       {running && elapsedSec >= 45 && (
         <p className="activity-sidebar-wait-hint">
-          Tant qu’Ollama travaille sur une étape, le journal ne grossit pas — c’est
+          Ollama peut rester longtemps sur une étape sans nouveau message — c’est
           normal.
         </p>
       )}
@@ -121,10 +220,16 @@ export function ActivitySidebar({
         </p>
       )}
       {!running && progress.length > 0 && (
-        <p className="activity-sidebar-muted">Dernière mission terminée.</p>
+        <p className="activity-sidebar-muted activity-sidebar-muted--success">
+          Dernière mission terminée — détail des étapes ci-dessous.
+        </p>
       )}
       {progress.length > 0 && (
-        <pre className="activity-sidebar-log">{progress.join("\n")}</pre>
+        <MissionStepTimeline
+          progress={progress}
+          running={running}
+          compact={isInline}
+        />
       )}
     </div>
   );

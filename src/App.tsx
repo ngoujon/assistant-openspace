@@ -13,7 +13,7 @@ function newConversation(): Conversation {
   const id = crypto.randomUUID();
   return {
     id,
-    title: "Nouvelle conversation",
+    title: "Nouveau projet",
     updatedAt: Date.now(),
     messages: [],
   };
@@ -72,11 +72,15 @@ export default function App() {
         prev.map((c) => {
           if (c.id !== active?.id) return c;
           const messages = updater(c.messages);
+          const hasAssistant = messages.some((m) => m.role === "assistant");
           const firstUser = messages.find((m) => m.role === "user");
+          /** Avant la 1ʳᵉ réponse : extrait du message utilisateur ; ensuite l’orchestrateur renomme via setActiveConversationTitle. */
           const title =
-            firstUser?.content.slice(0, 48).trim() ||
-            c.title ||
-            "Nouvelle conversation";
+            !hasAssistant && firstUser
+              ? firstUser.content.slice(0, 48).trim() ||
+                c.title ||
+                "Nouveau projet"
+              : c.title;
           return {
             ...c,
             messages,
@@ -87,6 +91,54 @@ export default function App() {
       );
     },
     [active?.id],
+  );
+
+  const setConversationTitleById = useCallback(
+    (conversationId: string, newTitle: string) => {
+      const t = newTitle.trim();
+      if (!t) return;
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId
+            ? { ...c, title: t.slice(0, 80), updatedAt: Date.now() }
+            : c,
+        ),
+      );
+    },
+    [],
+  );
+
+  const setConversationArtifactMarkdown = useCallback(
+    (
+      conversationId: string,
+      markdown: string,
+      opts?: {
+        /** Après fusion : ne reprendre la discussion qu’à partir d’après ce message. */
+        discussionCutoffAfterId?: string;
+        /** Nouveau livrable (mission) : annule la coupure pour le prochain apply. */
+        clearDiscussionCutoff?: boolean;
+      },
+    ) => {
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id !== conversationId) return c;
+          let artifactDiscussionCutoffAfterId = c.artifactDiscussionCutoffAfterId;
+          if (opts?.clearDiscussionCutoff) {
+            artifactDiscussionCutoffAfterId = undefined;
+          }
+          if (opts?.discussionCutoffAfterId !== undefined) {
+            artifactDiscussionCutoffAfterId = opts.discussionCutoffAfterId;
+          }
+          return {
+            ...c,
+            artifactMarkdown: markdown,
+            updatedAt: Date.now(),
+            artifactDiscussionCutoffAfterId,
+          };
+        }),
+      );
+    },
+    [],
   );
 
   const handleNewChat = useCallback(() => {
@@ -162,6 +214,8 @@ export default function App() {
                     .catch((e: Error) => setOllamaError(e.message));
                 }}
                 setMessages={setActiveMessages}
+                onConversationTitle={setConversationTitleById}
+                onConversationArtifact={setConversationArtifactMarkdown}
                 activityState={rightActivity}
                 setRightActivity={setRightActivity}
               />

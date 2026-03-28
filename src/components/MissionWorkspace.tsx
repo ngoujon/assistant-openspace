@@ -6,6 +6,7 @@ import {
 } from "@/orchestration/pipeline";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
 import { ORCHESTRATOR_ID, loadTeamMembers } from "@/lib/teamTreeStorage";
+import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 
 interface MissionWorkspaceProps {
   model: string;
@@ -15,15 +16,8 @@ interface MissionWorkspaceProps {
     progress: string[];
     elapsedSec: number;
   }) => void;
-}
-
-function unwrapMarkdownFence(s: string): string {
-  const t = s.trim();
-  if (!t.startsWith("```")) return t;
-  const lines = t.split("\n");
-  if (lines[0]?.startsWith("```")) lines.shift();
-  if (lines[lines.length - 1]?.trim() === "```") lines.pop();
-  return lines.join("\n").trim();
+  /** Quand une mission produit un Markdown, pour le lier à la conversation (Discussion). */
+  onArtifactProduced?: (markdown: string) => void;
 }
 
 function downloadMarkdown(content: string, filename: string) {
@@ -42,6 +36,7 @@ function downloadMarkdown(content: string, filename: string) {
 export function MissionWorkspace({
   model,
   onActivityReport,
+  onArtifactProduced,
 }: MissionWorkspaceProps) {
   const [context, setContext] = useState("");
   const [files, setFiles] = useState<
@@ -149,7 +144,9 @@ export function MissionWorkspace({
           setProgress((p) => [...p, label]);
         },
       });
-      setResultMd(unwrapMarkdownFence(md));
+      const finalMd = unwrapMarkdownFence(md);
+      setResultMd(finalMd);
+      onArtifactProduced?.(finalMd);
     } catch (e) {
       if ((e as Error).name === "AbortError") {
         setProgress((p) => [...p, "Interrompu."]);
@@ -160,7 +157,7 @@ export function MissionWorkspace({
       setRunning(false);
       abortRef.current = null;
     }
-  }, [running, context, files, model]);
+  }, [running, context, files, model, onArtifactProduced]);
 
   const canStart = (context.trim().length > 0 || files.length > 0) && !!model;
 

@@ -9,15 +9,34 @@ import {
 import { ActivitySidebar } from "@/components/ActivitySidebar";
 import { MissionWorkspace } from "@/components/MissionWorkspace";
 import {
+  applyDiscussionToArtifact,
+  formatHistoryForRouting,
+  generateDiscussionConversationTitle,
   routeDiscussionMessage,
   streamDiscussionReply,
 } from "@/lib/discussionTeamChat";
+import {
+  isArtifactApplyIntent,
+  resolveForcedResponderFromMessage,
+} from "@/lib/discussionMention";
+import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
 import { loadTeamMembers } from "@/lib/teamTreeStorage";
 import type { RightActivityState } from "@/types/activity";
 import type { ChatMessage, Conversation } from "@/types";
 
 type ChatMode = "mission" | "free";
+
+/** Messages à envoyer à l’orchestrateur pour une fusion : uniquement après la dernière mise à jour. */
+function messagesAfterArtifactCutoff(
+  messages: ChatMessage[],
+  cutoffAfterId?: string,
+): ChatMessage[] {
+  if (!cutoffAfterId?.trim()) return messages;
+  const idx = messages.findIndex((m) => m.id === cutoffAfterId);
+  if (idx === -1) return messages;
+  return messages.slice(idx + 1);
+}
 
 interface ChatPanelProps {
   conversation: Conversation;
@@ -28,6 +47,17 @@ interface ChatPanelProps {
   onRetryOllama: () => void;
   setMessages: (
     fn: (prev: ChatMessage[]) => ChatMessage[],
+  ) => void;
+  /** Titre court proposé par l’orchestrateur après une réponse (mode Discussion). */
+  onConversationTitle: (conversationId: string, title: string) => void;
+  /** Met à jour le Markdown livrable lié à cette conversation (mission + fusions). */
+  onConversationArtifact: (
+    conversationId: string,
+    markdown: string,
+    opts?: {
+      discussionCutoffAfterId?: string;
+      clearDiscussionCutoff?: boolean;
+    },
   ) => void;
   activityState: RightActivityState;
   setRightActivity: Dispatch<SetStateAction<RightActivityState>>;
@@ -41,6 +71,8 @@ export function ChatPanel({
   ollamaError,
   onRetryOllama,
   setMessages,
+  onConversationTitle,
+  onConversationArtifact,
   activityState,
   setRightActivity,
 }: ChatPanelProps) {
@@ -97,11 +129,119 @@ export function ChatPanel({
     setRightActivity,
   ]);
 
+  const downloadLinkedArtifact = useCallback(() => {
+    const md = conversation.artifactMarkdown?.trim();
+    if (!md) return;
+    const slug =
+      conversation.title
+        .slice(0, 48)
+        .replace(/[^\wÀ-ÿ-]+/g, "-")
+        .replace(/^-|-$/g, "") || "livrable";
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [conversation.artifactMarkdown, conversation.title]);
+
+  const patchArtifactFromDiscussion = useCallback(
+    async (instructionText: string) => {
+      const art = conversation.artifactMarkdown?.trim();
+      if (!art) {
+        setError(
+          "Aucun livrable lié. Termine une mission (onglet Mission équipe), puis reviens en Discussion.",
+        );
+        return;
+      }
+      if (!model) {
+        setError(
+          "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
+        );
+        return;
+      }
+
+      const userMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: instructionText,
+      };
+      const historyWithUser = [...conversation.messages, userMsg];
+      const discussionForPatch = [
+        ...messagesAfterArtifactCutoff(
+          conversation.messages,
+          conversation.artifactDiscussionCutoffAfterId,
+        ),
+        userMsg,
+      ];
+      setInput("");
+      setError(null);
+      setMessages(() => historyWithUser);
+
+      const ac = new AbortController();
+      abortRef.current = ac;
+      setIsRouting(true);
+
+      try {
+        const souls = loadAgentSouls();
+        const raw = await applyDiscussionToArtifact({
+          model,
+          souls,
+          discussionMessages: discussionForPatch,
+          artifactMarkdown: art,
+          signal: ac.signal,
+        });
+        const finalMd = unwrapMarkdownFence(raw);
+        const assistantMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content:
+            "Le livrable Markdown a été révisé d’après la discussion. Tu peux le télécharger depuis la barre « Livrable lié » ou poursuivre les échanges.",
+          speakerLabel: "Orchestrateur",
+          routingNote: "Synthèse de la discussion intégrée au document.",
+          artifactPatchNote: true,
+        };
+        onConversationArtifact(conversation.id, finalMd, {
+          discussionCutoffAfterId: assistantMsg.id,
+        });
+        setMessages(() => [...historyWithUser, assistantMsg]);
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        setError((e as Error).message || "Erreur réseau");
+        setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+      } finally {
+        setIsRouting(false);
+        abortRef.current = null;
+      }
+    },
+    [
+      conversation.id,
+      conversation.messages,
+      conversation.artifactMarkdown,
+      conversation.artifactDiscussionCutoffAfterId,
+      model,
+      setMessages,
+      onConversationArtifact,
+    ],
+  );
+
   const sendDiscussion = useCallback(async () => {
     const text = input.trim();
     if (!text || streaming || isRouting) return;
     if (!model) {
       setError("Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2");
+      return;
+    }
+
+    if (isArtifactApplyIntent(text)) {
+      if (!conversation.artifactMarkdown?.trim()) {
+        setError(
+          "Aucun livrable lié. Termine une mission pour produire un Markdown, puis reviens en Discussion.",
+        );
+        return;
+      }
+      await patchArtifactFromDiscussion(text);
       return;
     }
 
@@ -123,6 +263,8 @@ export function ChatPanel({
     try {
       const members = loadTeamMembers();
       const souls = loadAgentSouls();
+      const forcedResponderId =
+        resolveForcedResponderFromMessage(text, members) ?? undefined;
 
       const routing = await routeDiscussionMessage({
         model,
@@ -130,6 +272,7 @@ export function ChatPanel({
         members,
         historyWithLatestUser: historyWithUser,
         signal: ac.signal,
+        forcedResponderId,
       });
 
       const speakerLabel =
@@ -149,6 +292,7 @@ export function ChatPanel({
       setIsRouting(false);
       setStreaming(true);
 
+      let assistantAccum = "";
       await streamDiscussionReply({
         model,
         souls,
@@ -156,6 +300,7 @@ export function ChatPanel({
         brief: routing.brief,
         historyWithLatestUser: historyWithUser,
         onToken: (chunk) => {
+          assistantAccum += chunk;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
@@ -166,6 +311,30 @@ export function ChatPanel({
         },
         signal: ac.signal,
       });
+
+      const transcriptMessages: ChatMessage[] = [
+        ...historyWithUser,
+        {
+          id: assistantId,
+          role: "assistant",
+          content: assistantAccum,
+          speakerLabel,
+          routingNote: routing.userNote,
+        },
+      ];
+      const recentTranscript = formatHistoryForRouting(transcriptMessages, 6000);
+      const convId = conversation.id;
+      void generateDiscussionConversationTitle({
+        model,
+        souls,
+        recentTranscript,
+      })
+        .then((t) => {
+          if (t) onConversationTitle(convId, t);
+        })
+        .catch(() => {
+          /* titre optionnel : on garde l’extrait utilisateur si échec */
+        });
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
       setError((e as Error).message || "Erreur réseau");
@@ -184,8 +353,12 @@ export function ChatPanel({
     streaming,
     isRouting,
     model,
+    conversation.id,
     conversation.messages,
+    conversation.artifactMarkdown,
     setMessages,
+    onConversationTitle,
+    patchArtifactFromDiscussion,
   ]);
 
   const stop = useCallback(() => {
@@ -260,17 +433,66 @@ export function ChatPanel({
         <MissionWorkspace
           model={model}
           onActivityReport={reportMissionActivity}
+          onArtifactProduced={(md) =>
+            onConversationArtifact(conversation.id, md, {
+              clearDiscussionCutoff: true,
+            })
+          }
         />
       ) : (
         <>
+          {conversation.artifactMarkdown?.trim() && (
+            <div
+              className="discussion-artifact-bar"
+              aria-label="Livrable Markdown lié à cette conversation"
+            >
+              <div className="discussion-artifact-bar-row">
+                <span className="discussion-artifact-title">Livrable lié</span>
+                <div className="discussion-artifact-actions">
+                  <button
+                    type="button"
+                    className="btn-secondary btn-compact"
+                    onClick={downloadLinkedArtifact}
+                  >
+                    Télécharger .md
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary btn-compact"
+                    disabled={busy}
+                    onClick={() =>
+                      void patchArtifactFromDiscussion(
+                        "Appliquer la mise à jour.",
+                      )
+                    }
+                  >
+                    Appliquer la discussion au livrable
+                  </button>
+                </div>
+              </div>
+              <pre className="discussion-artifact-preview">
+                {conversation.artifactMarkdown.length > 2800
+                  ? `${conversation.artifactMarkdown.slice(0, 2800)}\n\n…`
+                  : conversation.artifactMarkdown}
+              </pre>
+            </div>
+          )}
+          <p className="discussion-routing-hint" role="note">
+            <strong>@mention</strong> : cible un membre ou l’orchestrateur (
+            <code>@orchestrateur</code>, id ou nom tel qu’affiché dans{" "}
+            <strong>Équipe</strong>). Sans @, l’orchestrateur choisit qui répond.
+            {conversation.artifactMarkdown?.trim()
+              ? " Pour intégrer la discussion dans le document : écris « appliquer la mise à jour » ou le bouton ci-dessus."
+              : " Après une mission, le livrable est lié ici pour affinage."}
+          </p>
           <div className="chat-messages" role="log" aria-live="polite">
             {conversation.messages.length === 0 && (
               <p className="chat-empty">
                 Tu t’adresses à <strong>toute l’équipe</strong>. L’
                 <strong>orchestrateur</strong> route chaque message vers le membre le
-                plus pertinent (ou répond lui-même pour une synthèse, un compte rendu
-                ou une vision globale si tu le demandes). Configure les rôles dans
-                l’onglet <strong>Équipe</strong>.
+                plus pertinent (ou répond lui-même pour une synthèse ou un arbitrage).
+                Utilise <strong>@</strong> pour parler à quelqu’un en direct. Configure
+                les rôles dans l’onglet <strong>Équipe</strong>.
               </p>
             )}
             {conversation.messages.map((m, i) => {
@@ -288,7 +510,7 @@ export function ChatPanel({
               return (
                 <article
                   key={m.id}
-                  className={`bubble bubble-${m.role}`}
+                  className={`bubble bubble-${m.role}${m.artifactPatchNote ? " bubble-artifact-patch" : ""}`}
                 >
                   <span className="bubble-role">{roleLine}</span>
                   {m.routingNote && (
@@ -308,7 +530,7 @@ export function ChatPanel({
             <textarea
               className="chat-input"
               rows={3}
-              placeholder="Message à toute l’équipe…"
+              placeholder="Message ou @membre… (ex. appliquer la mise à jour)"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {

@@ -8,6 +8,8 @@ export interface ChatMessage {
   speakerLabel?: string;
   /** Note affichée (ex. choix de l’orchestrateur). */
   routingNote?: string;
+  /** Réponse liée à une fusion discussion → livrable. */
+  artifactPatchNote?: boolean;
 }
 
 export interface Conversation {
@@ -15,6 +17,16 @@ export interface Conversation {
   title: string;
   updatedAt: number;
   messages: ChatMessage[];
+  /**
+   * Dernier livrable Markdown (ex. mission) — affiné via Discussion puis
+   * « appliquer la mise à jour ».
+   */
+  artifactMarkdown?: string;
+  /**
+   * Id du dernier message après une fusion livrable : les prochaines fusions
+   * n’incluent que les messages **après** celui-ci (limite le contexte).
+   */
+  artifactDiscussionCutoffAfterId?: string;
 }
 
 export type MainTab = "chat" | "team";
