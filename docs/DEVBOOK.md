@@ -15,7 +15,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 - **Stack** : Vite 6, React 19, TypeScript strict, pas de framework CSS externe (variables CSS + layout responsive basique).
 - **Persistance** : conversations et messages dans `localStorage` (`openspace-conversations-v1`) — suffisant pour le MVP ; migration possible vers fichier ou DB plus tard.
 - **Ollama** : appels uniquement vers `/api/ollama/*` en dev pour éviter les soucis CORS ; même origine que l’UI.
-- **Onglet Équipe** : contenu statique ; orchestration multi-agents reportée.
+- **Onglet Équipe** : au premier livrable, texte de substitution uniquement (l’arbre arrive dans l’entrée « suite » le même jour).
 
 ### Fichiers clés
 
@@ -35,6 +35,25 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | Date | Changement |
 |------|------------|
 | 2026-03-28 | Initialisation projet, UI, chat Ollama, docs, règles Cursor |
+| 2026-03-28 | Onglet Équipe : arbre Orchestrateur → agents → sous-agents |
+
+---
+
+## 2026-03-28 (suite) — Arbre hiérarchique (onglet Équipe)
+
+### Objectif
+
+Afficher un organigramme lisible : **Orchestrateur** en tête, trois **agents** (Directeur Artistique, CTO, Directeur juridique), puis des **sous-agents** par branche.
+
+### Décisions
+
+- Structure de données **`TEAM_HIERARCHY`** dans `TeamPanel.tsx` (pas encore branchée sur Ollama).
+- Sous-agents : libellés métier génériques par pôle (modifiables sans changer la hiérarchie).
+- Présentation : liste imbriquée `role="tree"` / `treeitem`, repères visuels (bordure gauche, cartes par nœud).
+
+### Fichiers touchés
+
+- `src/components/TeamPanel.tsx`, `src/index.css`
 
 ---
 

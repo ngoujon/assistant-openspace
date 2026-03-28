@@ -21,7 +21,7 @@ flowchart LR
 | `components/Layout.tsx` | Grille trois colonnes |
 | `components/Sidebar.tsx` | Liste conversations + actions |
 | `components/ChatPanel.tsx` | Messages, saisie, streaming |
-| `components/TeamPanel.tsx` | Placeholder équipe virtuelle |
+| `components/TeamPanel.tsx` | Arbre hiérarchique (Orchestrateur, agents, sous-agents) — logique Ollama à venir |
 | `lib/ollama.ts` | Client API Ollama (tags + chat stream) |
 | `lib/storage.ts` | Sérialisation `localStorage` |
 | `types.ts` | Types partagés |
