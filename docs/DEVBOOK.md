@@ -36,6 +36,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 |------|------------|
 | 2026-03-28 | Initialisation projet, UI, chat Ollama, docs, règles Cursor |
 | 2026-03-28 | Onglet Équipe : arbre Orchestrateur → agents → sous-agents |
+| 2026-03-28 | Équipe : libellés des sous-agents (Designer UI/UX, Développeur, DPO) |
 
 ---
 
@@ -48,7 +49,7 @@ Afficher un organigramme lisible : **Orchestrateur** en tête, trois **agents** 
 ### Décisions
 
 - Structure de données **`TEAM_HIERARCHY`** dans `TeamPanel.tsx` (pas encore branchée sur Ollama).
-- Sous-agents : libellés métier génériques par pôle (modifiables sans changer la hiérarchie).
+- Sous-agents : **Designer UI / UX** (sous DA), **Développeur** (sous CTO), **DPO** (sous Directeur juridique) — un sous-agent par branche pour l’instant.
 - Présentation : liste imbriquée `role="tree"` / `treeitem`, repères visuels (bordure gauche, cartes par nœud).
 
 ### Fichiers touchés

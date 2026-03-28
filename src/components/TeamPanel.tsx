@@ -7,7 +7,7 @@ interface TeamNode {
   children?: TeamNode[];
 }
 
-/** Hiérarchie : orchestrateur → agents → sous-agents (libellés des sous-agents évolutifs). */
+/** Hiérarchie : orchestrateur → agents → sous-agents. */
 const TEAM_HIERARCHY: TeamNode = {
   id: "orchestrateur",
   label: "Orchestrateur",
@@ -18,27 +18,20 @@ const TEAM_HIERARCHY: TeamNode = {
       label: "Directeur Artistique",
       kind: "agent",
       children: [
-        { id: "da-design", label: "Design & expérience", kind: "sub" },
-        { id: "da-brand", label: "Identité & brand", kind: "sub" },
+        { id: "da-uiux", label: "Designer UI / UX", kind: "sub" },
       ],
     },
     {
       id: "cto",
       label: "CTO",
       kind: "agent",
-      children: [
-        { id: "cto-arch", label: "Architecture & produit", kind: "sub" },
-        { id: "cto-ops", label: "Infra & fiabilité", kind: "sub" },
-      ],
+      children: [{ id: "cto-dev", label: "Développeur", kind: "sub" }],
     },
     {
       id: "juridique",
       label: "Directeur juridique",
       kind: "agent",
-      children: [
-        { id: "jur-contrats", label: "Contrats & partenariats", kind: "sub" },
-        { id: "jur-compliance", label: "Conformité & risques", kind: "sub" },
-      ],
+      children: [{ id: "jur-dpo", label: "DPO", kind: "sub" }],
     },
   ],
 };
