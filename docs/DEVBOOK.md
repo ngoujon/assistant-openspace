@@ -38,6 +38,26 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-03-28 | Onglet Équipe : arbre Orchestrateur → agents → sous-agents |
 | 2026-03-28 | Équipe : libellés des sous-agents (Designer UI/UX, Développeur, DPO) |
 | 2026-03-28 | Équipe : modale « âme et rôle » par nœud, seeds, persistance `openspace-team-souls-v1` |
+| 2026-03-28 | UI : thème sombre minimal (zinc), chat type assistant avec bandeau d’accent, compositeur centré |
+
+---
+
+## 2026-03-28 — Thème sombre minimal « codes IA »
+
+### Objectif
+
+Interface **sombre**, **épurée** et **simple à lire**, en s’alignant sur les usages habituels des chats IA : contraste maîtrisé, peu de bordures criardes, bulles utilisateur / assistant distinctes, zone de saisie claire, onglets discrets.
+
+### Décisions
+
+- Palette proche **zinc** (`#09090b`, surfaces `#18181b`), texte **hiérarchisé** (`--text`, `--text-secondary`, `--text-tertiary`).
+- **Accent** cyan doux (`#7dd3fc`) réservé aux états actifs, focus et CTA — pas de surcharge visuelle.
+- Chat : assistant avec **bandeau latéral** (inset box-shadow) ; liste des conversations avec **barre active** à gauche ; **largeur max** du fil pour la lisibilité.
+- Modale : léger **backdrop blur**, ombre portée unique.
+
+### Fichiers touchés
+
+- `src/index.css`
 
 ---
 

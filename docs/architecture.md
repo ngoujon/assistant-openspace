@@ -13,6 +13,10 @@ flowchart LR
   Vite -->|"/api/ollama/*"| Ollama
 ```
 
+## Interface
+
+Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas de librairie UI. Objectif : lisibilité longue durée et patterns familiers (chat assistant / utilisateur, compositeur en bas).
+
 ## Arborescence `src/`
 
 | Élément | Rôle |
