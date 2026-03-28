@@ -41,6 +41,25 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-03-28 | UI : thème sombre minimal (zinc), chat type assistant avec bandeau d’accent, compositeur centré |
 | 2026-03-28 | Mission équipe : pipeline orchestrateur → agents → sous-agents → README.md + téléchargement |
 | 2026-03-28 | Équipe : arbre éditable (ajout, DnD), seeds Ollama depuis la modale, pipeline aligné sur l’arbre |
+| 2026-03-28 | Docker : image nginx + build Vite, port 3004, proxy Ollama vers hôte |
+
+---
+
+## 2026-03-28 — Docker (nginx, port 3004)
+
+### Objectif
+
+Exécuter l’app dans un conteneur, **accessible sur le port 3004**, avec relais vers **Ollama sur l’hôte** comme en dev Vite.
+
+### Décisions
+
+- **Multi-stage** : `node:22-alpine` pour `npm ci` + `npm run build`, puis `nginx:alpine` pour servir `dist/` et proxy `/api/ollama/` → `host.docker.internal:11434`.
+- **`docker-compose.yml`** : `extra_hosts` pour Linux (`host-gateway`).
+- **`.dockerignore`** : exclut `node_modules`, `dist`, etc.
+
+### Fichiers
+
+- `Dockerfile`, `nginx.conf`, `docker-compose.yml`, `.dockerignore`, `docs/docker.md`
 
 ---
 

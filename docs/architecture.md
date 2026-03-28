@@ -2,7 +2,7 @@
 
 ## Vue d’ensemble
 
-Application **SPA** React montée sur Vite. Aucun serveur applicatif Node dédié en dev : le serveur Vite sert les assets et proxy les appels Ollama.
+Application **SPA** React montée sur Vite. En **développement**, le serveur Vite sert les assets et proxy les appels Ollama. En **Docker**, nginx sert le build statique et reproduit le même proxy vers l’Ollama de l’hôte (`docs/docker.md`).
 
 ```mermaid
 flowchart LR

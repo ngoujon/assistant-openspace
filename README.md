@@ -30,6 +30,14 @@ npm run preview
 
 Le port **3004** est configuré pour `npm run dev` et `npm run preview`.
 
+## Docker (port 3004)
+
+```bash
+docker compose up --build
+```
+
+Puis ouvre **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le conteneur s’y connecte via `host.docker.internal:11434`). Détails et cas Linux : `docs/docker.md`.
+
 ## Fonctionnalités principales
 
 ### Mission équipe (onglet Chat, mode par défaut)
@@ -65,6 +73,7 @@ Le navigateur appelle `/api/ollama/...` ; Vite redirige vers `http://127.0.0.1:1
 | `docs/mission-orchestration.md` | Pipeline mission, limites, fichiers concernés |
 | `docs/ollama.md` | API et dépannage |
 | `docs/architecture.md` | Structure du code |
+| `docs/docker.md` | Image Docker, compose, Ollama hôte |
 
 ## Licence
 
