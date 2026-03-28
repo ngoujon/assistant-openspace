@@ -1,2 +1,7 @@
 # macOS AppleDouble (forks de ressources sur volumes exFAT / non-Apple)
 ._*
+
+node_modules
+dist
+*.local
+*.tsbuildinfo
