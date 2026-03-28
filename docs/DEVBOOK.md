@@ -42,6 +42,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-03-28 | Mission équipe : pipeline orchestrateur → agents → sous-agents → README.md + téléchargement |
 | 2026-03-28 | Équipe : arbre éditable (ajout, DnD), seeds Ollama depuis la modale, pipeline aligné sur l’arbre |
 | 2026-03-28 | Docker : image nginx + build Vite, port 3004, proxy Ollama vers hôte |
+| 2026-03-28 | Ollama : liste de modèles filtrée (exclut embedding, ex. nomic-embed-text) |
 
 ---
 

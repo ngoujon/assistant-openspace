@@ -15,6 +15,10 @@ sont réécrites vers le chemin équivalent sur le port `11434`.
 
 Le code client utilise la constante de base `/api/ollama` dans `src/lib/ollama.ts`.
 
+## Modèles proposés dans l’UI
+
+La liste démarre depuis `/api/tags`, puis exclut les modèles **sans chat** : noms contenant `embed` / `rerank`, ou capacités Ollama `embedding` sans `completion` (via `/api/show`). Ainsi `nomic-embed-text` n’apparaît pas dans le sélecteur.
+
 ## Dépannage
 
 | Symptôme | Piste |

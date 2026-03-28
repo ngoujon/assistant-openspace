@@ -1,12 +1,48 @@
 const BASE = "/api/ollama";
 
+/** Heuristique rapide (évite un appel /api/show inutile pour nomic-embed-text, etc.). */
+function isLikelyNonChatModelName(name: string): boolean {
+  const lower = name.toLowerCase();
+  if (/\bembed/i.test(lower)) return true;
+  if (/\brerank/i.test(lower)) return true;
+  if (/\btext-embedding\b/i.test(lower)) return true;
+  return false;
+}
+
+/**
+ * Ollama 0.3+ expose `capabilities` : les seuls `embedding` ne supportent pas /api/chat.
+ */
+async function modelSupportsChat(model: string): Promise<boolean> {
+  if (isLikelyNonChatModelName(model)) return false;
+  try {
+    const res = await fetch(`${BASE}/api/show`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model }),
+    });
+    if (!res.ok) return true;
+    const data = (await res.json()) as { capabilities?: string[] };
+    const caps = data.capabilities;
+    if (!caps?.length) return true;
+    if (caps.includes("embedding") && !caps.includes("completion")) {
+      return false;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/** Modèles utilisables pour le chat (exclut embedding / rerank). */
 export async function fetchOllamaModels(): Promise<string[]> {
   const res = await fetch(`${BASE}/api/tags`);
   if (!res.ok) {
     throw new Error(`Ollama indisponible (${res.status}). Lance Ollama sur ce Mac.`);
   }
   const data = (await res.json()) as { models?: { name: string }[] };
-  return data.models?.map((m) => m.name) ?? [];
+  const names = data.models?.map((m) => m.name) ?? [];
+  const flags = await Promise.all(names.map((n) => modelSupportsChat(n)));
+  return names.filter((_, i) => flags[i]);
 }
 
 export interface OllamaChatMessage {

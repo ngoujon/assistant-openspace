@@ -32,7 +32,9 @@ export default function App() {
     fetchOllamaModels()
       .then((m) => {
         setModels(m);
-        setModel((prev) => prev || m[0] || "");
+        setModel((prev) =>
+          prev && m.includes(prev) ? prev : m[0] || "",
+        );
         setOllamaError(null);
       })
       .catch((e: Error) => setOllamaError(e.message));
@@ -140,7 +142,9 @@ export default function App() {
                   fetchOllamaModels()
                     .then((m) => {
                       setModels(m);
-                      setModel((prev) => prev || m[0] || "");
+                      setModel((prev) =>
+                        prev && m.includes(prev) ? prev : m[0] || "",
+                      );
                       setOllamaError(null);
                     })
                     .catch((e: Error) => setOllamaError(e.message));
