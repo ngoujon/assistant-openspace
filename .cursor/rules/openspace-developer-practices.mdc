@@ -1,0 +1,32 @@
+---
+description: Bonnes pratiques développeur pour le dépôt OpenSpace Localhost
+alwaysApply: true
+---
+
+# Pratiques de développement — OpenSpace
+
+## Portée et changements
+
+- Modifier uniquement le code nécessaire à la demande ; éviter les refactors opportunistes non demandés.
+- Après une évolution fonctionnelle ou documentaire notable : **mettre à jour** `docs/DEVBOOK.md` (section datée ou tableau changelog) et **commiter** avec un message clair en français.
+
+## TypeScript et React
+
+- TypeScript **strict** : pas de `any` implicite ; typer les réponses API (types dédiés ou `unknown` + garde).
+- Préférer les composants **contrôlés** et l’état local minimal ; remonter l’état quand plusieurs vues en dépendent.
+- Effets `useEffect` : dépendances complètes ; éviter les mises à jour d’état en cascade fragiles (préférer un seul flux de vérité).
+
+## Ollama et réseau
+
+- Ne pas appeler `11434` en dur depuis le navigateur : passer par **`/api/ollama`** (proxy Vite en dev) pour garder une seule stratégie CORS / déploiement.
+- Gérer **streaming** et **AbortController** pour ne pas laisser de requêtes pendantes ; messages d’erreur compréhensibles pour l’utilisateur.
+
+## Style et UX
+
+- Interface et textes utilisateur en **français** sauf termes techniques usuels (Ollama, modèle, stream).
+- Respecter la grille existante (sidebar / centre / colonne droite) pour la cohérence visuelle.
+
+## Documentation
+
+- Le **README** reste la porte d’entrée (installation, ports, liens vers `docs/`).
+- Détails techniques (API, architecture, décisions) dans **`docs/`** ; ne pas dupliquer de longs blocs entre README et DEVBOOK sans lien explicite.
