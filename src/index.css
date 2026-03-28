@@ -679,7 +679,7 @@ body {
 /* ——— Équipe ——— */
 .team-panel {
   padding: 1.5rem 1.25rem 2rem;
-  max-width: 36rem;
+  max-width: 42rem;
   margin: 0 auto;
 }
 
@@ -700,6 +700,22 @@ body {
 .team-copy strong {
   color: var(--text);
   font-weight: 600;
+}
+
+.team-copy-mono {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+}
+
+.team-actions-bar {
+  margin-bottom: 1rem;
+}
+
+.team-drop-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  line-height: 1.45;
 }
 
 .team-tree-wrap {
@@ -739,12 +755,59 @@ body {
   margin-left: 0.625rem;
 }
 
-.team-tree-item > .team-tree-node {
+.team-tree-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
   margin-bottom: 0.3rem;
 }
 
-.team-tree-children > .team-tree-item:last-child > .team-tree-node {
+.team-tree-children > .team-tree-item:last-child > .team-tree-row {
   margin-bottom: 0.1rem;
+}
+
+.team-tree-drop-target {
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: var(--accent-muted);
+}
+
+.team-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  flex-shrink: 0;
+  cursor: grab;
+  user-select: none;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.team-drag-handle:active {
+  cursor: grabbing;
+}
+
+.team-tree-delete {
+  width: 2rem;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  align-self: stretch;
+}
+
+.team-tree-delete:hover {
+  color: var(--danger);
+  background: var(--danger-bg);
 }
 
 .team-tree-node {
@@ -756,7 +819,8 @@ body {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-raised);
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   text-align: left;
   font: inherit;
   color: inherit;
@@ -828,6 +892,10 @@ body {
   box-shadow: var(--shadow-modal);
 }
 
+.modal-dialog-wide {
+  width: min(600px, 100%);
+}
+
 .modal-header {
   display: flex;
   align-items: flex-start;
@@ -869,6 +937,66 @@ body {
 .modal-close:hover {
   color: var(--text);
   background: var(--bg-surface);
+}
+
+.modal-field-block {
+  padding: 0 1.125rem;
+  flex-shrink: 0;
+}
+
+.modal-field-label {
+  display: block;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  margin-bottom: 0.35rem;
+}
+
+.modal-name-input {
+  width: 100%;
+  font: inherit;
+  font-size: 0.9375rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.65rem;
+}
+
+.modal-name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.modal-name-input:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.modal-seed-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.modal-seed-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+  flex: 1;
+  min-width: 8rem;
+}
+
+.modal-gen-error {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--danger);
 }
 
 .modal-textarea {

@@ -5,6 +5,7 @@ import {
   useState,
   type MouseEvent,
 } from "react";
+import { generateMemberSoulSeed } from "@/lib/generateMemberSeed";
 
 export interface SoulModalNode {
   id: string;
@@ -15,28 +16,44 @@ export interface SoulModalNode {
 interface AgentSoulModalProps {
   node: SoulModalNode | null;
   initialText: string;
+  initialLabel: string;
+  parentId: string | null;
+  parentLabel: string | null;
+  model: string;
   onClose: () => void;
-  /** `agentId` = identifiant stable du nœud dans l’arbre (ex. orchestrateur, da-uiux). */
-  onSave: (text: string, agentId: string) => void;
+  onSave: (text: string, agentId: string, label: string) => void;
 }
 
 export function AgentSoulModal({
   node,
   initialText,
+  initialLabel,
+  parentId,
+  parentLabel,
+  model,
   onClose,
   onSave,
 }: AgentSoulModalProps) {
   const titleId = useId();
   const descId = useId();
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState(initialText);
+  const [nameDraft, setNameDraft] = useState(initialLabel);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     if (node) {
       setDraft(initialText);
-      queueMicrotask(() => textareaRef.current?.focus());
+      setNameDraft(initialLabel);
+      setGenError(null);
+      queueMicrotask(() => {
+        if (node.kind === "master") textareaRef.current?.focus();
+        else nameInputRef.current?.focus();
+      });
     }
-  }, [node, initialText]);
+  }, [node, initialText, initialLabel]);
 
   useEffect(() => {
     if (!node) return;
@@ -57,7 +74,8 @@ export function AgentSoulModal({
   };
 
   const save = () => {
-    if (node) onSave(draft, node.id);
+    const label = nameDraft.trim() || node.label;
+    if (node) onSave(draft, node.id, label);
     onClose();
   };
 
@@ -68,6 +86,28 @@ export function AgentSoulModal({
         ? "Agent"
         : "Sous-agent";
 
+  const canGenerateSeed =
+    !!model && nameDraft.trim().length > 0 && !generating;
+
+  const handleGenerateSeed = async () => {
+    if (!canGenerateSeed) return;
+    setGenError(null);
+    setGenerating(true);
+    try {
+      const text = await generateMemberSoulSeed({
+        model,
+        memberLabel: nameDraft.trim(),
+        parentId,
+        parentLabel,
+      });
+      setDraft(text);
+    } catch (e) {
+      setGenError((e as Error).message || "Échec de la génération");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
     <div
       className="modal-overlay"
@@ -75,7 +115,7 @@ export function AgentSoulModal({
       onMouseDown={handleOverlayMouseDown}
     >
       <div
-        className="modal-dialog"
+        className="modal-dialog modal-dialog-wide"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -88,7 +128,7 @@ export function AgentSoulModal({
               {kindLabel} · Âme et rôle
             </p>
             <h2 className="modal-title" id={titleId}>
-              {node.label}
+              {nameDraft.trim() || node.label}
             </h2>
           </div>
           <button
@@ -100,6 +140,41 @@ export function AgentSoulModal({
             ×
           </button>
         </header>
+
+        <div className="modal-field-block">
+          <label className="modal-field-label" htmlFor="soul-member-name">
+            Nom du membre
+          </label>
+          <input
+            ref={nameInputRef}
+            id="soul-member-name"
+            type="text"
+            className="modal-name-input"
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            disabled={node.kind === "master"}
+            autoComplete="off"
+          />
+          {node.kind !== "master" && (
+            <div className="modal-seed-row">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={!canGenerateSeed}
+                onClick={() => void handleGenerateSeed()}
+              >
+                {generating ? "Génération…" : "Générer un seed"}
+              </button>
+              <span className="modal-seed-hint">
+                Utilise Ollama ({model || "aucun modèle"}) selon le nom et la place
+                dans l’équipe
+                {parentLabel ? ` (sous « ${parentLabel} »)` : ""}.
+              </span>
+            </div>
+          )}
+          {genError && <p className="modal-gen-error">{genError}</p>}
+        </div>
+
         <textarea
           ref={textareaRef}
           className="modal-textarea"

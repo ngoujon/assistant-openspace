@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { runMissionPipeline, type MissionFile } from "@/orchestration/pipeline";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
+import { loadTeamMembers } from "@/lib/teamTreeStorage";
 
 interface MissionWorkspaceProps {
   model: string;
@@ -85,6 +86,7 @@ export function MissionWorkspace({ model }: MissionWorkspaceProps) {
     abortRef.current = ac;
 
     const souls = loadAgentSouls();
+    const teamMembers = loadTeamMembers();
     const missionFiles: MissionFile[] = files.map(({ name, content }) => ({
       name,
       content,
@@ -96,6 +98,7 @@ export function MissionWorkspace({ model }: MissionWorkspaceProps) {
         context,
         files: missionFiles,
         souls,
+        teamMembers,
         signal: ac.signal,
         onProgress: (label) => {
           setProgress((p) => [...p, label]);

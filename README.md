@@ -45,7 +45,8 @@ Le port **3004** est configuré pour `npm run dev` et `npm run preview`.
 
 ### Équipe
 
-- Arbre hiérarchique et édition des **âmes / rôles** par agent (seeds + `localStorage`).
+- Arbre **modifiable** : nouveaux membres sous l’orchestrateur, **glisser-déposer** sous l’orchestrateur ou sous un agent, suppression.
+- Modale **âme / rôle** par membre, avec bouton **Générer un seed** (Ollama, selon le nom et la place dans l’équipe — choisir le modèle dans l’onglet Chat).
 
 ### Autres
 

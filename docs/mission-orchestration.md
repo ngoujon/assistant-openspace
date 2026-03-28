@@ -19,10 +19,15 @@
 
 Les **textes « âme et rôle »** configurés dans l’onglet **Équipe** (modale par nœud) sont injectés comme **system prompts** pour chaque appel correspondant.
 
+## Équipe dynamique
+
+L’arbre (membres sous l’orchestrateur, sous-agents sous les piliers) est lu depuis `loadTeamMembers()` au moment du lancement. Toute modification dans l’onglet **Équipe** (ajout, glisser-déposer, noms) est donc prise en compte pour la mission suivante.
+
 ## Fichiers code
 
-- `src/orchestration/pipeline.ts` — `runMissionPipeline`.
+- `src/orchestration/pipeline.ts` — `runMissionPipeline` (boucle sur les piliers et leurs enfants).
 - `src/lib/ollama.ts` — `completeOllamaChat` (réponse complète, pas de SSE).
+- `src/lib/teamTreeStorage.ts` — persistance de l’arbre `openspace-team-tree-v1`.
 - `src/components/MissionWorkspace.tsx` — UI contexte, fichiers, progression, téléchargement.
 
 ## Coût / performance

@@ -148,7 +148,7 @@ export default function App() {
                 setMessages={setActiveMessages}
               />
             ) : (
-              <TeamPanel />
+              <TeamPanel model={model} />
             )}
           </div>
         </>

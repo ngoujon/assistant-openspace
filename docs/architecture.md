@@ -26,7 +26,10 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 | `components/Sidebar.tsx` | Liste conversations + actions |
 | `components/ChatPanel.tsx` | Modes Mission équipe / Discussion ; barre modèle |
 | `components/MissionWorkspace.tsx` | Contexte, fichiers, pipeline, aperçu MD, téléchargement |
-| `components/TeamPanel.tsx` | Arbre cliquable ; édition « âme et rôle » (persisté) |
+| `components/TeamPanel.tsx` | Arbre dynamique (ajout, DnD), modale âme/rôle + génération de seed |
+| `lib/teamTreeStorage.ts` | Membres, reparentage, profondeur max 3 (`openspace-team-tree-v1`) |
+| `lib/teamTreeDisplay.ts` | Conversion liste → arbre d’affichage (`DisplayNode`) |
+| `lib/generateMemberSeed.ts` | Appel Ollama pour proposer un texte « âme et rôle » |
 | `components/AgentSoulModal.tsx` | Modale d’édition (Échap / Entrée / Maj+Entrée) |
 | `data/teamSeeds.ts` | Textes initiaux (seeds) par id de nœud |
 | `lib/teamSoulsStorage.ts` | Lecture / écriture `openspace-team-souls-v1` |

@@ -40,6 +40,26 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-03-28 | Équipe : modale « âme et rôle » par nœud, seeds, persistance `openspace-team-souls-v1` |
 | 2026-03-28 | UI : thème sombre minimal (zinc), chat type assistant avec bandeau d’accent, compositeur centré |
 | 2026-03-28 | Mission équipe : pipeline orchestrateur → agents → sous-agents → README.md + téléchargement |
+| 2026-03-28 | Équipe : arbre éditable (ajout, DnD), seeds Ollama depuis la modale, pipeline aligné sur l’arbre |
+
+---
+
+## 2026-03-28 — Équipe dynamique + génération de seed
+
+### Objectif
+
+Créer des **membres** sous l’orchestrateur, les **réorganiser par glisser-déposer** (sous l’orchestrateur ou sous un agent), ouvrir la **modale** pour l’âme/rôle, et **générer un seed** via Ollama à partir du **nom** et de la **place** dans l’équipe.
+
+### Décisions
+
+- Stockage plat `TreeMember` + `openspace-team-tree-v1` ; affichage en arbre via `membersToDisplayTree`.
+- **Profondeur max** : orchestrateur → pilier → sous-agent (pas de sous-sous-agent). Un nœud qui a des **enfants** ne peut pas être déposé sous un agent.
+- **Souls** : `saveAgentSouls` persiste **toutes** les clés (ids UUID inclus).
+- **Mission** : `runMissionPipeline` itère sur les enfants directs de l’orchestrateur puis leurs enfants (0 à N sous-agents par pilier).
+
+### Fichiers touchés
+
+- `src/lib/teamTreeStorage.ts`, `src/lib/teamTreeDisplay.ts`, `src/lib/generateMemberSeed.ts`, `src/components/TeamPanel.tsx`, `src/components/AgentSoulModal.tsx`, `src/orchestration/pipeline.ts`, `src/App.tsx`, `src/index.css`, docs.
 
 ---
 
