@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import {
   missionProgressPercent,
   parseMissionProgressLine,
@@ -25,9 +26,16 @@ function MissionStepTimeline({
   running: boolean;
   compact?: boolean;
 }) {
+  const listRef = useRef<HTMLOListElement>(null);
   const pct = missionProgressPercent(progress);
   const showBar = progress.length > 0;
   const indeterminate = running && pct === null && progress.length > 0;
+
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [progress]);
 
   return (
     <div
@@ -56,7 +64,11 @@ function MissionStepTimeline({
           />
         </div>
       )}
-      <ol className="mission-step-list" aria-label="Étapes de la mission">
+      <ol
+        ref={listRef}
+        className="mission-step-list"
+        aria-label="Étapes de la mission"
+      >
         {progress.map((line, i) => {
           const p = parseMissionProgressLine(line);
           const isLast = i === progress.length - 1;
@@ -207,10 +219,19 @@ export function ActivitySidebar({
           Durée : {fmt}
         </p>
       )}
-      {running && elapsedSec >= 45 && (
+      {running && elapsedSec >= 8 && (
         <p className="activity-sidebar-wait-hint">
-          Ollama peut rester longtemps sur une étape sans nouveau message — c’est
-          normal.
+          La <strong>1<sup>re</sup> réponse</strong> charge souvent le modèle dans Ollama
+          (plusieurs minutes en CPU). La liste d’étapes ne change qu’à la fin de chaque
+          appel — ce n’est pas un blocage de l’app.
+        </p>
+      )}
+      {running && elapsedSec >= 120 && (
+        <p className="activity-sidebar-wait-hint activity-sidebar-wait-hint--strong">
+          Si tu n’as <strong>aucune</strong> réponse au-delà de ~15–20&nbsp;min, teste dans
+          un terminal : <code>ollama run</code> + ton modèle, ou redémarre Ollama. Un
+          modèle volumineux sur disque externe peut aussi expliquer des délais très
+          longs.
         </p>
       )}
       {!running && progress.length === 0 && (

@@ -172,6 +172,21 @@ body {
   color: var(--text-tertiary);
 }
 
+.activity-sidebar-wait-hint code {
+  font-size: 0.85em;
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--accent);
+}
+
+.activity-sidebar-wait-hint--strong {
+  color: var(--warn);
+  border-left: 3px solid rgba(251, 191, 36, 0.45);
+  padding-left: 0.5rem;
+}
+
 /* ——— Mission : chronologie d’étapes ——— */
 .mission-step-panel {
   margin: 0.35rem 0 0;

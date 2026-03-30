@@ -65,25 +65,87 @@ export interface OllamaChatMessage {
   content: string;
 }
 
+/** Combine un signal utilisateur et un délai max (évite un fetch infini si Ollama ne répond pas). */
+function mergeAbortWithTimeout(
+  user: AbortSignal | undefined,
+  timeoutMs: number | undefined,
+): AbortSignal | undefined {
+  if (!timeoutMs || timeoutMs <= 0) return user;
+  const ctrl = new AbortController();
+  const tid = window.setTimeout(() => {
+    ctrl.abort(
+      new DOMException(
+        "Ollama n’a pas renvoyé de réponse dans le délai imparti. Vérifie qu’Ollama tourne, teste `ollama run <modèle>` en terminal, ou choisis un modèle plus petit.",
+        "TimeoutError",
+      ),
+    );
+  }, timeoutMs);
+  const clear = () => window.clearTimeout(tid);
+  if (user) {
+    if (user.aborted) {
+      clear();
+      ctrl.abort(user.reason);
+    } else {
+      user.addEventListener(
+        "abort",
+        () => {
+          clear();
+          ctrl.abort(user.reason);
+        },
+        { once: true },
+      );
+    }
+  }
+  return ctrl.signal;
+}
+
 /** Réponse complète (sans stream) — pour enchaînements orchestration. */
 export async function completeOllamaChat(
   model: string,
   messages: OllamaChatMessage[],
   signal?: AbortSignal,
-  options?: { temperature?: number },
+  options?: {
+    temperature?: number;
+    /** Garde le modèle chargé entre requêtes (missions enchaînées). Ex. "30m". */
+    keepAlive?: string;
+    /** Délai max côté navigateur (ms) ; au-delà, annulation avec TimeoutError. */
+    timeoutMs?: number;
+  },
 ): Promise<string> {
   assertChatModel(model);
-  const res = await fetch(`${BASE}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages,
-      stream: false,
-      options: options?.temperature != null ? { temperature: options.temperature } : undefined,
-    }),
-    signal,
-  });
+  const combined = mergeAbortWithTimeout(signal, options?.timeoutMs);
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    stream: false,
+  };
+  if (options?.keepAlive != null && options.keepAlive !== "") {
+    body.keep_alive = options.keepAlive;
+  }
+  if (options?.temperature != null) {
+    body.options = { temperature: options.temperature };
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: combined,
+    });
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    const de = e as DOMException;
+    if (de?.name === "TimeoutError") {
+      throw new Error(de.message);
+    }
+    if (options?.timeoutMs && (e as Error).name === "AbortError") {
+      throw new Error(
+        "Ollama n’a pas renvoyé de réponse dans le délai imparti. Vérifie qu’Ollama tourne, teste `ollama run <modèle>` en terminal, ou choisis un modèle plus petit.",
+      );
+    }
+    throw e;
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `Erreur HTTP ${res.status}`);
