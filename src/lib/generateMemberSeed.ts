@@ -14,7 +14,7 @@ export interface GenerateSeedInput {
 }
 
 /**
- * Propose un texte « âme et rôle » en français pour un membre, selon son nom et sa place dans l’arbre.
+ * Propose un texte pour le champ « âme et rôle » (souvent **Rôle** + **Pratiques et standards** si gabarit par défaut), selon les réglages utilisateur.
  */
 export async function generateMemberSoulSeed(
   input: GenerateSeedInput,

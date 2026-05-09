@@ -102,9 +102,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             </h3>
             <p className="modal-settings-intro">
               Ces textes sont envoyés à Ollama lorsque tu cliques sur « Générer un seed » dans la fiche
-              d’un membre. Le gabarit par défaut s’inspire de la structuration des prompts{" "}
-              <strong>OpenClaw</strong> (sections fixes : contexte, mission, format, contraintes) — tu peux
-              tout adapter à ton style ou à ton modèle.
+              d’un membre. Le gabarit par défaut vise un **assistant métier** (pratiques, précautions,
+              qualité) plutôt qu’une persona fictionnelle — structure librement inspirée des prompts{" "}
+              <strong>OpenClaw</strong> (sections fixes).
             </p>
             <label className="modal-field-label" htmlFor="settings-seed-system">
               Message système

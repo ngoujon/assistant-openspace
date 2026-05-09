@@ -1,18 +1,18 @@
 const KEY = "openspace-app-settings-v1";
 
-/** Aligné sur l’esprit des prompts OpenClaw : sections fixes, mission explicite, format de sortie et garde-fous. */
+/** Assistant virtuel métier : consignes techniques et qualité, pas de persona fictionnelle. */
 export const DEFAULT_SEED_SYSTEM_PROMPT =
-  "Tu rédiges des profils « persona » pour une équipe virtuelle OpenSpace (équivalent d’une couche SOUL : identité + règles d’exécution). Réponds uniquement en français et respecte strictement la structure demandée dans le message utilisateur.";
+  "Tu rédiges des consignes pour un **assistant virtuel de travail** (OpenSpace) : périmètre métier, précautions et bonnes pratiques alignées sur le poste. Aucun personnage fictionnel, aucun trait de personnalité « humain ». Réponds uniquement en français et respecte strictement la structure du message utilisateur.";
 
 /**
- * Gabarit type OpenClaw : contexte d’exécution → mission → format → contraintes.
+ * Gabarit orienté pratiques professionnelles (ex. rigueur dev web : propreté du code, détails, qualité).
  * {{memberLabel}} = nom affiché ; {{place}} = phrase sur la position dans l’arbre (injectée par l’app).
  */
 export const DEFAULT_SEED_USER_TEMPLATE = `## Contexte d’exécution
 
-Tu produis la couche **âme et rôle** pour **un seul** membre de l’équipe virtuelle.
+Tu remplis le champ stocké sous **« âme et rôle »** dans l’UI — mais le **fond** doit être celui d’un **assistant métier**, pas d’un avatar avec une personnalité.
 
-### Identité affichée
+### Libellé du membre
 {{memberLabel}}
 
 ### Position dans l’organigramme
@@ -22,29 +22,37 @@ Tu produis la couche **âme et rôle** pour **un seul** membre de l’équipe vi
 
 ## Mission
 
-Rédiger le texte qui sera collé dans le champ **« âme et rôle »** : missions concrètes, périmètre, interactions avec le reste de l’équipe, puis personnalité opérationnelle (ton, valeurs, style de décision).
+Produire un texte **strictement utilitaire** pour ce membre :
+
+1. **Rôle :** périmètre métier factuel (missions, livrables typiques, interfaces avec le reste de l’équipe). Pas de narration, pas de voix de personnage.
+
+2. **Pratiques et standards :** précautions et **bonnes pratiques** cohérentes avec le métier déduit du libellé et de la place dans l’arbre. Exemples possibles si pertinent :
+   - rôle **développement / technique** : code lisible et maintenable, attention aux détails, tests quand c’est pertinent, perf et sécurité de base, accessibilité si UI, pas de sur-ingénierie inutile ;
+   - autres métiers : rigueur documentaire, sources, conformité, revue, communication claire avec les autres pôles — **toujours** en lien direct avec le métier, pas comme liste générique hors sujet.
+
+**Interdit :** section ou formulation type « Âme », traits de caractère, humour de façade, histoire personnelle, métaphores de personnage, « tu es quelqu’un qui… » au sens humain.
 
 ---
 
 ## Format de sortie (obligatoire)
 
-Réponds **uniquement** avec le corps du champ, en respectant **exactement** ces deux libellés de ligne (pas de ligne avant le premier) :
+Réponds **uniquement** avec le corps du champ, en respectant **exactement** ces deux libellés de ligne (pas de ligne vide avant le premier) :
 
 **Rôle :** …
 
-**Âme :** …
+**Pratiques et standards :** …
 
 - Pas de titre markdown de niveau 1 (\`#\`).
-- Pas de préambule du type « Voici… » ni de post-scriptum.
-- Pas de mention explicite de « prompt », « LLM », « modèle », « OpenClaw », « système » ou « IA générative ».
+- Pas de préambule (« Voici… ») ni de post-scriptum.
+- Pas de mention explicite de « prompt », « LLM », « modèle », « IA générative », « OpenClaw ».
 
 ---
 
 ## Contraintes
 
 - Langue : français.
-- Longueur cible : environ 8 à 15 lignes au total (Rôle + Âme).
-- Style : précis, actionnable, crédible dans un contexte produit / conseil / craft métier.`;
+- Longueur cible : environ 10 à 18 lignes au total (les deux sections réunies).
+- Ton : professionnel, sobre, prescriptif (ce que l’assistant doit faire ou éviter), comme une **fiche de consignes**, pas une fiche de casting.`;
 
 export interface AppSettings {
   seedSystemPrompt: string;
