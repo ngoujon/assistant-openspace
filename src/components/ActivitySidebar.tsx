@@ -145,10 +145,6 @@ export function ActivitySidebar({
     return (
       <div className="activity-sidebar" role="complementary" aria-label="Activité">
         <h2 className="activity-sidebar-title">Activité</h2>
-        <p className="activity-sidebar-muted">
-          Tu es sur l’onglet <strong>Équipe</strong>. Les échanges en cours liés au
-          chat apparaissent ici lorsque tu reviens sur <strong>Chat</strong>.
-        </p>
       </div>
     );
   }
