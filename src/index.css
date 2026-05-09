@@ -1580,6 +1580,21 @@ body {
   margin-bottom: 0.35rem;
 }
 
+.modal-name-seed-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.modal-name-seed-row .modal-name-input {
+  flex: 1;
+  min-width: 12rem;
+  width: auto;
+  margin-bottom: 0;
+}
+
 .modal-name-input {
   width: 100%;
   font: inherit;
@@ -1589,7 +1604,6 @@ body {
   color: var(--text);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  margin-bottom: 0.65rem;
 }
 
 .modal-name-input:focus {
@@ -1625,14 +1639,6 @@ body {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-muted);
-}
-
-.modal-seed-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
-  margin-bottom: 0.35rem;
 }
 
 .modal-gen-error {

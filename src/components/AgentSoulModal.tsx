@@ -165,16 +165,28 @@ export function AgentSoulModal({
           <label className="modal-field-label" htmlFor="soul-member-name">
             Nom du membre
           </label>
-          <input
-            ref={nameInputRef}
-            id="soul-member-name"
-            type="text"
-            className="modal-name-input"
-            value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
-            disabled={node.kind === "master"}
-            autoComplete="off"
-          />
+          <div className="modal-name-seed-row">
+            <input
+              ref={nameInputRef}
+              id="soul-member-name"
+              type="text"
+              className="modal-name-input"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              disabled={node.kind === "master"}
+              autoComplete="off"
+            />
+            {node.kind !== "master" && (
+              <button
+                type="button"
+                className="btn-secondary btn-compact"
+                disabled={!canGenerateSeed}
+                onClick={() => void handleGenerateSeed()}
+              >
+                {generating ? "Génération…" : "Générer un seed"}
+              </button>
+            )}
+          </div>
           {node.kind !== "master" && parentOptions.length > 0 && (
             <div className="modal-field-block modal-field-tight">
               <label className="modal-field-label" htmlFor="soul-parent-select">
@@ -192,18 +204,6 @@ export function AgentSoulModal({
                   </option>
                 ))}
               </select>
-            </div>
-          )}
-          {node.kind !== "master" && (
-            <div className="modal-seed-row">
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={!canGenerateSeed}
-                onClick={() => void handleGenerateSeed()}
-              >
-                {generating ? "Génération…" : "Générer un seed"}
-              </button>
             </div>
           )}
           {genError && <p className="modal-gen-error">{genError}</p>}
