@@ -28,10 +28,6 @@ export function Sidebar({
       </header>
       <nav className="sidebar-nav" aria-label="Conversations">
         <h2 className="sidebar-section">Conversations</h2>
-        <p className="sidebar-storage-hint">
-          Historique enregistré dans ce navigateur (localStorage). Clique une
-          conversation pour la rouvrir.
-        </p>
         <ul className="conv-list">
           {sorted.map((c) => (
             <li key={c.id}>

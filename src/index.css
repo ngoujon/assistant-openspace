@@ -420,14 +420,6 @@ body {
   max-height: min(36vh, 14rem);
 }
 
-.sidebar-storage-hint {
-  margin: 0 0 0.65rem;
-  padding: 0 0.25rem;
-  font-size: 0.6875rem;
-  line-height: 1.45;
-  color: var(--text-tertiary);
-}
-
 .sidebar-inner {
   padding: 1.25rem 0.875rem 1.5rem;
 }
