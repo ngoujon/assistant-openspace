@@ -67,11 +67,6 @@ export function TeamArchiveSection({
   return (
     <div className="team-archive-wrap">
       <h3 className="team-tree-title">Archives</h3>
-      <p className="team-drop-hint">
-        Enregistre une <strong>copie nommée</strong> de l’organisation et des textes
-        « âme » pour tester une autre composition sans perdre la précédente. Restaure
-        une archive pour la remettre comme équipe active.
-      </p>
       <div className="team-archive-form">
         <label className="team-archive-label" htmlFor="team-archive-name">
           Nom de la composition

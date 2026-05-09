@@ -357,11 +357,6 @@ export function TeamPanel({ model }: TeamPanelProps) {
 
       <div className="team-tree-wrap">
         <h3 className="team-tree-title">Organisation</h3>
-        <p className="team-drop-hint">
-          Clique sur la carte pour ouvrir la fiche. Pour déplacer : maintiens le
-          clic sur la ligne (nom ou poignée) et dépose sur l’orchestrateur ou un
-          agent directeur — la ligne cible se surligne. Évite le bouton ×.
-        </p>
         <ul
           className="team-tree-root team-tree-lineage-root"
           role="tree"
