@@ -7,6 +7,7 @@ import {
   type DragEvent,
 } from "react";
 import { AgentSoulModal, type SoulModalNode } from "@/components/AgentSoulModal";
+import { TeamArchiveSection } from "@/components/TeamArchiveSection";
 import {
   membersToDisplayTree,
   parentLabelFor,
@@ -314,6 +315,15 @@ export function TeamPanel({ model }: TeamPanelProps) {
     setMembers((prev) => addMemberUnder(prev, ORCHESTRATOR_ID));
   }, []);
 
+  const handleRestoreArchive = useCallback(
+    (nextMembers: TreeMember[], nextSouls: Record<string, string>) => {
+      setMembers(nextMembers);
+      setSouls(nextSouls);
+      setEditing(null);
+    },
+    [],
+  );
+
   if (!root) {
     return <div className="team-panel">Arbre d’équipe invalide.</div>;
   }
@@ -347,6 +357,12 @@ export function TeamPanel({ model }: TeamPanelProps) {
           Nouveau membre (sous orchestrateur)
         </button>
       </div>
+
+      <TeamArchiveSection
+        members={members}
+        souls={souls}
+        onRestore={handleRestoreArchive}
+      />
 
       <div className="team-tree-wrap">
         <h3 className="team-tree-title">Organisation</h3>

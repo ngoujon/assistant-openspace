@@ -21,7 +21,7 @@ Les **textes « âme et rôle »** configurés dans l’onglet **Équipe** (moda
 
 ## Équipe dynamique
 
-L’arbre (membres sous l’orchestrateur, sous-agents sous les piliers) est lu depuis `loadTeamMembers()` au moment du lancement. Toute modification dans l’onglet **Équipe** (ajout, glisser-déposer, noms) est donc prise en compte pour la mission suivante.
+L’arbre (membres sous l’orchestrateur, sous-agents sous les piliers) est lu depuis `loadTeamMembers()` au moment du lancement. Toute modification dans l’onglet **Équipe** (ajout, glisser-déposer, noms) est donc prise en compte pour la mission suivante. Des **archives nommées** permettent de sauvegarder une composition (arbre + âmes) et de la restaurer plus tard (`src/lib/teamArchiveStorage.ts`).
 
 ## Fichiers code
 

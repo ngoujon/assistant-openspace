@@ -44,6 +44,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-03-28 | Docker : image nginx + build Vite, port 3004, proxy Ollama vers hôte |
 | 2026-03-28 | Ollama : liste de modèles filtrée (exclut embedding, ex. nomic-embed-text) |
 | 2026-03-28 | Discussion : routage par orchestrateur, réponse du membre le plus qualifié |
+| 2026-05-09 | Équipe : archives nommées (arbre + âmes), restauration depuis `openspace-team-archives-v1` |
 
 ---
 
@@ -176,6 +177,24 @@ Afficher un organigramme lisible : **Orchestrateur** en tête, trois **agents** 
 ### Fichiers touchés
 
 - `src/components/TeamPanel.tsx`, `src/index.css`
+
+---
+
+## 2026-05-09 — Archives d’équipe
+
+### Objectif
+
+Pouvoir **sauvegarder des compositions** (organigramme + textes « âme ») sous un **nom**, les consulter dans une liste et **restaurer** l’équipe active sans perdre les variantes précédentes.
+
+### Décisions
+
+- Persistance navigateur : `localStorage` clé **`openspace-team-archives-v1`** — tableau d’entrées `{ id, name, createdAt, members, souls }`.
+- Chaque archive est une **copie figée** au moment de l’archivage ; **Restaurer** remplace l’équipe active (`openspace-team-tree-v1` + `openspace-team-souls-v1` via les effets existants du panneau).
+- Les âmes restaurées reprennent les valeurs archivées ; pour un membre sans entrée dans l’archive (migration rare), retombée sur les seeds `AGENT_SOUL_SEEDS` si l’id est connu.
+
+### Fichiers touchés
+
+- `src/lib/teamArchiveStorage.ts`, `src/components/TeamArchiveSection.tsx`, `src/components/TeamPanel.tsx`, `src/index.css`
 
 ---
 
