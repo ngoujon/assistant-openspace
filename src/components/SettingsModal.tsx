@@ -102,7 +102,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             </h3>
             <p className="modal-settings-intro">
               Ces textes sont envoyés à Ollama lorsque tu cliques sur « Générer un seed » dans la fiche
-              d’un membre. Tu peux les adapter à ton style ou à ton modèle.
+              d’un membre. Le gabarit par défaut s’inspire de la structuration des prompts{" "}
+              <strong>OpenClaw</strong> (sections fixes : contexte, mission, format, contraintes) — tu peux
+              tout adapter à ton style ou à ton modèle.
             </p>
             <label className="modal-field-label" htmlFor="settings-seed-system">
               Message système
@@ -122,10 +124,10 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               Gabarit du message utilisateur
             </label>
             <p className="modal-settings-hint">
-              Utilise les placeholders <code className="modal-settings-code">{"{{memberLabel}}"}</code>{" "}
-              (nom du membre) et{" "}
-              <code className="modal-settings-code">{"{{place}}"}</code> (phrase sur sa place dans
-              l’organigramme). Ils sont remplacés automatiquement.
+              Placeholders obligatoires pour l’injection runtime :{" "}
+              <code className="modal-settings-code">{"{{memberLabel}}"}</code> (nom) et{" "}
+              <code className="modal-settings-code">{"{{place}}"}</code> (phrase sur la place dans
+              l’organigramme). Tu peux les placer où tu veux dans tes sections.
             </p>
             <textarea
               id="settings-seed-user"
@@ -133,7 +135,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               value={seedUser}
               onChange={(e) => setSeedUser(e.target.value)}
               spellCheck={false}
-              rows={14}
+              rows={22}
             />
             <button
               type="button"

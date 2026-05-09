@@ -1,20 +1,50 @@
 const KEY = "openspace-app-settings-v1";
 
+/** Aligné sur l’esprit des prompts OpenClaw : sections fixes, mission explicite, format de sortie et garde-fous. */
 export const DEFAULT_SEED_SYSTEM_PROMPT =
-  "Tu écris des fiches de personnage pour une équipe virtuelle pilotée par LLM. Réponds uniquement en français.";
+  "Tu rédiges des profils « persona » pour une équipe virtuelle OpenSpace (équivalent d’une couche SOUL : identité + règles d’exécution). Réponds uniquement en français et respecte strictement la structure demandée dans le message utilisateur.";
 
-/** {{memberLabel}} = nom affiché ; {{place}} = phrase sur la position dans l’arbre (injectée par l’app). */
-export const DEFAULT_SEED_USER_TEMPLATE = `Nom du membre : **{{memberLabel}}**
+/**
+ * Gabarit type OpenClaw : contexte d’exécution → mission → format → contraintes.
+ * {{memberLabel}} = nom affiché ; {{place}} = phrase sur la position dans l’arbre (injectée par l’app).
+ */
+export const DEFAULT_SEED_USER_TEMPLATE = `## Contexte d’exécution
 
+Tu produis la couche **âme et rôle** pour **un seul** membre de l’équipe virtuelle.
+
+### Identité affichée
+{{memberLabel}}
+
+### Position dans l’organigramme
 {{place}}
 
-Rédige un texte structuré pour le champ « âme et rôle » du membre, au format :
+---
 
-Rôle : … (missions, périmètre, interactions avec le reste de l’équipe)
+## Mission
 
-Âme : … (ton, valeurs, style de décision)
+Rédiger le texte qui sera collé dans le champ **« âme et rôle »** : missions concrètes, périmètre, interactions avec le reste de l’équipe, puis personnalité opérationnelle (ton, valeurs, style de décision).
 
-Longueur : environ 8–15 lignes au total. Pas de titre markdown de niveau 1. Pas de mention de « prompt » ou « LLM ».`;
+---
+
+## Format de sortie (obligatoire)
+
+Réponds **uniquement** avec le corps du champ, en respectant **exactement** ces deux libellés de ligne (pas de ligne avant le premier) :
+
+**Rôle :** …
+
+**Âme :** …
+
+- Pas de titre markdown de niveau 1 (\`#\`).
+- Pas de préambule du type « Voici… » ni de post-scriptum.
+- Pas de mention explicite de « prompt », « LLM », « modèle », « OpenClaw », « système » ou « IA générative ».
+
+---
+
+## Contraintes
+
+- Langue : français.
+- Longueur cible : environ 8 à 15 lignes au total (Rôle + Âme).
+- Style : précis, actionnable, crédible dans un contexte produit / conseil / craft métier.`;
 
 export interface AppSettings {
   seedSystemPrompt: string;

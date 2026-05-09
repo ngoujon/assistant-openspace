@@ -47,6 +47,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-05-09 | Équipe : archives nommées (arbre + âmes), restauration depuis `openspace-team-archives-v1` |
 | 2026-05-09 | Docker dev : `docker-compose.dev.yml` + Vite sur 3004 (HMR), proxy Ollama via `OPENSPACE_OLLAMA_PROXY_TARGET` |
 | 2026-05-09 | Paramètres : engrenage sidebar, prompts seed Ollama éditables (`openspace-app-settings-v1`) |
+| 2026-05-09 | Gabarit seed par défaut : structure type OpenClaw (contexte / mission / format / contraintes) |
 
 ---
 
