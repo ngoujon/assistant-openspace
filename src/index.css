@@ -929,18 +929,6 @@ body {
   scrollbar-color: var(--border-strong) transparent;
 }
 
-.mission-lead {
-  margin: 0 0 1rem;
-  font-size: 0.875rem;
-  line-height: 1.6;
-  color: var(--text-secondary);
-}
-
-.mission-lead strong {
-  color: var(--text);
-  font-weight: 600;
-}
-
 .mission-label {
   display: block;
   font-size: 0.6875rem;

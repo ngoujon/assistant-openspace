@@ -170,15 +170,6 @@ export function MissionWorkspace({
   return (
     <div className="mission-workspace">
       <div className="mission-body">
-        <p className="mission-lead">
-          Décris ton contexte et ajoute des fichiers texte.{" "}
-          <strong>L’orchestrateur</strong> analyse le tout, sollicite les{" "}
-          <strong>directeurs</strong> et leurs <strong>sous-agents</strong> via Ollama,
-          puis produit un <strong>README Markdown</strong> consolidé. La{" "}
-          <strong>progression</strong> s’affiche dans la colonne de droite (bandeau en
-          haut sur mobile).
-        </p>
-
         <label className="mission-label" htmlFor="mission-context">
           Contexte
         </label>
