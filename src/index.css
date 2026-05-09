@@ -1627,13 +1627,6 @@ body {
   box-shadow: 0 0 0 2px var(--accent-muted);
 }
 
-.modal-parent-hint {
-  margin: 0;
-  font-size: 0.72rem;
-  color: var(--text-tertiary);
-  line-height: 1.45;
-}
-
 .modal-seed-row {
   display: flex;
   flex-wrap: wrap;

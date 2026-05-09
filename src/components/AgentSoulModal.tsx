@@ -192,10 +192,6 @@ export function AgentSoulModal({
                   </option>
                 ))}
               </select>
-              <p className="modal-parent-hint">
-                Tu peux aussi glisser toute la ligne du membre dans l’arbre. Un membre avec des
-                subordonnés ne peut pas devenir sous-agent.
-              </p>
             </div>
           )}
           {node.kind !== "master" && (
