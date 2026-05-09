@@ -45,6 +45,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-03-28 | Ollama : liste de modèles filtrée (exclut embedding, ex. nomic-embed-text) |
 | 2026-03-28 | Discussion : routage par orchestrateur, réponse du membre le plus qualifié |
 | 2026-05-09 | Équipe : archives nommées (arbre + âmes), restauration depuis `openspace-team-archives-v1` |
+| 2026-05-09 | Docker dev : `docker-compose.dev.yml` + Vite sur 3004 (HMR), proxy Ollama via `OPENSPACE_OLLAMA_PROXY_TARGET` |
 
 ---
 
@@ -195,6 +196,24 @@ Pouvoir **sauvegarder des compositions** (organigramme + textes « âme ») sous
 ### Fichiers touchés
 
 - `src/lib/teamArchiveStorage.ts`, `src/components/TeamArchiveSection.tsx`, `src/components/TeamPanel.tsx`, `src/index.css`
+
+---
+
+## 2026-05-09 — Docker : Vite avec HMR sur le port 3004
+
+### Objectif
+
+Trouver sur **http://localhost:3004** les changements du code **en temps réel** sans `docker compose build` à chaque modification.
+
+### Décisions
+
+- **`docker-compose.dev.yml`** : service `openspace-dev` (`node:22-alpine`), volume projet + volume nommé pour `node_modules`, commande `npm ci && npm run dev`.
+- **`vite.config.ts`** : `server.host: true` ; proxy Ollama configurable par **`OPENSPACE_OLLAMA_PROXY_TARGET`** (Docker → `host.docker.internal:11434`) ; **`CHOKIDAR_USEPOLLING`** pour la fiabilité du watch sur certains montages ; **`OPENSPACE_DOCKER_DEV`** pour la config HMR côté navigateur (`localhost:3004`).
+- Scripts npm : `docker:dev`, `docker:dev:d`, `docker:dev:down`.
+
+### Fichiers touchés
+
+- `docker-compose.dev.yml`, `vite.config.ts`, `package.json`, `docs/docker.md`, `docs/ollama.md`, `README.md`
 
 ---
 

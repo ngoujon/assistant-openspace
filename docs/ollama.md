@@ -6,6 +6,8 @@ L’application parle à l’API HTTP d’Ollama, normalement exposée sur **`ht
 
 ## Proxy de développement (Vite)
 
+La cible du proxy est **`http://127.0.0.1:11434`** par défaut. Sous **Docker dev** (`docker-compose.dev.yml`), la variable d’environnement **`OPENSPACE_OLLAMA_PROXY_TARGET`** est fixée à `http://host.docker.internal:11434` pour joindre Ollama sur la machine hôte depuis le conteneur.
+
 Dans `vite.config.ts`, les requêtes vers :
 
 - `GET /api/ollama/api/tags` → liste des modèles

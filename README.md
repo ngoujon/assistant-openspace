@@ -32,6 +32,18 @@ Le port **3004** est configuré pour `npm run dev` et `npm run preview`.
 
 ## Docker (port 3004)
 
+### Rechargement à chaud (recommandé pendant le dev)
+
+Sans reconstruire l’image nginx : Vite dans Docker avec les sources montées.
+
+```bash
+npm run docker:dev
+```
+
+Puis **http://localhost:3004**. Arrêt : `Ctrl+C` ou `npm run docker:dev:down`. Ne pas lancer en parallèle du mode production ci-dessous (même port).
+
+### Image nginx (build statique)
+
 Depuis un volume **exFAT** (ex. disque externe), préfère :
 
 ```bash
@@ -44,7 +56,7 @@ Sinon :
 docker compose up --build -d
 ```
 
-Puis ouvre **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le conteneur s’y connecte via `host.docker.internal:11434`). Détails, Linux et dépannage `._.cursor` : `docs/docker.md`.
+Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le conteneur s’y connecte via `host.docker.internal:11434`). Détails, Linux et dépannage `._.cursor` : `docs/docker.md`.
 
 ## Fonctionnalités principales
 

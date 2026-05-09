@@ -8,8 +8,11 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 3004 --strictPort",
     "docker:up": "sh scripts/docker-up.sh up --build -d",
+    "docker:dev": "sh scripts/docker-up.sh -f docker-compose.dev.yml up",
+    "docker:dev:d": "sh scripts/docker-up.sh -f docker-compose.dev.yml up -d",
     "docker:build": "sh scripts/docker-up.sh build",
-    "docker:down": "docker compose down"
+    "docker:down": "docker compose down",
+    "docker:dev:down": "docker compose -f docker-compose.dev.yml down"
   },
   "dependencies": {
     "react": "^19.0.0",
