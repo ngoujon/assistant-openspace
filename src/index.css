@@ -1635,14 +1635,6 @@ body {
   margin-bottom: 0.35rem;
 }
 
-.modal-seed-hint {
-  font-size: 0.72rem;
-  color: var(--text-tertiary);
-  line-height: 1.4;
-  flex: 1;
-  min-width: 8rem;
-}
-
 .modal-gen-error {
   margin: 0.25rem 0 0;
   font-size: 0.8125rem;

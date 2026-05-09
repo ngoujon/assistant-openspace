@@ -204,11 +204,6 @@ export function AgentSoulModal({
               >
                 {generating ? "Génération…" : "Générer un seed"}
               </button>
-              <span className="modal-seed-hint">
-                Utilise Ollama ({model || "aucun modèle"}) selon le nom et la place
-                dans l’équipe
-                {seedParentLabel ? ` (sous « ${seedParentLabel} »)` : ""}.
-              </span>
             </div>
           )}
           {genError && <p className="modal-gen-error">{genError}</p>}
