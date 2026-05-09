@@ -338,15 +338,6 @@ export function TeamPanel({ model }: TeamPanelProps) {
   return (
     <div className="team-panel">
       <h2 className="team-heading">Équipe virtuelle</h2>
-      <p className="team-copy">
-        <strong>Ajoute</strong> des membres sous l’orchestrateur.{" "}
-        <strong>Glisse toute la ligne</strong> (carte du membre) vers
-        l’orchestrateur ou un directeur, ou utilise{" "}
-        <strong>Rattaché sous</strong> dans la fiche du membre. Un membre qui a
-        déjà des subordonnés ne peut pas devenir sous-agent. Clique sur un rôle
-        pour l’<strong>âme et rôle</strong> et la génération de seed (modèle dans
-        l’onglet Chat).
-      </p>
 
       <div className="team-actions-bar">
         <button
