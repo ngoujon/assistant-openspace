@@ -224,10 +224,6 @@ export function AgentSoulModal({
           rows={14}
         />
         <footer className="modal-footer">
-          <span className="modal-hint">
-            Échap : fermer sans enregistrer · Entrée : enregistrer · Maj+Entrée
-            : saut de ligne
-          </span>
           <div className="modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
               Annuler
