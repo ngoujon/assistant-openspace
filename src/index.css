@@ -430,6 +430,42 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sidebar-brand-row .sidebar-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-settings-btn {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.sidebar-settings-btn:hover {
+  color: var(--text);
+  background: var(--bg-surface);
+}
+
+.sidebar-settings-icon {
+  display: block;
+}
+
 .sidebar-title {
   font-size: 0.9375rem;
   font-weight: 600;
@@ -1520,6 +1556,85 @@ body {
 
 .modal-dialog-wide {
   width: min(600px, 100%);
+}
+
+.modal-dialog-settings {
+  width: min(720px, 100%);
+  max-height: min(92vh, 820px);
+}
+
+.modal-settings-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.5rem 1.125rem 0.75rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.modal-settings-section {
+  margin: 0;
+}
+
+.modal-settings-section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.modal-settings-intro {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.modal-settings-hint {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.modal-settings-code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+
+.modal-settings-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0.55rem 0.65rem;
+  margin-bottom: 0.65rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+.modal-settings-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.modal-settings-textarea--short {
+  min-height: 5rem;
+}
+
+.modal-settings-label-block {
+  margin-top: 0.75rem;
+}
+
+.modal-settings-reset {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
 }
 
 .modal-header {

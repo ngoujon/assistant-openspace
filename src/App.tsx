@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivitySidebar } from "@/components/ActivitySidebar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Layout } from "@/components/Layout";
+import { SettingsModal } from "@/components/SettingsModal";
 import { Sidebar } from "@/components/Sidebar";
 import { TeamPanel } from "@/components/TeamPanel";
 import { fetchOllamaModels } from "@/lib/ollama";
@@ -32,6 +33,7 @@ export default function App() {
   const [rightActivity, setRightActivity] = useState<RightActivityState>({
     kind: "idle",
   });
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (mainTab === "team") {
@@ -165,66 +167,70 @@ export default function App() {
   }
 
   return (
-    <Layout
-      sidebar={
-        <Sidebar
-          conversations={conversations}
-          activeId={active.id}
-          onSelect={handleSelectConversation}
-          onNew={handleNewChat}
-          onDelete={handleDeleteConversation}
-        />
-      }
-      rightAside={<ActivitySidebar state={rightActivity} />}
-      main={
-        <>
-          <nav className="main-tabs" aria-label="Zones principales">
-            <button
-              type="button"
-              className={mainTab === "chat" ? "tab active" : "tab"}
-              onClick={() => setMainTab("chat")}
-            >
-              Chat
-            </button>
-            <button
-              type="button"
-              className={mainTab === "team" ? "tab active" : "tab"}
-              onClick={() => setMainTab("team")}
-            >
-              Équipe
-            </button>
-          </nav>
-          <div className="main-body">
-            {mainTab === "chat" ? (
-              <ChatPanel
-                conversation={active}
-                models={models}
-                model={model}
-                onModelChange={setModel}
-                ollamaError={ollamaError}
-                onRetryOllama={() => {
-                  fetchOllamaModels()
-                    .then((m) => {
-                      setModels(m);
-                      setModel((prev) =>
-                        prev && m.includes(prev) ? prev : m[0] || "",
-                      );
-                      setOllamaError(null);
-                    })
-                    .catch((e: Error) => setOllamaError(e.message));
-                }}
-                setMessages={setActiveMessages}
-                onConversationTitle={setConversationTitleById}
-                onConversationArtifact={setConversationArtifactMarkdown}
-                activityState={rightActivity}
-                setRightActivity={setRightActivity}
-              />
-            ) : (
-              <TeamPanel model={model} />
-            )}
-          </div>
-        </>
-      }
-    />
+    <>
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <Layout
+        sidebar={
+          <Sidebar
+            conversations={conversations}
+            activeId={active.id}
+            onSelect={handleSelectConversation}
+            onNew={handleNewChat}
+            onDelete={handleDeleteConversation}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
+        }
+        rightAside={<ActivitySidebar state={rightActivity} />}
+        main={
+          <>
+            <nav className="main-tabs" aria-label="Zones principales">
+              <button
+                type="button"
+                className={mainTab === "chat" ? "tab active" : "tab"}
+                onClick={() => setMainTab("chat")}
+              >
+                Chat
+              </button>
+              <button
+                type="button"
+                className={mainTab === "team" ? "tab active" : "tab"}
+                onClick={() => setMainTab("team")}
+              >
+                Équipe
+              </button>
+            </nav>
+            <div className="main-body">
+              {mainTab === "chat" ? (
+                <ChatPanel
+                  conversation={active}
+                  models={models}
+                  model={model}
+                  onModelChange={setModel}
+                  ollamaError={ollamaError}
+                  onRetryOllama={() => {
+                    fetchOllamaModels()
+                      .then((m) => {
+                        setModels(m);
+                        setModel((prev) =>
+                          prev && m.includes(prev) ? prev : m[0] || "",
+                        );
+                        setOllamaError(null);
+                      })
+                      .catch((e: Error) => setOllamaError(e.message));
+                  }}
+                  setMessages={setActiveMessages}
+                  onConversationTitle={setConversationTitleById}
+                  onConversationArtifact={setConversationArtifactMarkdown}
+                  activityState={rightActivity}
+                  setRightActivity={setRightActivity}
+                />
+              ) : (
+                <TeamPanel model={model} />
+              )}
+            </div>
+          </>
+        }
+      />
+    </>
   );
 }

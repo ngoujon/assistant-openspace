@@ -46,6 +46,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-03-28 | Discussion : routage par orchestrateur, réponse du membre le plus qualifié |
 | 2026-05-09 | Équipe : archives nommées (arbre + âmes), restauration depuis `openspace-team-archives-v1` |
 | 2026-05-09 | Docker dev : `docker-compose.dev.yml` + Vite sur 3004 (HMR), proxy Ollama via `OPENSPACE_OLLAMA_PROXY_TARGET` |
+| 2026-05-09 | Paramètres : engrenage sidebar, prompts seed Ollama éditables (`openspace-app-settings-v1`) |
 
 ---
 
@@ -196,6 +197,23 @@ Pouvoir **sauvegarder des compositions** (organigramme + textes « âme ») sous
 ### Fichiers touchés
 
 - `src/lib/teamArchiveStorage.ts`, `src/components/TeamArchiveSection.tsx`, `src/components/TeamPanel.tsx`, `src/index.css`
+
+---
+
+## 2026-05-09 — Paramètres et prompts « Générer un seed »
+
+### Objectif
+
+Permettre de **personnaliser les messages** envoyés à Ollama pour la **génération de seed** (fiche âme / rôle), depuis une **modale Paramètres** ouverte via une icône à côté du titre OpenSpace.
+
+### Décisions
+
+- Persistance **`openspace-app-settings-v1`** : `seedSystemPrompt`, `seedUserTemplate` avec placeholders `{{memberLabel}}` et `{{place}}`.
+- `generateMemberSoulSeed` lit `loadAppSettings()` à chaque appel.
+
+### Fichiers touchés
+
+- `src/lib/appSettingsStorage.ts`, `src/lib/generateMemberSeed.ts`, `src/components/SettingsModal.tsx`, `src/components/Sidebar.tsx`, `src/App.tsx`, `src/index.css`
 
 ---
 

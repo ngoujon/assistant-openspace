@@ -78,7 +78,7 @@ Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le c
 
 ### Autres
 
-- **Colonne gauche** : conversations (mode Discussion), persistance `localStorage`.
+- **Colonne gauche** : conversations (mode Discussion), persistance `localStorage` ; icône **Paramètres** à droite du titre OpenSpace (prompts pour **Générer un seed**, stockés dans le navigateur).
 - **Colonne droite** : réservée pour extensions.
 
 ## Ollama et proxy
