@@ -4,6 +4,19 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Compositeur @ : miroir aligné + Activité discussion sur un seul fil
+
+### Objectif
+
+- Corriger le **décalage** entre le textarea transparent et le miroir des mentions : le miroir utilisait des badges plus courts que le littéral `@[…]`, ce qui changeait les césures ; affichage métrique + sync `scrollTop` après changement de valeur.
+- En mode **Discussion**, afficher **une seule** frise d’étapes (historique mission + session courante) sans bloc ni titre « Discussion (cette session) ».
+
+### Fichiers
+
+- `src/components/MentionRichText.tsx`, `src/components/MentionComboboxTextarea.tsx`, `src/components/ActivitySidebar.tsx`, `src/index.css`
+
+---
+
 ## 2026-05-10 — Mission → Discussion : conserver le contexte + transition
 
 ### Objectif
@@ -49,6 +62,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 
 | Date | Changement |
 |------|------------|
+| 2026-05-10 | Compositeur @ : miroir aligné sur le littéral `@[…]` + sync scroll ; Activité discussion : une seule timeline (mission + session) |
 | 2026-05-10 | LLM : Mistral AI (défaut) + Ollama local ; clé API dans Paramètres ; proxies `/api/mistral` et doc |
 | 2026-05-10 | Mistral : choix du modèle uniquement dans Paramètres (`mistralChatModel`) |
 | 2026-05-10 | Ollama : choix du modèle dans Paramètres (`ollamaChatModel`) — plus de sélecteur dans la barre du chat |

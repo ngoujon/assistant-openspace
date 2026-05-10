@@ -4,12 +4,20 @@ interface MentionRichTextProps {
   text: string;
   /** Classe sur le conteneur (ex. bulle de chat). */
   className?: string;
+  /**
+   * Superposition compositeur : affiche le littéral `@[…]` (même césures que le textarea).
+   */
+  metricMirror?: boolean;
 }
 
 /**
  * Affiche le texte en stylisant les mentions `@[Libellé]` comme des badges.
  */
-export function MentionRichText({ text, className }: MentionRichTextProps) {
+export function MentionRichText({
+  text,
+  className,
+  metricMirror = false,
+}: MentionRichTextProps) {
   const parts = splitBracketMentionsForVisual(text);
   return (
     <span
@@ -21,11 +29,14 @@ export function MentionRichText({ text, className }: MentionRichTextProps) {
         ) : (
           <span
             key={i}
-            className="agent-mention-badge"
+            className={
+              "agent-mention-badge" +
+              (metricMirror ? " agent-mention-badge--metric-mirror" : "")
+            }
             title={part.raw}
             translate="no"
           >
-            @{part.displayLabel}
+            {metricMirror ? part.raw : `@${part.displayLabel}`}
           </span>
         ),
       )}

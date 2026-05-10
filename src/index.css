@@ -202,56 +202,6 @@ body {
   font-weight: 600;
 }
 
-.activity-mission-history {
-  margin: 0 0 0.75rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border);
-  scrollbar-width: thin;
-}
-
-/* Historique mission : occupe la hauteur disponible jusqu’au pied (bouton .md). */
-.activity-sidebar.activity-sidebar--discussion-with-history .activity-mission-history {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.5rem;
-  overflow: hidden;
-}
-
-.activity-sidebar.activity-sidebar--discussion-with-history .activity-discussion-main {
-  flex: 1 1 42%;
-  min-height: 0;
-  overflow: auto;
-}
-
-.activity-discussion-session {
-  margin: 0 0 0.5rem;
-}
-
-.activity-discussion-session-title {
-  margin: 0 0 0.4rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.activity-sidebar.activity-sidebar--discussion-with-history
-  .activity-mission-history
-  .mission-step-panel {
-  flex: 1 1 auto;
-  min-height: 0;
-  margin-top: 0.25rem;
-}
-
-.activity-mission-history-title {
-  margin: 0 0 0.4rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
 .activity-sidebar-muted {
   margin: 0;
   font-size: 0.75rem;
@@ -1244,6 +1194,19 @@ body {
   border-radius: 999px;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+}
+
+/* Même métrique que le textarea pour superposition du compositeur @ */
+.agent-mention-badge--metric-mirror {
+  display: inline;
+  margin: 0;
+  padding: 0.08em 0.28em;
+  font-size: inherit;
+  font-weight: 600;
+  line-height: inherit;
+  letter-spacing: inherit;
+  vertical-align: baseline;
+  border-radius: 0.35em;
 }
 
 .bubble-user .agent-mention-badge {

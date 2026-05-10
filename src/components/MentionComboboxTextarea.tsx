@@ -165,6 +165,13 @@ export function MentionComboboxTextarea({
     el?.scrollIntoView({ block: "nearest" });
   }, [menuOpen, mentionIndex]);
 
+  /** Garde le miroir aligné après insertion @ ou changement de valeur (onScroll ne couvre pas tout). */
+  useLayoutEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    setMirrorScrollTop(ta.scrollTop);
+  }, [value]);
+
   const pickMember = useCallback(
     (m: TreeMember) => {
       const el = textareaRef.current;
@@ -273,7 +280,9 @@ export function MentionComboboxTextarea({
             className="mention-mirror-content"
             style={{ transform: `translateY(-${mirrorScrollTop}px)` }}
           >
-            {value ? <MentionRichText text={value} /> : null}
+            {value ? (
+              <MentionRichText text={value} metricMirror />
+            ) : null}
           </div>
         </div>
         <textarea

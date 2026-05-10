@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { triggerMarkdownDownload } from "@/lib/downloadMarkdown";
 import {
   missionProgressPercent,
@@ -121,6 +121,8 @@ function MissionStepTimeline({
   );
 }
 
+const EMPTY_PROGRESS: string[] = [];
+
 interface ActivitySidebarProps {
   state: RightActivityState;
   /** Sur mobile la colonne droite est masquée : version compacte au-dessus du fil. */
@@ -141,6 +143,16 @@ export function ActivitySidebar({
   llmProvider = "ollama",
 }: ActivitySidebarProps) {
   const isInline = variant === "inline";
+
+  const discussionMissionHist = missionHistory?.progress?.length
+    ? missionHistory.progress
+    : EMPTY_PROGRESS;
+  const discussionSessionProgress =
+    state.kind === "discussion" ? state.discussionProgress : EMPTY_PROGRESS;
+  const discussionCombinedProgress = useMemo(
+    () => [...discussionMissionHist, ...discussionSessionProgress],
+    [discussionMissionHist, discussionSessionProgress],
+  );
 
   if (state.kind === "idle") {
     if (isInline) return null;
@@ -167,49 +179,33 @@ export function ActivitySidebar({
     if (isInline) return null;
     const { isRouting, streaming, panelError } = state;
     const busy = isRouting || streaming;
-    const hist = missionHistory?.progress?.length ? missionHistory : null;
 
     return (
       <div
-        className={`activity-sidebar activity-sidebar--discussion${hist ? " activity-sidebar--discussion-with-history" : ""}`}
+        className="activity-sidebar activity-sidebar--discussion"
         role="status"
         aria-live="polite"
         aria-busy={busy}
       >
         <h2 className="activity-sidebar-title">Activité</h2>
-        {hist ? (
-          <div className="activity-mission-history">
-            <h3 className="activity-mission-history-title">Mission (historique)</h3>
-            <MissionStepTimeline
-              progress={hist.progress}
-              running={false}
-              compact
-            />
-          </div>
-        ) : null}
         <div className="activity-discussion-main">
           {panelError && (
             <p className="activity-sidebar-error" role="alert">
               {panelError}
             </p>
           )}
-          {state.discussionProgress.length > 0 ? (
-            <div className="activity-discussion-session">
-              <h3 className="activity-discussion-session-title">
-                Discussion (cette session)
-              </h3>
-              <MissionStepTimeline
-                progress={state.discussionProgress}
-                running={busy}
-                compact
-              />
-            </div>
+          {discussionCombinedProgress.length > 0 ? (
+            <MissionStepTimeline
+              progress={discussionCombinedProgress}
+              running={busy}
+              compact
+            />
           ) : !panelError && busy ? (
             <p className="activity-sidebar-status">En cours…</p>
           ) : null}
           {!panelError && !busy && !linkedArtifact && (
             <p className="activity-sidebar-muted">
-              {state.discussionProgress.length === 0
+              {discussionCombinedProgress.length === 0
                 ? "Aucun envoi en cours. Écris un message et envoie pour lancer l’équipe."
                 : "Prêt pour le prochain message."}
             </p>
