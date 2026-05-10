@@ -19,7 +19,7 @@ const STEP_KIND_LABELS: Record<MissionStepVisualKind, string | null> = {
   specialist: "Spécialiste",
   synthesis: "Synthèse",
   "pole-solo": "Pôle",
-  default: null,
+  default: "SYSTEME",
 };
 
 function MissionStepTimeline({
@@ -79,6 +79,9 @@ function MissionStepTimeline({
           const isLast = i === progress.length - 1;
           const isActive = running && isLast && p.kind !== "done";
           const kindLabel = STEP_KIND_LABELS[p.kind];
+          const defaultUnnumbered =
+            p.kind === "default" &&
+            (p.step == null || p.total == null);
           return (
             <li
               key={`${i}-${line.slice(0, 48)}`}
@@ -104,11 +107,24 @@ function MissionStepTimeline({
                     <span className="mission-step-num mission-step-num--check" title="Terminé">
                       ✓
                     </span>
+                  ) : p.kind === "default" ? (
+                    <span className="mission-step-pill mission-step-pill--systeme">
+                      {kindLabel}
+                    </span>
                   ) : (
                     <span className="mission-step-num mission-step-num--dot">·</span>
                   )}
-                  {kindLabel ? (
-                    <span className="mission-step-pill">{kindLabel}</span>
+                  {kindLabel && !defaultUnnumbered ? (
+                    <span
+                      className={
+                        "mission-step-pill" +
+                        (p.kind === "default"
+                          ? " mission-step-pill--systeme"
+                          : "")
+                      }
+                    >
+                      {kindLabel}
+                    </span>
                   ) : null}
                 </div>
                 <p className="mission-step-desc">{p.description}</p>

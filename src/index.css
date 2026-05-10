@@ -488,6 +488,10 @@ body {
   border: 1px solid color-mix(in srgb, var(--step-accent) 45%, transparent);
 }
 
+.mission-step-pill--systeme {
+  letter-spacing: 0.09em;
+}
+
 .mission-step-desc {
   margin: 0;
   font-size: 0.8125rem;
