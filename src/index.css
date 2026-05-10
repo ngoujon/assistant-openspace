@@ -27,6 +27,7 @@
   --font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, sans-serif;
   --sidebar-w: 272px;
+  --org-aside-w: minmax(260px, 22rem);
   --right-w: minmax(288px, 34rem);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 12px 40px rgba(0, 0, 0, 0.38);
@@ -78,12 +79,16 @@ body {
   font-size: 0.9rem;
 }
 
-/* ——— Shell 3 colonnes ——— */
+/* ——— Shell 3 ou 4 colonnes (Équipe : Organisation avant Activité) ——— */
 .shell {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr var(--right-w);
   height: 100%;
   min-height: 100vh;
+}
+
+.shell.shell--with-org-aside {
+  grid-template-columns: var(--sidebar-w) 1fr var(--org-aside-w) var(--right-w);
 }
 
 .shell-sidebar {
@@ -102,6 +107,26 @@ body {
   min-width: 0;
   min-height: 0;
   background: transparent;
+}
+
+.shell-org {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
+.shell-org > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .shell-right {
@@ -1308,6 +1333,51 @@ body {
   margin: 0 auto;
 }
 
+.team-panel--centre {
+  width: 100%;
+}
+
+.team-org-aside-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0.85rem 1.25rem;
+  box-sizing: border-box;
+}
+
+.team-org-aside-error {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--danger);
+}
+
+.team-org-aside-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  margin-bottom: 0.75rem;
+}
+
+.team-org-aside-title {
+  margin: 0;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.team-org-aside-add {
+  flex-shrink: 0;
+  max-width: 100%;
+  text-align: center;
+}
+
+
 .team-heading {
   margin: 0 0 0.5rem;
   font-size: 1.1875rem;
@@ -1455,6 +1525,23 @@ body {
   border-radius: var(--radius-lg);
   padding: 1.125rem 1.125rem 1.25rem;
   box-shadow: var(--shadow-sm);
+}
+
+.team-tree-wrap.team-tree-wrap--aside {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0.65rem 0.55rem 0.75rem;
+}
+
+.team-tree-wrap.team-tree-wrap--aside .team-tree-root {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
 .team-tree-head {

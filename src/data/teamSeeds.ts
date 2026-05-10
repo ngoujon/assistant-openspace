@@ -1,6 +1,6 @@
 /**
  * Seeds initiaux : âme et rôle de chaque nœud (prompts / personnalité pour usage futur avec Ollama).
- * Clés = identifiants dans `TEAM_HIERARCHY` (`src/components/TeamPanel.tsx`).
+ * Clés = identifiants dans `TEAM_HIERARCHY` (`src/components/TeamWorkspaceContext.tsx` / arbre Équipe).
  */
 export const AGENT_SOUL_SEEDS: Record<string, string> = {
   orchestrateur: `Tu es l’orchestrateur de l’équipe virtuelle.

@@ -31,6 +31,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Mission : zone glisser-déposer + clic pour fichiers .txt / .md (remplace le bouton « Ajouter des fichiers ») |
 | 2026-05-10 | Mission : actions « Lancer / Arrêter » alignées à droite |
 | 2026-05-10 | Équipe : « Nouveau membre » à droite du titre « Organisation » |
+| 2026-05-10 | Équipe : colonne Organisation pleine hauteur à gauche de l’activité (`shell-org`, `TeamWorkspaceProvider`) |
 
 ## 2026-03-28 — Bootstrap UI + Chat Ollama
 
@@ -133,7 +134,7 @@ Créer des **membres** sous l’orchestrateur, les **réorganiser par glisser-d�
 
 ### Fichiers touchés
 
-- `src/lib/teamTreeStorage.ts`, `src/lib/teamTreeDisplay.ts`, `src/lib/generateMemberSeed.ts`, `src/components/TeamPanel.tsx`, `src/components/AgentSoulModal.tsx`, `src/orchestration/pipeline.ts`, `src/App.tsx`, `src/index.css`, docs.
+- `src/lib/teamTreeStorage.ts`, `src/lib/teamTreeDisplay.ts`, `src/lib/generateMemberSeed.ts`, `src/components/TeamOrganisationAside.tsx`, `TeamCentrePanel.tsx`, `TeamWorkspaceContext.tsx`, `src/components/AgentSoulModal.tsx`, `src/orchestration/pipeline.ts`, `src/App.tsx`, `src/index.css`, docs.
 
 ---
 
@@ -194,7 +195,7 @@ Interface **sombre**, **épurée** et **simple à lire**, en s’alignant sur le
 
 ### Fichiers touchés
 
-- `src/components/TeamPanel.tsx`, `src/components/AgentSoulModal.tsx`, `src/data/teamSeeds.ts`, `src/lib/teamSoulsStorage.ts`, `src/index.css`
+- `src/components/TeamOrganisationAside.tsx`, `TeamCentrePanel.tsx`, `TeamWorkspaceContext.tsx`, `src/components/AgentSoulModal.tsx`, `src/data/teamSeeds.ts`, `src/lib/teamSoulsStorage.ts`, `src/index.css`
 
 ---
 
@@ -206,13 +207,13 @@ Afficher un organigramme lisible : **Orchestrateur** en tête, trois **agents** 
 
 ### Décisions
 
-- Structure de données **`TEAM_HIERARCHY`** dans `TeamPanel.tsx` (pas encore branchée sur Ollama).
+- Structure de données **`TEAM_HIERARCHY`** dans `teamSeeds` / arbre Équipe (pas encore branchée sur Ollama).
 - Sous-agents : **Designer UI / UX** (sous DA), **Développeur** (sous CTO), **DPO** (sous Directeur juridique) — un sous-agent par branche pour l’instant.
 - Présentation : liste imbriquée `role="tree"` / `treeitem`, repères visuels (bordure gauche, cartes par nœud).
 
 ### Fichiers touchés
 
-- `src/components/TeamPanel.tsx`, `src/index.css`
+- `src/components/TeamOrganisationAside.tsx`, `TeamCentrePanel.tsx`, `TeamWorkspaceContext.tsx`, `src/index.css`
 
 ---
 
@@ -230,7 +231,7 @@ Pouvoir **sauvegarder des compositions** (organigramme + textes « âme ») sous
 
 ### Fichiers touchés
 
-- `src/lib/teamArchiveStorage.ts`, `src/components/TeamArchiveSection.tsx`, `src/components/TeamPanel.tsx`, `src/index.css`
+- `src/lib/teamArchiveStorage.ts`, `src/components/TeamArchiveSection.tsx`, `src/components/TeamOrganisationAside.tsx`, `TeamCentrePanel.tsx`, `TeamWorkspaceContext.tsx`, `src/index.css`
 
 ---
 

@@ -1,42 +1,23 @@
+import { type DragEvent } from "react";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-} from "react";
-import { AgentSoulModal, type SoulModalNode } from "@/components/AgentSoulModal";
-import { TeamArchiveSection } from "@/components/TeamArchiveSection";
-import {
-  membersToDisplayTree,
-  parentLabelFor,
-  type DisplayNode,
-} from "@/lib/teamTreeDisplay";
-import { loadAgentSouls, saveAgentSouls } from "@/lib/teamSoulsStorage";
-import type { LlmProvider } from "@/lib/llmProvider";
-import {
-  ORCHESTRATOR_ID,
-  addMemberUnder,
   canReparent,
-  loadTeamMembers,
-  removeMemberSubtree,
-  reparentMember,
-  saveTeamMembers,
-  subtreeIds,
-  updateMemberLabel,
-  validParentTargetsForMember,
+  ORCHESTRATOR_ID,
   type TreeMember,
 } from "@/lib/teamTreeStorage";
+import type { DisplayNode } from "@/lib/teamTreeDisplay";
+import { useTeamWorkspace } from "@/components/TeamWorkspaceContext";
 
-interface TeamPanelProps {
-  model: string;
-  llmProvider: LlmProvider;
-  mistralApiKey: string;
-}
-
-function toSoulModalNode(node: DisplayNode): SoulModalNode {
-  return { id: node.id, label: node.label, kind: node.kind };
+function badgeForKind(kind: DisplayNode["kind"]): string {
+  switch (kind) {
+    case "master":
+      return "Orchestrateur";
+    case "agent":
+      return "Agent";
+    case "sub":
+      return "Sous-agent";
+    default:
+      return "";
+  }
 }
 
 function TeamBranch({
@@ -206,163 +187,43 @@ function TeamBranch({
   );
 }
 
-function badgeForKind(kind: DisplayNode["kind"]): string {
-  switch (kind) {
-    case "master":
-      return "Orchestrateur";
-    case "agent":
-      return "Agent";
-    case "sub":
-      return "Sous-agent";
-    default:
-      return "";
-  }
-}
-
-export function TeamPanel({
-  model,
-  llmProvider,
-  mistralApiKey,
-}: TeamPanelProps) {
-  const [members, setMembers] = useState(loadTeamMembers);
-  const [souls, setSouls] = useState(loadAgentSouls);
-  const [editing, setEditing] = useState<DisplayNode | null>(null);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const draggingRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    saveTeamMembers(members);
-  }, [members]);
-
-  useEffect(() => {
-    saveAgentSouls(souls);
-  }, [souls]);
-
-  const root = useMemo(
-    () => membersToDisplayTree(members),
-    [members],
-  );
-
-  const handleOpen = useCallback((n: DisplayNode) => {
-    setEditing(n);
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setEditing(null);
-  }, []);
-
-  const handleSaveSoul = useCallback(
-    (
-      text: string,
-      agentId: string,
-      label: string,
-      newParentId?: string,
-    ) => {
-      setMembers((prev) => {
-        let next = updateMemberLabel(prev, agentId, label);
-        const cur = prev.find((m) => m.id === agentId);
-        if (
-          newParentId !== undefined &&
-          cur &&
-          cur.parentId !== newParentId
-        ) {
-          next = reparentMember(next, agentId, newParentId);
-        }
-        return next;
-      });
-      setSouls((prev) => ({ ...prev, [agentId]: text }));
-    },
-    [],
-  );
-
-  const handleDragStart = useCallback((id: string) => {
-    draggingRef.current = id;
-    setDraggingId(id);
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
-    draggingRef.current = null;
-    setDraggingId(null);
-    setDropTargetId(null);
-  }, []);
-
-  const handleDropOn = useCallback(
-    (newParentId: string, draggedMemberId?: string) => {
-      const id =
-        (draggedMemberId && draggedMemberId.trim()) ||
-        draggingRef.current ||
-        draggingId;
-      if (!id) return;
-      setMembers((prev) => reparentMember(prev, id, newParentId));
-      handleDragEnd();
-    },
-    [draggingId, handleDragEnd],
-  );
-
-  const handleDelete = useCallback((id: string) => {
-    setMembers((prev) => {
-      const removed = subtreeIds(id, prev);
-      const nextMembers = removeMemberSubtree(prev, id);
-      queueMicrotask(() => {
-        setSouls((s) => {
-          const next = { ...s };
-          removed.forEach((rid) => {
-            delete next[rid];
-          });
-          return next;
-        });
-        setEditing((cur) => (cur && removed.has(cur.id) ? null : cur));
-      });
-      return nextMembers;
-    });
-  }, []);
-
-  const addUnderOrchestrator = useCallback(() => {
-    setMembers((prev) => addMemberUnder(prev, ORCHESTRATOR_ID));
-  }, []);
-
-  const handleRestoreArchive = useCallback(
-    (nextMembers: TreeMember[], nextSouls: Record<string, string>) => {
-      setMembers(nextMembers);
-      setSouls(nextSouls);
-      setEditing(null);
-    },
-    [],
-  );
+/** Colonne pleine hauteur à gauche de l’activité : arbre Organisation. */
+export function TeamOrganisationAside() {
+  const {
+    members,
+    root,
+    draggingId,
+    dropTargetId,
+    setDropTargetId,
+    handleOpen,
+    handleDragStart,
+    handleDragEnd,
+    handleDropOn,
+    handleDelete,
+    addUnderOrchestrator,
+  } = useTeamWorkspace();
 
   if (!root) {
-    return <div className="team-panel">Arbre d’équipe invalide.</div>;
+    return (
+      <div className="team-org-aside-inner">
+        <p className="team-org-aside-error">Arbre d’équipe invalide.</p>
+      </div>
+    );
   }
 
-  const editingMember = editing
-    ? members.find((m) => m.id === editing.id)
-    : null;
-  const editParentLabel = editing
-    ? parentLabelFor(editing.id, members)
-    : null;
-
   return (
-    <div className="team-panel">
-      <h2 className="team-heading">Équipe virtuelle</h2>
-
-      <TeamArchiveSection
-        members={members}
-        souls={souls}
-        onRestore={handleRestoreArchive}
-      />
-
-      <div className="team-tree-wrap">
-        <div className="team-tree-head">
-          <h3 className="team-tree-title">Organisation</h3>
-          <button
-            type="button"
-            className="btn-primary team-tree-add-member"
-            onClick={addUnderOrchestrator}
-          >
-            Nouveau membre (sous orchestrateur)
-          </button>
-        </div>
+    <div className="team-org-aside-inner">
+      <header className="team-org-aside-header">
+        <h2 className="team-org-aside-title">Organisation</h2>
+        <button
+          type="button"
+          className="btn-primary team-org-aside-add"
+          onClick={addUnderOrchestrator}
+        >
+          Nouveau membre (sous orchestrateur)
+        </button>
+      </header>
+      <div className="team-tree-wrap team-tree-wrap--aside">
         <ul
           className="team-tree-root team-tree-lineage-root"
           role="tree"
@@ -390,24 +251,6 @@ export function TeamPanel({
           />
         </ul>
       </div>
-
-      <AgentSoulModal
-        node={editing ? toSoulModalNode(editing) : null}
-        initialText={editing ? souls[editing.id] ?? "" : ""}
-        initialLabel={editing?.label ?? ""}
-        parentId={editingMember?.parentId ?? null}
-        parentLabel={editParentLabel}
-        parentOptions={
-          editing && editing.kind !== "master"
-            ? validParentTargetsForMember(editing.id, members)
-            : []
-        }
-        model={model}
-        llmProvider={llmProvider}
-        mistralApiKey={mistralApiKey}
-        onClose={handleCloseModal}
-        onSave={handleSaveSoul}
-      />
     </div>
   );
 }

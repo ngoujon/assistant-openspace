@@ -9,7 +9,9 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { Layout } from "@/components/Layout";
 import { SettingsModal } from "@/components/SettingsModal";
 import { Sidebar } from "@/components/Sidebar";
-import { TeamPanel } from "@/components/TeamPanel";
+import { TeamCentrePanel } from "@/components/TeamCentrePanel";
+import { TeamOrganisationAside } from "@/components/TeamOrganisationAside";
+import { TeamWorkspaceProvider } from "@/components/TeamWorkspaceContext";
 import { fetchOllamaModels } from "@/lib/ollama";
 import { loadConversations, saveConversations } from "@/lib/storage";
 import type { RightActivityState } from "@/types/activity";
@@ -213,6 +215,73 @@ export default function App() {
     return <div className="app-loading">Chargement…</div>;
   }
 
+  const sidebarEl = (
+    <Sidebar
+      conversations={conversations}
+      activeId={active.id}
+      onSelect={handleSelectConversation}
+      onNew={handleNewChat}
+      onDelete={handleDeleteConversation}
+      onOpenSettings={() => setSettingsOpen(true)}
+    />
+  );
+
+  const rightAsideEl = (
+    <ActivitySidebar
+      state={rightActivity}
+      linkedArtifact={activityLinkedArtifact}
+      llmProvider={llmProvider}
+    />
+  );
+
+  const mainEl = (
+    <>
+      <nav className="main-tabs" aria-label="Zones principales">
+        <button
+          type="button"
+          className={mainTab === "chat" ? "tab active" : "tab"}
+          onClick={() => setMainTab("chat")}
+        >
+          Chat
+        </button>
+        <button
+          type="button"
+          className={mainTab === "team" ? "tab active" : "tab"}
+          onClick={() => setMainTab("team")}
+        >
+          Équipe
+        </button>
+      </nav>
+      <div className="main-body">
+        {mainTab === "chat" ? (
+          <ChatPanel
+            conversation={active}
+            models={models}
+            model={model}
+            onModelChange={setModel}
+            llmProvider={llmProvider}
+            mistralApiKey={mistralApiKey}
+            llmError={llmError}
+            onRetryLlm={refreshLlmModels}
+            setMessages={setActiveMessages}
+            onConversationTitle={setConversationTitleById}
+            onConversationArtifact={setConversationArtifactMarkdown}
+            activityState={rightActivity}
+            setRightActivity={setRightActivity}
+          />
+        ) : (
+          <TeamCentrePanel />
+        )}
+      </div>
+    </>
+  );
+
+  const layoutShared = {
+    sidebar: sidebarEl,
+    main: mainEl,
+    rightAside: rightAsideEl,
+  };
+
   return (
     <>
       <SettingsModal
@@ -220,70 +289,20 @@ export default function App() {
         onClose={() => setSettingsOpen(false)}
         onSaved={refreshLlmModels}
       />
-      <Layout
-        sidebar={
-          <Sidebar
-            conversations={conversations}
-            activeId={active.id}
-            onSelect={handleSelectConversation}
-            onNew={handleNewChat}
-            onDelete={handleDeleteConversation}
-            onOpenSettings={() => setSettingsOpen(true)}
+      {mainTab === "team" ? (
+        <TeamWorkspaceProvider
+          model={model}
+          llmProvider={llmProvider}
+          mistralApiKey={mistralApiKey}
+        >
+          <Layout
+            {...layoutShared}
+            midAside={<TeamOrganisationAside />}
           />
-        }
-        rightAside={
-          <ActivitySidebar
-            state={rightActivity}
-            linkedArtifact={activityLinkedArtifact}
-            llmProvider={llmProvider}
-          />
-        }
-        main={
-          <>
-            <nav className="main-tabs" aria-label="Zones principales">
-              <button
-                type="button"
-                className={mainTab === "chat" ? "tab active" : "tab"}
-                onClick={() => setMainTab("chat")}
-              >
-                Chat
-              </button>
-              <button
-                type="button"
-                className={mainTab === "team" ? "tab active" : "tab"}
-                onClick={() => setMainTab("team")}
-              >
-                Équipe
-              </button>
-            </nav>
-            <div className="main-body">
-              {mainTab === "chat" ? (
-                <ChatPanel
-                  conversation={active}
-                  models={models}
-                  model={model}
-                  onModelChange={setModel}
-                  llmProvider={llmProvider}
-                  mistralApiKey={mistralApiKey}
-                  llmError={llmError}
-                  onRetryLlm={refreshLlmModels}
-                  setMessages={setActiveMessages}
-                  onConversationTitle={setConversationTitleById}
-                  onConversationArtifact={setConversationArtifactMarkdown}
-                  activityState={rightActivity}
-                  setRightActivity={setRightActivity}
-                />
-              ) : (
-                <TeamPanel
-                  model={model}
-                  llmProvider={llmProvider}
-                  mistralApiKey={mistralApiKey}
-                />
-              )}
-            </div>
-          </>
-        }
-      />
+        </TeamWorkspaceProvider>
+      ) : (
+        <Layout {...layoutShared} />
+      )}
     </>
   );
 }
