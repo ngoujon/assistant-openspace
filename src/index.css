@@ -186,7 +186,11 @@ body {
 }
 
 .activity-download-md-btn {
-  align-self: flex-start;
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
+  display: inline-flex;
+  justify-content: center;
 }
 
 .activity-sidebar-title {
