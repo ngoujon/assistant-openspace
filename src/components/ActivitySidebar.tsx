@@ -7,6 +7,7 @@ import {
 } from "@/lib/parseMissionProgressLine";
 import type { LlmProvider } from "@/lib/llmProvider";
 import type { ActivityLinkedArtifact, RightActivityState } from "@/types/activity";
+import type { MissionActivitySnapshot } from "@/types";
 
 export type { ActivityLinkedArtifact } from "@/types/activity";
 
@@ -126,6 +127,8 @@ interface ActivitySidebarProps {
   variant?: "sidebar" | "inline";
   /** Téléchargement du cahier des charges / rapport lié à la conversation active. */
   linkedArtifact?: ActivityLinkedArtifact | null;
+  /** Dernière mission (étapes) persistée pour ce projet — affichée en Discussion. */
+  missionHistory?: MissionActivitySnapshot | null;
   /** Messages d’attente mission (Ollama vs Mistral). */
   llmProvider?: LlmProvider;
 }
@@ -134,6 +137,7 @@ export function ActivitySidebar({
   state,
   variant = "sidebar",
   linkedArtifact = null,
+  missionHistory = null,
   llmProvider = "ollama",
 }: ActivitySidebarProps) {
   const isInline = variant === "inline";
@@ -163,6 +167,8 @@ export function ActivitySidebar({
     if (isInline) return null;
     const { isRouting, streaming, panelError, streamingSpeaker } = state;
     const busy = isRouting || streaming;
+    const hist = missionHistory?.progress?.length ? missionHistory : null;
+
     return (
       <div
         className="activity-sidebar activity-sidebar--discussion"
@@ -171,6 +177,16 @@ export function ActivitySidebar({
         aria-busy={busy}
       >
         <h2 className="activity-sidebar-title">Activité</h2>
+        {hist ? (
+          <div className="activity-mission-history">
+            <h3 className="activity-mission-history-title">Mission (historique)</h3>
+            <MissionStepTimeline
+              progress={hist.progress}
+              running={false}
+              compact
+            />
+          </div>
+        ) : null}
         <div className="activity-discussion-main">
           {panelError && (
             <p className="activity-sidebar-error" role="alert">
@@ -304,9 +320,9 @@ export function ActivitySidebar({
       {showMissionDownload && linkedArtifact ? (
         <div className="activity-sidebar-footer">
           <p className="activity-sidebar-muted">
-            Le document Markdown est enregistré sur cette conversation. Tu peux aussi
-            l’ouvrir en <strong>Discussion</strong> pour l’affiner puis « appliquer la
-            mise à jour ».
+            Le document Markdown est enregistré sur cette conversation. En{" "}
+            <strong>Discussion</strong>, le livrable est mis à jour automatiquement
+            d’après les échanges ; télécharge le fichier pour voir le détail.
           </p>
           <button
             type="button"

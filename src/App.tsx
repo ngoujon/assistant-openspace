@@ -15,7 +15,29 @@ import { TeamWorkspaceProvider } from "@/components/TeamWorkspaceContext";
 import { fetchOllamaModels } from "@/lib/ollama";
 import { loadConversations, saveConversations } from "@/lib/storage";
 import type { RightActivityState } from "@/types/activity";
-import type { Conversation } from "@/types";
+import type { Conversation, MissionActivitySnapshot } from "@/types";
+
+/** Colonne Activité au chargement (évite un flash « vide » avant les effets du ChatPanel). */
+function deriveInitialRightActivity(c: Conversation): RightActivityState {
+  const hasArtifact = Boolean(c.artifactMarkdown?.trim());
+  const hasMessages = c.messages.length > 0;
+  if (hasArtifact || hasMessages) {
+    return {
+      kind: "discussion",
+      isRouting: false,
+      streaming: false,
+      panelError: null,
+      streamingSpeaker: null,
+    };
+  }
+  const snap = c.missionActivitySnapshot;
+  return {
+    kind: "mission",
+    running: false,
+    progress: snap?.progress ?? [],
+    elapsedSec: snap?.elapsedSec ?? 0,
+  };
+}
 
 function newConversation(): Conversation {
   const id = crypto.randomUUID();
@@ -32,7 +54,7 @@ export default function App() {
     const loaded = loadConversations();
     return loaded.length ? loaded : [newConversation()];
   });
-  const [activeId, setActiveId] = useState(() => conversations[0]?.id ?? "");
+  const [activeId, setActiveId] = useState(() => conversations[0]!.id);
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState("");
   const [llmProvider, setLlmProvider] = useState<LlmProvider>(
@@ -42,9 +64,9 @@ export default function App() {
     () => loadAppSettings().mistralApiKey,
   );
   const [llmError, setLlmError] = useState<string | null>(null);
-  const [rightActivity, setRightActivity] = useState<RightActivityState>({
-    kind: "idle",
-  });
+  const [rightActivity, setRightActivity] = useState<RightActivityState>(() =>
+    deriveInitialRightActivity(conversations[0]!),
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   /** Colonne Activité : éviter un état « équipe » résiduel qui masquerait mission / discussion. */
@@ -98,7 +120,9 @@ export default function App() {
 
   useEffect(() => {
     if (!conversations.some((c) => c.id === activeId)) {
-      setActiveId(conversations[0]!.id);
+      const next = conversations[0]!;
+      setActiveId(next.id);
+      setRightActivity(deriveInitialRightActivity(next));
     }
   }, [conversations, activeId]);
 
@@ -158,6 +182,23 @@ export default function App() {
     [],
   );
 
+  const persistMissionActivitySnapshot = useCallback(
+    (conversationId: string, snapshot: MissionActivitySnapshot) => {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId
+            ? {
+                ...c,
+                missionActivitySnapshot: { ...snapshot },
+                updatedAt: Date.now(),
+              }
+            : c,
+        ),
+      );
+    },
+    [],
+  );
+
   const setConversationArtifactMarkdown = useCallback(
     (
       conversationId: string,
@@ -202,11 +243,17 @@ export default function App() {
     const c = newConversation();
     setConversations((prev) => [c, ...prev]);
     setActiveId(c.id);
+    setRightActivity(deriveInitialRightActivity(c));
   }, []);
 
-  const handleSelectConversation = useCallback((id: string) => {
-    setActiveId(id);
-  }, []);
+  const handleSelectConversation = useCallback(
+    (id: string) => {
+      setActiveId(id);
+      const c = conversations.find((x) => x.id === id);
+      if (c) setRightActivity(deriveInitialRightActivity(c));
+    },
+    [conversations],
+  );
 
   const handleDeleteConversation = useCallback((id: string) => {
     setConversations((prev) => {
@@ -234,6 +281,7 @@ export default function App() {
     <ActivitySidebar
       state={activityForShell}
       linkedArtifact={activityLinkedArtifact}
+      missionHistory={active.missionActivitySnapshot}
       llmProvider={llmProvider}
     />
   );
@@ -252,6 +300,7 @@ export default function App() {
         setMessages={setActiveMessages}
         onConversationTitle={setConversationTitleById}
         onConversationArtifact={setConversationArtifactMarkdown}
+        onMissionActivitySnapshot={persistMissionActivitySnapshot}
         setRightActivity={setRightActivity}
       />
       <TeamCentrePanel />

@@ -288,6 +288,18 @@ Trouver sur **http://localhost:3004** les changements du code **en temps réel**
 
 ---
 
+## 2026-05-10 — Activité mission persistée par projet
+
+### Objectif
+
+Conserver l’**historique des étapes** de la colonne Activité au **rafraîchissement** et au **changement de projet** : snapshot `missionActivitySnapshot` sur chaque `Conversation` (localStorage), réhydratation du panneau mission et bloc « Mission (historique) » en mode Discussion.
+
+### Fichiers
+
+- `src/types.ts`, `src/lib/storage.ts`, `src/App.tsx`, `src/components/ChatPanel.tsx`, `src/components/ActivitySidebar.tsx`, `src/index.css`
+
+---
+
 ## 2026-05-10 — Discussion : fusion livrable automatique, sans bandeau « Livrable lié »
 
 ### Objectif

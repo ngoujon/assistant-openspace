@@ -1,5 +1,12 @@
 export type ChatRole = "user" | "assistant" | "system";
 
+/** Dernière progression « Mission équipe » pour la colonne Activité (persistée par projet). */
+export interface MissionActivitySnapshot {
+  progress: string[];
+  elapsedSec: number;
+  running: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -32,4 +39,6 @@ export interface Conversation {
    * n’incluent que les messages **après** celui-ci (limite le contexte).
    */
   artifactDiscussionCutoffAfterId?: string;
+  /** Historique mission (étapes) — conservé au rafraîchissement et au changement de projet. */
+  missionActivitySnapshot?: MissionActivitySnapshot;
 }

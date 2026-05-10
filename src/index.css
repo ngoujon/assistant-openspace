@@ -198,6 +198,23 @@ body {
   font-weight: 600;
 }
 
+.activity-mission-history {
+  flex-shrink: 0;
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  max-height: min(40vh, 14rem);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.activity-mission-history-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .activity-sidebar-muted {
   margin: 0;
   font-size: 0.75rem;

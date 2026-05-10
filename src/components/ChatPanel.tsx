@@ -22,7 +22,11 @@ import type { LlmProvider } from "@/lib/llmProvider";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
 import { loadTeamMembers, type TreeMember } from "@/lib/teamTreeStorage";
 import type { RightActivityState } from "@/types/activity";
-import type { ChatMessage, Conversation } from "@/types";
+import type {
+  ChatMessage,
+  Conversation,
+  MissionActivitySnapshot,
+} from "@/types";
 
 type ChatMode = "mission" | "free";
 
@@ -72,6 +76,11 @@ interface ChatPanelProps {
       missionUserBrief?: string;
     },
   ) => void;
+  /** Persiste la progression mission sur la conversation (localStorage). */
+  onMissionActivitySnapshot?: (
+    conversationId: string,
+    snapshot: MissionActivitySnapshot,
+  ) => void;
   setRightActivity: Dispatch<SetStateAction<RightActivityState>>;
 }
 
@@ -87,6 +96,7 @@ export function ChatPanel({
   setMessages,
   onConversationTitle,
   onConversationArtifact,
+  onMissionActivitySnapshot,
   setRightActivity,
 }: ChatPanelProps) {
   const [mode, setMode] = useState<ChatMode>(() =>
@@ -107,6 +117,7 @@ export function ChatPanel({
     async () => {},
   );
   const pumpDiscussionQueueRef = useRef<() => Promise<void>>(async () => {});
+  const lastMissionPersistSigRef = useRef<string>("");
 
   const [discussionQueue, setDiscussionQueue] = useState<
     DiscussionQueuedMessage[]
@@ -139,15 +150,20 @@ export function ChatPanel({
     setMode(hasArtifact || hasMessages ? "free" : "mission");
   }, [conversation.id]);
 
-  /** Colonne Activité : en mode Mission, suivre le projet actif (pas le précédent). */
+  /**
+   * Colonne Activité : en mode Mission, réhydrater depuis le snapshot du projet
+   * (sans dépendre du snapshot pour ne pas écraser une mission en cours à chaque persistance).
+   */
   useEffect(() => {
     if (mode !== "mission") return;
+    const snap = conversation.missionActivitySnapshot;
     setRightActivity({
       kind: "mission",
       running: false,
-      progress: [],
-      elapsedSec: 0,
+      progress: snap?.progress ?? [],
+      elapsedSec: snap?.elapsedSec ?? 0,
     });
+    lastMissionPersistSigRef.current = "";
   }, [conversation.id, mode, setRightActivity]);
 
   const reportMissionActivity = useCallback(
@@ -160,8 +176,20 @@ export function ChatPanel({
         kind: "mission",
         ...payload,
       });
+      const last = payload.progress[payload.progress.length - 1] ?? "";
+      const sig = `${payload.running}:${payload.progress.length}:${last}`;
+      const skipPersistIdle =
+        !payload.running && payload.progress.length === 0;
+      const skipPersistWarmup =
+        payload.running && payload.progress.length === 0;
+      if (skipPersistIdle || skipPersistWarmup) {
+        /* ne pas écraser un snapshot disque avec l’état initial du workspace */
+      } else if (sig !== lastMissionPersistSigRef.current) {
+        lastMissionPersistSigRef.current = sig;
+        onMissionActivitySnapshot?.(conversation.id, payload);
+      }
     },
-    [setRightActivity],
+    [conversation.id, onMissionActivitySnapshot, setRightActivity],
   );
 
   useEffect(() => {
