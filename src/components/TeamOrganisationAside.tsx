@@ -1,4 +1,5 @@
-import { type DragEvent } from "react";
+import { type DragEvent, useState } from "react";
+import { TeamArchiveModal } from "@/components/TeamArchiveModal";
 import {
   canReparent,
   ORCHESTRATOR_ID,
@@ -189,8 +190,10 @@ function TeamBranch({
 
 /** Colonne pleine hauteur à gauche de l’activité : arbre Organisation. */
 export function TeamOrganisationAside() {
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
   const {
     members,
+    souls,
     root,
     draggingId,
     dropTargetId,
@@ -201,6 +204,7 @@ export function TeamOrganisationAside() {
     handleDropOn,
     handleDelete,
     addUnderOrchestrator,
+    handleRestoreArchive,
   } = useTeamWorkspace();
 
   if (!root) {
@@ -214,7 +218,33 @@ export function TeamOrganisationAside() {
   return (
     <div className="team-org-aside-inner">
       <header className="team-org-aside-header">
-        <h2 className="team-org-aside-title">Organisation</h2>
+        <div className="team-org-aside-title-group">
+          <h2 className="team-org-aside-title">Organisation</h2>
+          <button
+            type="button"
+            className="team-archive-open-btn"
+            aria-label="Ouvrir les archives de l’équipe"
+            title="Archives des compositions"
+            onClick={() => setArchiveModalOpen(true)}
+          >
+            <svg
+              className="team-archive-open-icon"
+              width={22}
+              height={22}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="5" width="18" height="14" rx="2" ry="2" />
+              <path d="M3 10h18" />
+              <path d="M9 5V3h6v2" />
+            </svg>
+          </button>
+        </div>
         <button
           type="button"
           className="btn-primary team-org-aside-add"
@@ -223,6 +253,13 @@ export function TeamOrganisationAside() {
           Nouveau membre (sous orchestrateur)
         </button>
       </header>
+      <TeamArchiveModal
+        open={archiveModalOpen}
+        onClose={() => setArchiveModalOpen(false)}
+        members={members}
+        souls={souls}
+        onRestore={handleRestoreArchive}
+      />
       <div className="team-tree-wrap team-tree-wrap--aside">
         <ul
           className="team-tree-root team-tree-lineage-root"

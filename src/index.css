@@ -1515,6 +1515,13 @@ body {
   margin-bottom: 0.75rem;
 }
 
+.team-org-aside-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
 .team-org-aside-title {
   margin: 0;
   font-size: 0.6875rem;

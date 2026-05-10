@@ -30,6 +30,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | UI : typographie Plus Jakarta Sans, palette / rayons / ombres harmonisés, colonnes latérales vitrées, onglets et bulles de chat affinés |
 | 2026-05-10 | Mission : zone glisser-déposer + clic pour fichiers .txt / .md (remplace le bouton « Ajouter des fichiers ») |
 | 2026-05-10 | Mission : actions « Lancer / Arrêter » alignées à droite |
+| 2026-05-10 | Équipe : archives (icône coffre) à droite du titre « Organisation » ; panneau central sans ce bouton |
 | 2026-05-10 | Équipe : « Nouveau membre » à droite du titre « Organisation » |
 | 2026-05-10 | Équipe : colonne Organisation pleine hauteur à gauche de l’activité (`shell-org`, `TeamWorkspaceProvider`) |
 | 2026-05-10 | Archives équipe : confirmation Restaurer / Supprimer via modale `ConfirmDialog` (plus de `window.confirm`) |
