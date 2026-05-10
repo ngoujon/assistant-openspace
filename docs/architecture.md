@@ -53,7 +53,7 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 2. **`routeDiscussionMessage`** (`src/lib/discussionTeamChat.ts`) : appel non stream avec prompt **orchestrateur** + liste des membres (`loadTeamMembers`) + fil + **brief mission** (`missionUserBrief`) et **extrait du livrable** ; réponse JSON `responderId`, `brief`, `userNote`.
 3. Création d’une bulle `assistant` avec `speakerLabel` et `routingNote`.
 4. **`streamDiscussionReply`** : `system` = âme du membre + consignes **réponses courtes** (pas de recopie du document) + même contexte mission/livrable (tronqué) + consigne orchestrateur ; historique user/assistant ; streaming des tokens.
-5. **`applyDiscussionToArtifact`** (intention ou bouton) : fusion avec brief mission + discussion + document complet.
+5. **`applyDiscussionToArtifact`** (automatique après chaque réponse en Discussion si un livrable existe) : fusion avec brief mission + fil depuis la dernière coupure + document complet ; le détail se lit en téléchargeant le `.md` (colonne Activité).
 
 ## Flux Mission équipe
 

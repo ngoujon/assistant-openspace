@@ -14,16 +14,9 @@ import {
   routeDiscussionMessage,
   streamDiscussionReply,
 } from "@/lib/discussionTeamChat";
-import {
-  isArtifactApplyIntent,
-  resolveForcedResponderFromMessage,
-} from "@/lib/discussionMention";
+import { resolveForcedResponderFromMessage } from "@/lib/discussionMention";
 import { sleepMs } from "@/lib/llmRateLimit";
 import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
-import {
-  markdownFilenameFromConversationTitle,
-  triggerMarkdownDownload,
-} from "@/lib/downloadMarkdown";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
@@ -198,98 +191,36 @@ export function ChatPanel({
     setRightActivity,
   ]);
 
-  const downloadLinkedArtifact = useCallback(() => {
-    const md = conversation.artifactMarkdown?.trim();
-    if (!md) return;
-    triggerMarkdownDownload(
-      md,
-      markdownFilenameFromConversationTitle(conversation.title),
-    );
-  }, [conversation.artifactMarkdown, conversation.title]);
-
-  const patchArtifactFromDiscussion = useCallback(
-    async (instructionText: string) => {
-      const art = conversation.artifactMarkdown?.trim();
-      if (!art) {
-        setError(
-          "Aucun livrable lié. Termine une mission (phase Mission équipe), puis reviens en Discussion.",
-        );
-        return;
-      }
-      if (!model) {
-        setError(
-          llmProvider === "mistral"
-            ? "Aucun modèle Mistral disponible. Vérifie ta clé API dans Paramètres."
-            : "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
-        );
-        return;
-      }
-
-      const userMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "user",
-        content: instructionText,
-      };
-      const historyWithUser = [...conversation.messages, userMsg];
-      const discussionForPatch = [
-        ...messagesAfterArtifactCutoff(
-          conversation.messages,
-          conversation.artifactDiscussionCutoffAfterId,
-        ),
-        userMsg,
-      ];
-      setError(null);
-      setMessages(() => historyWithUser);
-
-      const ac = new AbortController();
-      abortRef.current = ac;
-      setIsRouting(true);
-
-      try {
-        const souls = loadAgentSouls();
-        const raw = await applyDiscussionToArtifact({
-          llmProvider,
-          mistralApiKey,
-          model,
-          souls,
-          discussionMessages: discussionForPatch,
-          artifactMarkdown: art,
-          missionUserBrief: conversation.missionUserBrief,
-          signal: ac.signal,
-        });
-        const finalMd = unwrapMarkdownFence(raw);
-        const assistantMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content:
-            "Le fichier Markdown lié a été mis à jour d’après la discussion. Utilise **Télécharger .md** pour voir le document complet à jour ; ici on reste sur les échanges (questions, clarifications), pas sur le corps du livrable.",
-          speakerLabel: "Orchestrateur",
-          routingNote: "Fusion discussion → livrable.",
-          artifactPatchNote: true,
-        };
-        onConversationArtifact(conversation.id, finalMd, {
-          discussionCutoffAfterId: assistantMsg.id,
-        });
-        setMessages(() => [...historyWithUser, assistantMsg]);
-      } catch (e) {
-        if ((e as Error).name === "AbortError") return;
-        setError((e as Error).message || "Erreur réseau");
-        setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
-      } finally {
-        setIsRouting(false);
-        abortRef.current = null;
-      }
+  /** Fusion discussion → livrable (sans message factice dans le fil). */
+  const artifactMergeFromDiscussion = useCallback(
+    async (opts: {
+      discussionMessages: ChatMessage[];
+      artifactMarkdown: string;
+      cutoffAfterAssistantId: string;
+      signal: AbortSignal;
+    }) => {
+      const souls = loadAgentSouls();
+      const raw = await applyDiscussionToArtifact({
+        llmProvider,
+        mistralApiKey,
+        model,
+        souls,
+        discussionMessages: opts.discussionMessages,
+        artifactMarkdown: opts.artifactMarkdown,
+        missionUserBrief: conversation.missionUserBrief,
+        signal: opts.signal,
+      });
+      const finalMd = unwrapMarkdownFence(raw);
+      onConversationArtifact(conversation.id, finalMd, {
+        discussionCutoffAfterId: opts.cutoffAfterAssistantId,
+      });
     },
     [
       conversation.id,
-      conversation.messages,
-      conversation.artifactMarkdown,
-      conversation.artifactDiscussionCutoffAfterId,
       conversation.missionUserBrief,
       llmProvider,
       mistralApiKey,
       model,
-      setMessages,
       onConversationArtifact,
     ],
   );
@@ -305,18 +236,6 @@ export function ChatPanel({
               : "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
           );
           skipPump = true;
-          return;
-        }
-
-        if (isArtifactApplyIntent(text)) {
-          if (!conversation.artifactMarkdown?.trim()) {
-            setError(
-              "Aucun livrable lié. Termine une mission pour produire un Markdown, puis reviens en Discussion.",
-            );
-            skipPump = true;
-            return;
-          }
-          await patchArtifactFromDiscussion(text);
           return;
         }
 
@@ -424,6 +343,34 @@ export function ChatPanel({
             .catch(() => {
               /* titre optionnel : on garde l’extrait utilisateur si échec */
             });
+
+          const art = conversation.artifactMarkdown?.trim();
+          if (art && assistantId) {
+            const discussionForPatch = messagesAfterArtifactCutoff(
+              transcriptMessages,
+              conversation.artifactDiscussionCutoffAfterId,
+            );
+            setIsRouting(true);
+            try {
+              await artifactMergeFromDiscussion({
+                discussionMessages: discussionForPatch,
+                artifactMarkdown: art,
+                cutoffAfterAssistantId: assistantId,
+                signal: ac.signal,
+              });
+            } catch (mergeErr) {
+              if ((mergeErr as Error).name === "AbortError") {
+                skipPump = true;
+                return;
+              }
+              setError(
+                (mergeErr as Error).message ||
+                  "La mise à jour automatique du livrable a échoué ; télécharge le .md existant depuis Activité si besoin.",
+              );
+            } finally {
+              setIsRouting(false);
+            }
+          }
         } catch (e) {
           if ((e as Error).name === "AbortError") {
             skipPump = true;
@@ -453,10 +400,11 @@ export function ChatPanel({
       conversation.id,
       conversation.messages,
       conversation.artifactMarkdown,
+      conversation.artifactDiscussionCutoffAfterId,
       conversation.missionUserBrief,
       setMessages,
       onConversationTitle,
-      patchArtifactFromDiscussion,
+      artifactMergeFromDiscussion,
       teamMembers,
     ],
   );
@@ -613,42 +561,6 @@ export function ChatPanel({
         />
       ) : (
         <>
-          {conversation.artifactMarkdown?.trim() && (
-            <div
-              className="discussion-artifact-bar"
-              aria-label="Livrable Markdown lié à cette conversation"
-            >
-              <div className="discussion-artifact-bar-row">
-                <span className="discussion-artifact-title">Livrable lié</span>
-                <div className="discussion-artifact-actions">
-                  <button
-                    type="button"
-                    className="btn-secondary btn-compact"
-                    onClick={downloadLinkedArtifact}
-                  >
-                    Télécharger .md
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-primary btn-compact"
-                    disabled={busy}
-                    onClick={() =>
-                      void patchArtifactFromDiscussion(
-                        "Appliquer la mise à jour.",
-                      )
-                    }
-                  >
-                    Appliquer la discussion au livrable
-                  </button>
-                </div>
-              </div>
-              <pre className="discussion-artifact-preview">
-                {conversation.artifactMarkdown.length > 2800
-                  ? `${conversation.artifactMarkdown.slice(0, 2800)}\n\n…`
-                  : conversation.artifactMarkdown}
-              </pre>
-            </div>
-          )}
           <div className="chat-messages" role="log" aria-live="polite">
             {conversation.messages.map((m, i) => {
               const isPendingAssistant =

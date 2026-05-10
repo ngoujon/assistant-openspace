@@ -11,9 +11,10 @@ const MAX_ARTIFACT_EXCERPT_STREAM = 14_000;
 /** Consignes communes : le chat n’est pas le canal du document complet. */
 const DISCUSSION_REPLY_STYLE_RULES = `## Règles pour tes messages dans ce chat
 
-- Réponses **courtes** : questions de clarification, confirmation que tu as compris, points encore flous — quelques phrases, pas un rapport long.
-- **Ne recopie pas** le livrable Markdown ni de longues portions du document : la version fichier à jour est produite par la **fusion** (formulation du type « appliquer la mise à jour » ou le bouton dédié) ; l’utilisateur récupère le fichier via **Télécharger**.
-- Tu peux citer **au plus** une courte phrase ou un titre de section si indispensable pour poser une question ciblée.`;
+- Un **rapport Markdown** (livrable) existe souvent déjà : la conversation sert surtout à **ajuster** des parties précises (ton, sections, chiffres), pas à **refaire** tout le document dans le chat.
+- Réponses **courtes** : questions de clarification, confirmation, ou **résumé en grandes lignes** des retouches envisagées ou reflétées dans le fichier (quelles sections / quel changement de fond) — **sans** recopier le livrable ni de longs extraits.
+- Le fichier \`.md\` est **mis à jour automatiquement** après ta réponse à partir du fil + du document courant ; pour lire le détail des modifications, l’utilisateur **télécharge** le livrable (colonne Activité).
+- Tu peux citer **au plus** une courte phrase ou un titre de section si indispensable pour clarifier.`;
 
 function sliceText(s: string, max: number): string {
   const t = s.trim();
@@ -194,7 +195,7 @@ export async function routeDiscussionMessage(opts: {
     MAX_ARTIFACT_EXCERPT_ROUTING,
   );
 
-  const userBlock = `${docCtx}## Membres de l’équipe (utilise les ids exacts ci-dessous)\n${roster}\n\n---\n## Fil de discussion\n${hist}\n\n---\nTâche : tu es **l’orchestrateur**. L’utilisateur s’adresse à **toute l’équipe** comme si c’était une réunion : **toi**, tu décides **qui est le plus qualifié** pour répondre au **dernier** message (sujet, compétence, contexte). Un **livrable Markdown** et le **brief initial** peuvent apparaître ci-dessus : sers-t’en pour le routage ; les réponses dans le fil restent **courtes** (pas de recopie du document dans le chat).\n\n- Si un **membre** doit répondre : mets son \`responderId\` et un \`brief\` concret pour lui (rappelle-lui de rester bref dans le chat, pas de livrable complet).\n- Si **toi** l’orchestrateur dois répondre (synthèse, compte rendu, arbitrage, vision globale, ou l’utilisateur le demande explicitement) : \`responderId\` = \`${ORCHESTRATOR_ID}\`.\n\nRéponds par **un seul objet JSON** valide, sans markdown ni texte autour :\n{\n  "responderId": "…",\n  "brief": "…",\n  "userNote": "…"\n}\n\n\`userNote\` : une phrase **optionnelle** pour l’utilisateur (ex. qui prend la parole et pourquoi).`;
+  const userBlock = `${docCtx}## Membres de l’équipe (utilise les ids exacts ci-dessous)\n${roster}\n\n---\n## Fil de discussion\n${hist}\n\n---\nTâche : tu es **l’orchestrateur**. L’utilisateur s’adresse à **toute l’équipe** comme si c’était une réunion : **toi**, tu décides **qui est le plus qualifié** pour répondre au **dernier** message (sujet, compétence, contexte). Un **livrable Markdown** et le **brief initial** peuvent apparaître ci-dessus : sers-t’en pour le routage ; les réponses dans le fil restent **courtes** (pas de recopie du document dans le chat ; le fichier livrable est **mis à jour automatiquement** après chaque échange complet).\n\n- Si un **membre** doit répondre : mets son \`responderId\` et un \`brief\` concret pour lui (rappelle-lui de rester bref dans le chat, pas de livrable complet).\n- Si **toi** l’orchestrateur dois répondre (synthèse, compte rendu, arbitrage, vision globale, ou l’utilisateur le demande explicitement) : \`responderId\` = \`${ORCHESTRATOR_ID}\`.\n\nRéponds par **un seul objet JSON** valide, sans markdown ni texte autour :\n{\n  "responderId": "…",\n  "brief": "…",\n  "userNote": "…"\n}\n\n\`userNote\` : une phrase **optionnelle** pour l’utilisateur (ex. qui prend la parole et pourquoi).`;
 
   const raw = await completeLlmChat(
     llmProvider,
@@ -453,11 +454,12 @@ ${doc}
 
 **Tâche**
 
-1. **Respecte l’intention** du brief initial ci-dessus quand tu interprètes les retouches ; synthétise **implicitement** la discussion dans le document révisé (pas besoin de répéter toute la conversation dans le fichier).
-2. **Modifie le Markdown** aux bons endroits : sections concernées, ajouts, suppressions, reformulations, listes, tableaux.
-3. **Conserve** la structure générale (\`#\` \`##\` \`###\`) sauf si la discussion impose une réorganisation claire.
-4. **Ne mets pas** le document dans un bloc de code : renvoie **uniquement** le Markdown final, prêt à enregistrer en \`.md\`.
-5. Si la discussion est floue, fais au mieux et reste cohérent avec le ton du document.
+1. Si les derniers échanges ne demandent **aucune retouche** au document (salutations, question générale sans consigne de modification, hors sujet), renvoie le Markdown **strictement inchangé** (même texte que le document actuel).
+2. Sinon, **respecte l’intention** du brief initial quand tu interprètes les retouches ; synthétise **implicitement** la discussion dans le document révisé (pas besoin de répéter toute la conversation dans le fichier).
+3. **Modifie le Markdown** seulement aux endroits concernés : sections visées, ajouts, suppressions, reformulations, listes, tableaux — évite de réécrire des parties non évoquées.
+4. **Conserve** la structure générale (\`#\` \`##\` \`###\`) sauf si la discussion impose une réorganisation claire.
+5. **Ne mets pas** le document dans un bloc de code : renvoie **uniquement** le Markdown final, prêt à enregistrer en \`.md\`.
+6. Si la discussion est floue sur une retouche, fais au mieux et reste cohérent avec le ton du document.
 
 Réponds par **le document Markdown complet révisé**, sans préambule ni post-scriptum.`;
 

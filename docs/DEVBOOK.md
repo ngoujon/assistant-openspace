@@ -288,6 +288,19 @@ Trouver sur **http://localhost:3004** les changements du code **en temps réel**
 
 ---
 
+## 2026-05-10 — Discussion : fusion livrable automatique, sans bandeau « Livrable lié »
+
+### Objectif
+
+Retirer l’aperçu / actions **Livrable lié** au-dessus du fil ; après chaque tour discussion (stream terminé), si un Markdown existe, lancer **`applyDiscussionToArtifact`** sans message orchestrateur supplémentaire ; le chat porte un **résumé court** des retouches (prompts), le détail reste dans le fichier téléchargé depuis **Activité**.
+
+### Fichiers
+
+- `src/components/ChatPanel.tsx`, `src/lib/discussionTeamChat.ts`, `src/lib/discussionMention.ts` (suppression intention textuelle « appliquer… »)
+- `src/index.css`, `README.md`, `docs/architecture.md`
+
+---
+
 ## 2026-05-10 — Livrable depuis Activité + prompts « angles oubliés »
 
 ### Objectif

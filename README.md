@@ -66,7 +66,7 @@ Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le c
 - Enchaînement **Orchestrateur → 3 directeurs → 3 sous-agents → synthèses → document final**, chaque étape via le **fournisseur LLM** choisi (Mistral ou Ollama).
 - Les **personas** sont ceux définis dans l’onglet **Équipe** (clic sur un rôle → texte « âme et rôle », stocké dans le navigateur).
 - **Télécharger le .md** une fois la mission terminée ; dès qu’un **livrable** est produit, l’interface passe **automatiquement** en **Discussion** (plus de bascule manuelle Mission / Discussion).
-- En **Discussion** : message à **toute l’équipe** ; l’**orchestrateur** désigne le **membre le plus qualifié** (ou répond lui-même pour synthèse / compte rendu si pertinent ou demandé), puis réponse en streaming avec l’âme de ce membre.
+- En **Discussion** : message à **toute l’équipe** ; l’**orchestrateur** désigne le **membre le plus qualifié** (ou répond lui-même pour synthèse / compte rendu si pertinent ou demandé), puis réponse en streaming avec l’âme de ce membre. Dès qu’un **livrable** existe, le Markdown est **mis à jour automatiquement** après chaque échange (retouches ciblées, pas le corps du document dans le chat) ; **Télécharger le .md** dans **Activité** pour voir le fichier complet.
 - Rouvrir une conversation qui a déjà des **messages** ou un **livrable** ouvre directement la Discussion.
 
 ### Équipe

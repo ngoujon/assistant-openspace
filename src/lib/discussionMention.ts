@@ -277,10 +277,3 @@ export function buildMissionMentionPrefix(
   );
 }
 
-/** Phrases qui déclenchent la fusion discussion → livrable. */
-const APPLY_INTENT =
-  /\b(appliquer\s+la\s+mise\s+à\s+jour|appliquer\s+les\s+changements|appliquer\s+les\s+modifications|applique(r)?\s+les\s+modifications|mets?\s+à\s+jour\s+le\s+(document|livrable|markdown|fichier))\b/i;
-
-export function isArtifactApplyIntent(text: string): boolean {
-  return APPLY_INTENT.test(text.trim());
-}

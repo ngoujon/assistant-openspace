@@ -888,53 +888,6 @@ body {
   box-shadow: inset 3px 0 0 0 var(--assistant-accent), var(--shadow-sm);
 }
 
-.discussion-artifact-bar {
-  margin: 0 0 0.65rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-strong);
-  background: var(--bg-surface);
-}
-
-.discussion-artifact-bar-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.discussion-artifact-title {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary);
-}
-
-.discussion-artifact-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.discussion-artifact-preview {
-  margin: 0;
-  max-height: 9rem;
-  overflow: auto;
-  padding: 0.5rem 0.6rem;
-  font-size: 0.75rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: var(--bg);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  scrollbar-width: thin;
-}
-
 .bubble-artifact-patch {
   box-shadow: inset 3px 0 0 0 #22c55e;
 }
