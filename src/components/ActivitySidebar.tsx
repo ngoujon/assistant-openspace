@@ -199,13 +199,10 @@ export function ActivitySidebar({
         )}
         {!panelError && !busy && linkedArtifact && (
           <div className="activity-artifact-download">
-            <p className="activity-sidebar-muted">
-              Livrable lié à ce projet (mission ou fusion discussion) — tu peux le
-              télécharger ici.
-            </p>
             <button
               type="button"
               className="btn-primary btn-compact"
+              aria-label="Télécharger le livrable Markdown (.md)"
               onClick={() =>
                 triggerMarkdownDownload(
                   linkedArtifact.markdown,
