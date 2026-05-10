@@ -6,11 +6,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from "react";
-import {
-  countMissionModelCalls,
-  runMissionPipeline,
-  type MissionFile,
-} from "@/orchestration/pipeline";
+import { runMissionPipeline, type MissionFile } from "@/orchestration/pipeline";
 import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
 import { buildMissionMentionPrefix } from "@/lib/discussionMention";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
@@ -215,13 +211,6 @@ export function MissionWorkspace({
       abortRef.current = null;
       return;
     }
-
-    const planned = countMissionModelCalls(membersTree, false);
-    setProgress([
-      `Démarrage — ${planned} requête(s) vers le modèle « ${model} » (une par une). Tant qu’une étape est en cours (${
-        llmProvider === "mistral" ? "API Mistral" : "Ollama local"
-      }), la liste ne grossit pas : c’est normal (plusieurs minutes possibles).`,
-    ]);
 
     const contextForPipeline =
       buildMissionMentionPrefix(context, membersTree) + context;
