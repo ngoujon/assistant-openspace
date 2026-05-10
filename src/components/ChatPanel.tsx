@@ -19,6 +19,7 @@ import {
   isArtifactApplyIntent,
   resolveForcedResponderFromMessage,
 } from "@/lib/discussionMention";
+import { sleepMs } from "@/lib/llmRateLimit";
 import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
 import {
   markdownFilenameFromConversationTitle,
@@ -355,6 +356,10 @@ export function ChatPanel({
             missionUserBrief: conversation.missionUserBrief,
             artifactMarkdown: conversation.artifactMarkdown,
           });
+
+          if (llmProvider === "mistral") {
+            await sleepMs(320, ac.signal);
+          }
 
           const speakerLabel =
             members.find((m) => m.id === routing.responderId)?.label ??

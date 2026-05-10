@@ -1,5 +1,6 @@
 import { generateMissionConversationTitle } from "@/lib/discussionTeamChat";
 import { completeLlmChat } from "@/lib/llmChat";
+import { sleepMs } from "@/lib/llmRateLimit";
 import type { OllamaChatMessage } from "@/lib/ollama";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
@@ -109,6 +110,9 @@ const MISSION_CHAT_TIMEOUT_MS = 40 * 60 * 1000;
 
 const MISSION_KEEP_ALIVE = "45m";
 
+/** Pause entre deux appels Mistral en mission (réduit les rafales côté API). */
+const MISTRAL_MISSION_INTER_STEP_MS = 450;
+
 function slicePayloadForModel(payload: string): string {
   if (payload.length <= MAX_PAYLOAD_SLICE) return payload;
   return (
@@ -127,13 +131,17 @@ async function missionComplete(
   signal: AbortSignal | undefined,
   temperature: number,
 ): Promise<string> {
-  return completeLlmChat(llmProvider, mistralApiKey, model, messages, signal, {
+  const out = await completeLlmChat(llmProvider, mistralApiKey, model, messages, signal, {
     temperature,
     ...(llmProvider === "ollama"
       ? { keepAlive: MISSION_KEEP_ALIVE }
       : {}),
     timeoutMs: MISSION_CHAT_TIMEOUT_MS,
   });
+  if (llmProvider === "mistral") {
+    await sleepMs(MISTRAL_MISSION_INTER_STEP_MS, signal);
+  }
+  return out;
 }
 
 interface BranchOutput {

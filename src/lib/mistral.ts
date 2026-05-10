@@ -1,3 +1,4 @@
+import { fetchWithRateLimitRetries } from "@/lib/llmRateLimit";
 import { assertChatModel, type OllamaChatMessage } from "@/lib/ollama";
 
 const BASE = "/api/mistral";
@@ -86,6 +87,19 @@ function mistralErrorMessage(status: number, body: string): string {
   if (status === 401) {
     return "Mistral AI : clé API refusée. Vérifie la clé dans Paramètres.";
   }
+  if (status === 429) {
+    const extra =
+      " Réessaie dans quelques minutes, utilise **Ollama en local** (Paramètres) pour les longues missions, ou vérifie les quotas sur console.mistral.ai.";
+    try {
+      const o = JSON.parse(body) as { message?: string };
+      if (typeof o.message === "string" && o.message.trim()) {
+        return `${o.message.trim()}${extra}`;
+      }
+    } catch {
+      /* ignore */
+    }
+    return `Mistral AI : limite de débit (trop de requêtes).${extra}`;
+  }
   try {
     const o = JSON.parse(body) as { message?: string; detail?: unknown };
     if (typeof o.message === "string" && o.message.trim()) return o.message.trim();
@@ -109,17 +123,21 @@ export async function completeMistralChat(
   const combined = mergeAbortWithTimeout(signal, options?.timeoutMs);
   let res: Response;
   try {
-    res = await fetch(`${BASE}/v1/chat/completions`, {
-      method: "POST",
-      headers: authHeaders(apiKey),
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        ...(options?.temperature != null ? { temperature: options.temperature } : {}),
-      }),
-      signal: combined,
-    });
+    res = await fetchWithRateLimitRetries(
+      () =>
+        fetch(`${BASE}/v1/chat/completions`, {
+          method: "POST",
+          headers: authHeaders(apiKey),
+          body: JSON.stringify({
+            model,
+            messages,
+            stream: false,
+            ...(options?.temperature != null ? { temperature: options.temperature } : {}),
+          }),
+          signal: combined,
+        }),
+      combined,
+    );
   } catch (e) {
     if (signal?.aborted) throw e;
     const de = e as DOMException;
@@ -153,12 +171,16 @@ export async function streamMistralChat(
   signal?: AbortSignal,
 ): Promise<void> {
   assertChatModel(model);
-  const res = await fetch(`${BASE}/v1/chat/completions`, {
-    method: "POST",
-    headers: authHeaders(apiKey),
-    body: JSON.stringify({ model, messages, stream: true }),
+  const res = await fetchWithRateLimitRetries(
+    () =>
+      fetch(`${BASE}/v1/chat/completions`, {
+        method: "POST",
+        headers: authHeaders(apiKey),
+        body: JSON.stringify({ model, messages, stream: true }),
+        signal,
+      }),
     signal,
-  });
+  );
   if (!res.ok) {
     const errText = await res.text();
     throw new Error(mistralErrorMessage(res.status, errText));
