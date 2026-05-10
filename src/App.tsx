@@ -48,11 +48,13 @@ export default function App() {
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  useEffect(() => {
-    if (mainTab === "team") {
-      setRightActivity({ kind: "team" });
-    }
-  }, [mainTab]);
+  /** Colonne droite : sur l’onglet Équipe on affiche « équipe » sans écraser l’état chat (mission / discussion). */
+  const activityForShell = useMemo<RightActivityState>(() => {
+    if (mainTab === "team") return { kind: "team" };
+    if (rightActivity.kind === "team")
+      return { kind: "idle" };
+    return rightActivity;
+  }, [mainTab, rightActivity]);
 
   const refreshLlmModels = useCallback(() => {
     const s = loadAppSettings();
@@ -235,7 +237,7 @@ export default function App() {
 
   const rightAsideEl = (
     <ActivitySidebar
-      state={rightActivity}
+      state={activityForShell}
       linkedArtifact={activityLinkedArtifact}
       llmProvider={llmProvider}
     />
@@ -273,7 +275,7 @@ export default function App() {
             setMessages={setActiveMessages}
             onConversationTitle={setConversationTitleById}
             onConversationArtifact={setConversationArtifactMarkdown}
-            activityState={rightActivity}
+            activityState={activityForShell}
             setRightActivity={setRightActivity}
           />
         ) : (

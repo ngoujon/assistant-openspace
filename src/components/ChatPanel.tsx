@@ -34,6 +34,12 @@ import type { ChatMessage, Conversation } from "@/types";
 
 type ChatMode = "mission" | "free";
 
+function initialChatMode(conversation: Conversation): ChatMode {
+  const hasArtifact = Boolean(conversation.artifactMarkdown?.trim());
+  const hasMessages = conversation.messages.length > 0;
+  return hasArtifact || hasMessages ? "free" : "mission";
+}
+
 interface DiscussionQueuedMessage {
   id: string;
   text: string;
@@ -93,7 +99,9 @@ export function ChatPanel({
   activityState,
   setRightActivity,
 }: ChatPanelProps) {
-  const [mode, setMode] = useState<ChatMode>("mission");
+  const [mode, setMode] = useState<ChatMode>(() =>
+    initialChatMode(conversation),
+  );
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [isRouting, setIsRouting] = useState(false);
