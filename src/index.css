@@ -143,6 +143,25 @@ body {
   opacity: 0.92;
 }
 
+.activity-artifact-download {
+  margin: 0.65rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.activity-artifact-download .activity-sidebar-muted {
+  margin: 0;
+}
+
+.activity-inline .activity-artifact-download {
+  margin-top: 0.5rem;
+}
+
 .activity-sidebar-status {
   margin: 0 0 0.5rem;
   font-size: 0.8125rem;

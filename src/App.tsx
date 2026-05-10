@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivitySidebar } from "@/components/ActivitySidebar";
+import { markdownFilenameFromConversationTitle } from "@/lib/downloadMarkdown";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Layout } from "@/components/Layout";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -67,6 +68,15 @@ export default function App() {
     () => conversations.find((c) => c.id === activeId) ?? conversations[0],
     [conversations, activeId],
   );
+
+  const activityLinkedArtifact = useMemo(() => {
+    const md = active.artifactMarkdown?.trim();
+    if (!md) return null;
+    return {
+      markdown: md,
+      filename: markdownFilenameFromConversationTitle(active.title),
+    };
+  }, [active.artifactMarkdown, active.title]);
 
   const setActiveMessages = useCallback(
     (updater: (prev: Conversation["messages"]) => Conversation["messages"]) => {
@@ -180,7 +190,12 @@ export default function App() {
             onOpenSettings={() => setSettingsOpen(true)}
           />
         }
-        rightAside={<ActivitySidebar state={rightActivity} />}
+        rightAside={
+          <ActivitySidebar
+            state={rightActivity}
+            linkedArtifact={activityLinkedArtifact}
+          />
+        }
         main={
           <>
             <nav className="main-tabs" aria-label="Zones principales">

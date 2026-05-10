@@ -6,6 +6,7 @@ import {
 } from "@/orchestration/pipeline";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
 import { ORCHESTRATOR_ID, loadTeamMembers } from "@/lib/teamTreeStorage";
+import { triggerMarkdownDownload } from "@/lib/downloadMarkdown";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 
 interface MissionWorkspaceProps {
@@ -18,19 +19,6 @@ interface MissionWorkspaceProps {
   }) => void;
   /** Quand une mission produit un Markdown, pour le lier à la conversation (Discussion). */
   onArtifactProduced?: (markdown: string) => void;
-}
-
-function downloadMarkdown(content: string, filename: string) {
-  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 export function MissionWorkspace({
@@ -164,7 +152,7 @@ export function MissionWorkspace({
   const handleDownload = useCallback(() => {
     if (!resultMd) return;
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadMarkdown(resultMd, `rapport-equipe-${stamp}.md`);
+    triggerMarkdownDownload(resultMd, `rapport-equipe-${stamp}.md`);
   }, [resultMd]);
 
   return (

@@ -19,6 +19,10 @@ import {
   isArtifactApplyIntent,
   resolveForcedResponderFromMessage,
 } from "@/lib/discussionMention";
+import {
+  markdownFilenameFromConversationTitle,
+  triggerMarkdownDownload,
+} from "@/lib/downloadMarkdown";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
 import { loadTeamMembers } from "@/lib/teamTreeStorage";
@@ -132,19 +136,20 @@ export function ChatPanel({
   const downloadLinkedArtifact = useCallback(() => {
     const md = conversation.artifactMarkdown?.trim();
     if (!md) return;
-    const slug =
-      conversation.title
-        .slice(0, 48)
-        .replace(/[^\wÀ-ÿ-]+/g, "-")
-        .replace(/^-|-$/g, "") || "livrable";
-    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${slug}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerMarkdownDownload(
+      md,
+      markdownFilenameFromConversationTitle(conversation.title),
+    );
   }, [conversation.artifactMarkdown, conversation.title]);
+
+  const trimmedArtifact = conversation.artifactMarkdown?.trim();
+  const linkedArtifactForActivity =
+    trimmedArtifact && trimmedArtifact.length > 0
+      ? {
+          markdown: trimmedArtifact,
+          filename: markdownFilenameFromConversationTitle(conversation.title),
+        }
+      : null;
 
   const patchArtifactFromDiscussion = useCallback(
     async (instructionText: string) => {
@@ -426,7 +431,11 @@ export function ChatPanel({
       </header>
 
       <div className="activity-inline-wrap" aria-hidden={false}>
-        <ActivitySidebar state={activityState} variant="inline" />
+        <ActivitySidebar
+          state={activityState}
+          variant="inline"
+          linkedArtifact={linkedArtifactForActivity}
+        />
       </div>
 
       {mode === "mission" ? (

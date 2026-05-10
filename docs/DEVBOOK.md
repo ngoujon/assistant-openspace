@@ -49,6 +49,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-05-09 | Paramètres : engrenage sidebar, prompts seed Ollama éditables (`openspace-app-settings-v1`) |
 | 2026-05-09 | Gabarit seed par défaut : structure type OpenClaw (contexte / mission / format / contraintes) |
 | 2026-05-09 | Gabarit seed : orientation assistant métier (Rôle + Pratiques et standards), sans persona |
+| 2026-05-10 | Activité : téléchargement du livrable .md (mission terminée ou discussion avec livrable) ; utilitaire `downloadMarkdown` ; prompts mission — angles « hors premier jet » |
 
 ---
 
@@ -234,6 +235,20 @@ Trouver sur **http://localhost:3004** les changements du code **en temps réel**
 ### Fichiers touchés
 
 - `docker-compose.dev.yml`, `vite.config.ts`, `package.json`, `docs/docker.md`, `docs/ollama.md`, `README.md`
+
+---
+
+## 2026-05-10 — Livrable depuis Activité + prompts « angles oubliés »
+
+### Objectif
+
+Rapprocher l’UI du flux « recherche multi-agents → cahier des charges Markdown » : accès au téléchargement depuis la colonne **Activité** (sidebar et bandeau inline), et renforcer les consignes orchestrateur / spécialistes pour explorer ce que l’utilisateur n’a pas dit dans son premier message.
+
+### Fichiers
+
+- `src/lib/downloadMarkdown.ts` — `triggerMarkdownDownload`, `markdownFilenameFromConversationTitle`
+- `src/components/ActivitySidebar.tsx`, `src/App.tsx`, `src/components/ChatPanel.tsx`, `src/components/MissionWorkspace.tsx`, `src/index.css`
+- `src/orchestration/pipeline.ts` — brief orchestrateur + consignes sous-agent / pôle solo
 
 ---
 

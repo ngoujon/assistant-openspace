@@ -1,10 +1,17 @@
 import { useLayoutEffect, useRef } from "react";
+import { triggerMarkdownDownload } from "@/lib/downloadMarkdown";
 import {
   missionProgressPercent,
   parseMissionProgressLine,
   type MissionStepVisualKind,
 } from "@/lib/parseMissionProgressLine";
 import type { RightActivityState } from "@/types/activity";
+
+/** Livrable Markdown lié à la conversation (mission terminée ou fusion discussion). */
+export interface ActivityLinkedArtifact {
+  markdown: string;
+  filename: string;
+}
 
 const STEP_KIND_LABELS: Record<MissionStepVisualKind, string | null> = {
   done: "Terminé",
@@ -120,11 +127,14 @@ interface ActivitySidebarProps {
   state: RightActivityState;
   /** Sur mobile la colonne droite est masquée : version compacte au-dessus du fil. */
   variant?: "sidebar" | "inline";
+  /** Téléchargement du cahier des charges / rapport lié à la conversation active. */
+  linkedArtifact?: ActivityLinkedArtifact | null;
 }
 
 export function ActivitySidebar({
   state,
   variant = "sidebar",
+  linkedArtifact = null,
 }: ActivitySidebarProps) {
   const isInline = variant === "inline";
 
@@ -183,7 +193,27 @@ export function ActivitySidebar({
             )}
           </p>
         )}
-        {!panelError && !busy && (
+        {!panelError && !busy && linkedArtifact && (
+          <div className="activity-artifact-download">
+            <p className="activity-sidebar-muted">
+              Livrable lié à ce projet (mission ou fusion discussion) — tu peux le
+              télécharger ici.
+            </p>
+            <button
+              type="button"
+              className="btn-primary btn-compact"
+              onClick={() =>
+                triggerMarkdownDownload(
+                  linkedArtifact.markdown,
+                  linkedArtifact.filename,
+                )
+              }
+            >
+              Télécharger le .md
+            </button>
+          </div>
+        )}
+        {!panelError && !busy && !linkedArtifact && (
           <p className="activity-sidebar-muted">
             Aucun envoi en cours. Écris un message et envoie pour lancer l’équipe.
           </p>
@@ -247,6 +277,27 @@ export function ActivitySidebar({
           running={running}
           compact={isInline}
         />
+      )}
+      {!running && linkedArtifact && progress.length > 0 && (
+        <div className="activity-artifact-download">
+          <p className="activity-sidebar-muted">
+            Le document Markdown est enregistré sur cette conversation. Tu peux aussi
+            l’ouvrir en <strong>Discussion</strong> pour l’affiner puis « appliquer la
+            mise à jour ».
+          </p>
+          <button
+            type="button"
+            className="btn-primary btn-compact"
+            onClick={() =>
+              triggerMarkdownDownload(
+                linkedArtifact.markdown,
+                linkedArtifact.filename,
+              )
+            }
+          >
+            Télécharger le .md
+          </button>
+        </div>
       )}
     </div>
   );
