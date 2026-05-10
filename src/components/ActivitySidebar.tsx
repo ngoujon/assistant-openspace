@@ -161,13 +161,61 @@ export function ActivitySidebar({
 
   if (state.kind === "discussion") {
     if (isInline) return null;
+    const { isRouting, streaming, panelError, streamingSpeaker } = state;
+    const busy = isRouting || streaming;
     return (
-      <div className="activity-sidebar" role="complementary" aria-label="Activité">
+      <div
+        className="activity-sidebar activity-sidebar--discussion"
+        role="status"
+        aria-live="polite"
+        aria-busy={busy}
+      >
         <h2 className="activity-sidebar-title">Activité</h2>
-        <p className="activity-sidebar-muted">
-          En phase <strong>Mission équipe</strong>, étapes et durée s’affichent ici. En
-          discussion, le détail des envois est dans la colonne « Échanges en cours ».
-        </p>
+        <div className="activity-discussion-main">
+          {panelError && (
+            <p className="activity-sidebar-error" role="alert">
+              {panelError}
+            </p>
+          )}
+          {!panelError && isRouting && (
+            <p className="activity-sidebar-status">
+              L’orchestrateur choisit le membre le plus qualifié pour répondre…
+            </p>
+          )}
+          {!panelError && !isRouting && streaming && (
+            <p className="activity-sidebar-status">
+              {streamingSpeaker ? (
+                <>
+                  Réponse en cours de <strong>{streamingSpeaker}</strong>…
+                </>
+              ) : (
+                "Réponse en cours de génération…"
+              )}
+            </p>
+          )}
+          {!panelError && !busy && !linkedArtifact && (
+            <p className="activity-sidebar-muted">
+              Aucun envoi en cours. Écris un message et envoie pour lancer l’équipe.
+            </p>
+          )}
+        </div>
+        {!panelError && !busy && linkedArtifact ? (
+          <div className="activity-sidebar-footer">
+            <button
+              type="button"
+              className="btn-primary btn-compact activity-download-md-btn"
+              aria-label="Télécharger le livrable Markdown (.md)"
+              onClick={() =>
+                triggerMarkdownDownload(
+                  linkedArtifact.markdown,
+                  linkedArtifact.filename,
+                )
+              }
+            >
+              Télécharger le .md
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -177,6 +225,9 @@ export function ActivitySidebar({
     elapsedSec >= 60
       ? `${Math.floor(elapsedSec / 60)} min ${(elapsedSec % 60).toString().padStart(2, "0")} s`
       : `${elapsedSec} s`;
+
+  const showMissionDownload =
+    !running && linkedArtifact && progress.length > 0;
 
   return (
     <div
@@ -189,67 +240,69 @@ export function ActivitySidebar({
       aria-live="polite"
       aria-busy={running}
     >
-      <h2 className="activity-sidebar-title">Mission en cours</h2>
-      {running && (
-        <p className="activity-sidebar-timer" aria-label="Durée écoulée">
-          Durée : {fmt}
-        </p>
-      )}
-      {running && elapsedSec >= 8 && (
-        <p className="activity-sidebar-wait-hint">
-          {llmProvider === "mistral" ? (
-            <>
-              La <strong>1<sup>re</sup> réponse</strong> peut être longue (API Mistral,
-              taille du contexte). La liste d’étapes ne change qu’à la fin de chaque appel
-              — ce n’est pas un blocage de l’app.
-            </>
-          ) : (
-            <>
-              La <strong>1<sup>re</sup> réponse</strong> charge souvent le modèle dans
-              Ollama (plusieurs minutes en CPU). La liste d’étapes ne change qu’à la fin
-              de chaque appel — ce n’est pas un blocage de l’app.
-            </>
-          )}
-        </p>
-      )}
-      {running && elapsedSec >= 120 && (
-        <p className="activity-sidebar-wait-hint activity-sidebar-wait-hint--strong">
-          {llmProvider === "mistral" ? (
-            <>
-              Si tu n’as <strong>aucune</strong> réponse au-delà de ~15–20&nbsp;min,
-              vérifie ta <strong>clé API</strong> dans Paramètres et le statut du service
-              Mistral ; réduis aussi le volume de fichiers joints si besoin.
-            </>
-          ) : (
-            <>
-              Si tu n’as <strong>aucune</strong> réponse au-delà de ~15–20&nbsp;min, teste
-              dans un terminal : <code>ollama run</code> + ton modèle, ou redémarre
-              Ollama. Un modèle volumineux sur disque externe peut aussi expliquer des
-              délais très longs.
-            </>
-          )}
-        </p>
-      )}
-      {!running && progress.length === 0 && (
-        <p className="activity-sidebar-muted">
-          Lance une mission en phase <strong>Mission équipe</strong> pour voir la
-          progression ici.
-        </p>
-      )}
-      {!running && progress.length > 0 && (
-        <p className="activity-sidebar-muted activity-sidebar-muted--success">
-          Dernière mission terminée — détail des étapes ci-dessous.
-        </p>
-      )}
-      {progress.length > 0 && (
-        <MissionStepTimeline
-          progress={progress}
-          running={running}
-          compact={isInline}
-        />
-      )}
-      {!running && linkedArtifact && progress.length > 0 && (
-        <div className="activity-artifact-download">
+      <div className="activity-mission-main">
+        <h2 className="activity-sidebar-title">Mission en cours</h2>
+        {running && (
+          <p className="activity-sidebar-timer" aria-label="Durée écoulée">
+            Durée : {fmt}
+          </p>
+        )}
+        {running && elapsedSec >= 8 && (
+          <p className="activity-sidebar-wait-hint">
+            {llmProvider === "mistral" ? (
+              <>
+                La <strong>1<sup>re</sup> réponse</strong> peut être longue (API Mistral,
+                taille du contexte). La liste d’étapes ne change qu’à la fin de chaque appel
+                — ce n’est pas un blocage de l’app.
+              </>
+            ) : (
+              <>
+                La <strong>1<sup>re</sup> réponse</strong> charge souvent le modèle dans
+                Ollama (plusieurs minutes en CPU). La liste d’étapes ne change qu’à la fin
+                de chaque appel — ce n’est pas un blocage de l’app.
+              </>
+            )}
+          </p>
+        )}
+        {running && elapsedSec >= 120 && (
+          <p className="activity-sidebar-wait-hint activity-sidebar-wait-hint--strong">
+            {llmProvider === "mistral" ? (
+              <>
+                Si tu n’as <strong>aucune</strong> réponse au-delà de ~15–20&nbsp;min,
+                vérifie ta <strong>clé API</strong> dans Paramètres et le statut du service
+                Mistral ; réduis aussi le volume de fichiers joints si besoin.
+              </>
+            ) : (
+              <>
+                Si tu n’as <strong>aucune</strong> réponse au-delà de ~15–20&nbsp;min, teste
+                dans un terminal : <code>ollama run</code> + ton modèle, ou redémarre
+                Ollama. Un modèle volumineux sur disque externe peut aussi expliquer des
+                délais très longs.
+              </>
+            )}
+          </p>
+        )}
+        {!running && progress.length === 0 && (
+          <p className="activity-sidebar-muted">
+            Lance une mission en phase <strong>Mission équipe</strong> pour voir la
+            progression ici.
+          </p>
+        )}
+        {!running && progress.length > 0 && (
+          <p className="activity-sidebar-muted activity-sidebar-muted--success">
+            Dernière mission terminée — détail des étapes ci-dessous.
+          </p>
+        )}
+        {progress.length > 0 && (
+          <MissionStepTimeline
+            progress={progress}
+            running={running}
+            compact={isInline}
+          />
+        )}
+      </div>
+      {showMissionDownload && linkedArtifact ? (
+        <div className="activity-sidebar-footer">
           <p className="activity-sidebar-muted">
             Le document Markdown est enregistré sur cette conversation. Tu peux aussi
             l’ouvrir en <strong>Discussion</strong> pour l’affiner puis « appliquer la
@@ -257,7 +310,7 @@ export function ActivitySidebar({
           </p>
           <button
             type="button"
-            className="btn-primary btn-compact"
+            className="btn-primary btn-compact activity-download-md-btn"
             onClick={() =>
               triggerMarkdownDownload(
                 linkedArtifact.markdown,
@@ -268,7 +321,7 @@ export function ActivitySidebar({
             Télécharger le .md
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

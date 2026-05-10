@@ -4,7 +4,6 @@ import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { fetchMistralModels } from "@/lib/mistral";
 import { ActivitySidebar } from "@/components/ActivitySidebar";
-import { ExchangesSidebar } from "@/components/ExchangesSidebar";
 import { markdownFilenameFromConversationTitle } from "@/lib/downloadMarkdown";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Layout } from "@/components/Layout";
@@ -231,13 +230,6 @@ export default function App() {
     />
   );
 
-  const exchangesAsideEl = (
-    <ExchangesSidebar
-      state={activityForShell}
-      linkedArtifact={activityLinkedArtifact}
-    />
-  );
-
   const activityAsideEl = (
     <ActivitySidebar
       state={activityForShell}
@@ -282,7 +274,6 @@ export default function App() {
           sidebar={sidebarEl}
           main={mainEl}
           organisationAside={<TeamOrganisationAside />}
-          exchangesAside={exchangesAsideEl}
           activityAside={activityAsideEl}
         />
       </TeamWorkspaceProvider>

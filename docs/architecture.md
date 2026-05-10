@@ -24,15 +24,14 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 | Élément | Rôle |
 |---------|------|
 | `App.tsx` | État global : conversations, conversation active, fournisseur LLM, modèle |
-| `components/Layout.tsx` | Grille : sidebar, contenu, puis bloc HUD (Organisation · Échanges en cours · Activité) |
+| `components/Layout.tsx` | Grille : sidebar, contenu, puis bloc HUD (Organisation · Activité) |
 | `components/Sidebar.tsx` | Liste conversations + actions |
 | `components/ChatPanel.tsx` | Mission équipe ; Discussion orchestrée (`discussionTeamChat`) |
 | `lib/discussionTeamChat.ts` | Routage orchestrateur + stream du membre choisi |
 | `components/MissionWorkspace.tsx` | Contexte, fichiers, pipeline, aperçu MD, téléchargement |
 | `components/TeamWorkspaceContext.tsx` | État partagé équipe (membres, âmes, DnD) |
 | `components/TeamOrganisationAside.tsx` | Colonne Organisation (arbre hiérarchique) |
-| `components/ExchangesSidebar.tsx` | Colonne Échanges en cours (discussion : routage, stream, .md) |
-| `components/ActivitySidebar.tsx` | Colonne Activité (mission : étapes, durée ; placeholders hors mission) |
+| `components/ActivitySidebar.tsx` | Colonne Activité (mission, discussion : statuts ; téléchargement .md en bas) |
 | `components/TeamCentrePanel.tsx` | Hôte de la modale âme/rôle (clic membre dans Organisation) |
 | `components/TeamArchiveModal.tsx` | Modale listant les compositions archivées (s’appuie sur `TeamArchiveSection`) |
 | `lib/teamTreeStorage.ts` | Membres, reparentage, profondeur max 3 (`openspace-team-tree-v1`) |

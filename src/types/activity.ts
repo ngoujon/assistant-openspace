@@ -4,7 +4,7 @@ export interface ActivityLinkedArtifact {
   filename: string;
 }
 
-/** Contenu de la colonne droite (activité / échanges en cours). */
+/** Contenu de la colonne Activité (mission, discussion). */
 export type RightActivityState =
   | { kind: "idle" }
   | { kind: "team" }

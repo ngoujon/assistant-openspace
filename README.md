@@ -77,7 +77,7 @@ Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le c
 ### Autres
 
 - **Colonne gauche** : conversations, persistance `localStorage` ; icône **Paramètres** à droite du titre OpenSpace (fournisseur LLM, clé Mistral, prompts pour **Générer un seed**).
-- **À droite du chat** : trois colonnes — **Organisation** (arbre de l’équipe), **Échanges en cours** (statuts discussion), **Activité** (mission : étapes, durée).
+- **À droite du chat** : **Organisation** (arbre) puis **Activité** (mission : étapes, durée ; en discussion : routage / stream ; bouton **Télécharger le .md** en bas de la colonne).
 
 ## Proxy LLM
 
