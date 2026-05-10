@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { loadAppSettings } from "@/lib/appSettingsStorage";
+import type { LlmProvider } from "@/lib/llmProvider";
+import { fetchMistralModels } from "@/lib/mistral";
 import { ActivitySidebar } from "@/components/ActivitySidebar";
 import { markdownFilenameFromConversationTitle } from "@/lib/downloadMarkdown";
 import { ChatPanel } from "@/components/ChatPanel";
@@ -10,6 +13,21 @@ import { fetchOllamaModels } from "@/lib/ollama";
 import { loadConversations, saveConversations } from "@/lib/storage";
 import type { RightActivityState } from "@/types/activity";
 import type { Conversation, MainTab } from "@/types";
+
+function pickDefaultModel(models: string[], provider: LlmProvider): string {
+  if (!models.length) return "";
+  if (provider === "mistral") {
+    const preferred = [
+      "mistral-small-latest",
+      "open-mistral-nemo",
+      "mistral-large-latest",
+    ];
+    for (const id of preferred) {
+      if (models.includes(id)) return id;
+    }
+  }
+  return models[0] ?? "";
+}
 
 function newConversation(): Conversation {
   const id = crypto.randomUUID();
@@ -30,7 +48,13 @@ export default function App() {
   const [mainTab, setMainTab] = useState<MainTab>("chat");
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState("");
-  const [ollamaError, setOllamaError] = useState<string | null>(null);
+  const [llmProvider, setLlmProvider] = useState<LlmProvider>(
+    () => loadAppSettings().llmProvider,
+  );
+  const [mistralApiKey, setMistralApiKey] = useState(
+    () => loadAppSettings().mistralApiKey,
+  );
+  const [llmError, setLlmError] = useState<string | null>(null);
   const [rightActivity, setRightActivity] = useState<RightActivityState>({
     kind: "idle",
   });
@@ -42,17 +66,39 @@ export default function App() {
     }
   }, [mainTab]);
 
-  useEffect(() => {
-    fetchOllamaModels()
+  const refreshLlmModels = useCallback(() => {
+    const s = loadAppSettings();
+    setLlmProvider(s.llmProvider);
+    setMistralApiKey(s.mistralApiKey);
+
+    if (s.llmProvider === "mistral" && !s.mistralApiKey.trim()) {
+      setModels([]);
+      setModel("");
+      setLlmError(
+        "Mistral AI : renseigne ta clé API dans Paramètres (menu latéral).",
+      );
+      return;
+    }
+
+    const run =
+      s.llmProvider === "mistral"
+        ? () => fetchMistralModels(s.mistralApiKey.trim())
+        : fetchOllamaModels;
+
+    run()
       .then((m) => {
         setModels(m);
         setModel((prev) =>
-          prev && m.includes(prev) ? prev : m[0] || "",
+          prev && m.includes(prev) ? prev : pickDefaultModel(m, s.llmProvider),
         );
-        setOllamaError(null);
+        setLlmError(null);
       })
-      .catch((e: Error) => setOllamaError(e.message));
+      .catch((e: Error) => setLlmError(e.message));
   }, []);
+
+  useEffect(() => {
+    refreshLlmModels();
+  }, [refreshLlmModels]);
 
   useEffect(() => {
     saveConversations(conversations);
@@ -178,7 +224,11 @@ export default function App() {
 
   return (
     <>
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onSaved={refreshLlmModels}
+      />
       <Layout
         sidebar={
           <Sidebar
@@ -194,6 +244,7 @@ export default function App() {
           <ActivitySidebar
             state={rightActivity}
             linkedArtifact={activityLinkedArtifact}
+            llmProvider={llmProvider}
           />
         }
         main={
@@ -221,18 +272,10 @@ export default function App() {
                   models={models}
                   model={model}
                   onModelChange={setModel}
-                  ollamaError={ollamaError}
-                  onRetryOllama={() => {
-                    fetchOllamaModels()
-                      .then((m) => {
-                        setModels(m);
-                        setModel((prev) =>
-                          prev && m.includes(prev) ? prev : m[0] || "",
-                        );
-                        setOllamaError(null);
-                      })
-                      .catch((e: Error) => setOllamaError(e.message));
-                  }}
+                  llmProvider={llmProvider}
+                  mistralApiKey={mistralApiKey}
+                  llmError={llmError}
+                  onRetryLlm={refreshLlmModels}
                   setMessages={setActiveMessages}
                   onConversationTitle={setConversationTitleById}
                   onConversationArtifact={setConversationArtifactMarkdown}
@@ -240,7 +283,11 @@ export default function App() {
                   setRightActivity={setRightActivity}
                 />
               ) : (
-                <TeamPanel model={model} />
+                <TeamPanel
+                  model={model}
+                  llmProvider={llmProvider}
+                  mistralApiKey={mistralApiKey}
+                />
               )}
             </div>
           </>

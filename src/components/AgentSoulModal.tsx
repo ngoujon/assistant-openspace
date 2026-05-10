@@ -6,6 +6,7 @@ import {
   type MouseEvent,
 } from "react";
 import { generateMemberSoulSeed } from "@/lib/generateMemberSeed";
+import type { LlmProvider } from "@/lib/llmProvider";
 
 export interface SoulModalNode {
   id: string;
@@ -22,6 +23,8 @@ interface AgentSoulModalProps {
   /** Vide pour l’orchestrateur ; sinon liste pour le sélecteur « Rattaché sous ». */
   parentOptions: { id: string; label: string }[];
   model: string;
+  llmProvider: LlmProvider;
+  mistralApiKey: string;
   onClose: () => void;
   onSave: (
     text: string,
@@ -39,6 +42,8 @@ export function AgentSoulModal({
   parentLabel,
   parentOptions,
   model,
+  llmProvider,
+  mistralApiKey,
   onClose,
   onSave,
 }: AgentSoulModalProps) {
@@ -115,6 +120,8 @@ export function AgentSoulModal({
     setGenerating(true);
     try {
       const text = await generateMemberSoulSeed({
+        llmProvider,
+        mistralApiKey,
         model,
         memberLabel: nameDraft.trim(),
         parentId: effectiveParentId,

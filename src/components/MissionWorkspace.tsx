@@ -8,8 +8,11 @@ import { loadAgentSouls } from "@/lib/teamSoulsStorage";
 import { ORCHESTRATOR_ID, loadTeamMembers } from "@/lib/teamTreeStorage";
 import { triggerMarkdownDownload } from "@/lib/downloadMarkdown";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
+import type { LlmProvider } from "@/lib/llmProvider";
 
 interface MissionWorkspaceProps {
+  llmProvider: LlmProvider;
+  mistralApiKey: string;
   model: string;
   /** Alimente la colonne droite (et la bande mobile) avec la progression. */
   onActivityReport?: (payload: {
@@ -24,6 +27,8 @@ interface MissionWorkspaceProps {
 }
 
 export function MissionWorkspace({
+  llmProvider,
+  mistralApiKey,
   model,
   onActivityReport,
   onArtifactProduced,
@@ -96,7 +101,11 @@ export function MissionWorkspace({
       return;
     }
     if (!model) {
-      setError("Aucun modèle Ollama. Lance Ollama et télécharge un modèle.");
+      setError(
+        llmProvider === "mistral"
+          ? "Aucun modèle Mistral. Vérifie ta clé API dans Paramètres."
+          : "Aucun modèle Ollama. Lance Ollama et télécharge un modèle.",
+      );
       return;
     }
 
@@ -129,11 +138,15 @@ export function MissionWorkspace({
       !!onConversationTitleSuggested,
     );
     setProgress([
-      `Démarrage — ${planned} requête(s) vers le modèle « ${model} » (une par une). Tant qu’une étape tourne chez Ollama, la liste ne grossit pas : c’est normal (plusieurs minutes possibles).`,
+      `Démarrage — ${planned} requête(s) vers le modèle « ${model} » (une par une). Tant qu’une étape est en cours (${
+        llmProvider === "mistral" ? "API Mistral" : "Ollama local"
+      }), la liste ne grossit pas : c’est normal (plusieurs minutes possibles).`,
     ]);
 
     try {
       const md = await runMissionPipeline({
+        llmProvider,
+        mistralApiKey,
         model,
         context,
         files: missionFiles,
@@ -162,6 +175,8 @@ export function MissionWorkspace({
     running,
     context,
     files,
+    llmProvider,
+    mistralApiKey,
     model,
     onArtifactProduced,
     onConversationTitleSuggested,

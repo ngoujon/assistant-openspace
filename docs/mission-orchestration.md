@@ -1,10 +1,10 @@
-# Mission équipe — orchestration Ollama
+# Mission équipe — orchestration LLM
 
 ## Flux utilisateur
 
 1. Onglet **Chat** → mode **Mission équipe** (par défaut).
 2. Saisir un **contexte** et/ou joindre des fichiers **.txt** / **.md**.
-3. **Lancer la mission** : enchaînement d’appels Ollama en local (`stream: false`).
+3. **Lancer la mission** : enchaînement d’appels au fournisseur configuré (Mistral ou Ollama), sans stream (`stream: false`).
 4. À la fin : aperçu du **README Markdown** généré et bouton **Télécharger le .md**.
 
 ## Pipeline (ordre)
@@ -27,7 +27,7 @@ L’arbre (membres sous l’orchestrateur, sous-agents sous les piliers) est lu 
 ## Fichiers code
 
 - `src/orchestration/pipeline.ts` — `runMissionPipeline` (boucle sur les piliers et leurs enfants).
-- `src/lib/ollama.ts` — `completeOllamaChat` (réponse complète, pas de SSE).
+- `src/lib/llmChat.ts` — `completeLlmChat` (réponse complète, pas de SSE ; Ollama ou Mistral selon Paramètres).
 - `src/lib/teamTreeStorage.ts` — persistance de l’arbre `openspace-team-tree-v1`.
 - `src/components/MissionWorkspace.tsx` — UI contexte, fichiers, progression, téléchargement.
 

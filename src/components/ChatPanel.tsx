@@ -24,6 +24,7 @@ import {
   triggerMarkdownDownload,
 } from "@/lib/downloadMarkdown";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
+import type { LlmProvider } from "@/lib/llmProvider";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
 import { loadTeamMembers } from "@/lib/teamTreeStorage";
 import type { RightActivityState } from "@/types/activity";
@@ -47,8 +48,10 @@ interface ChatPanelProps {
   models: string[];
   model: string;
   onModelChange: (m: string) => void;
-  ollamaError: string | null;
-  onRetryOllama: () => void;
+  llmProvider: LlmProvider;
+  mistralApiKey: string;
+  llmError: string | null;
+  onRetryLlm: () => void;
   setMessages: (
     fn: (prev: ChatMessage[]) => ChatMessage[],
   ) => void;
@@ -72,8 +75,10 @@ export function ChatPanel({
   models,
   model,
   onModelChange,
-  ollamaError,
-  onRetryOllama,
+  llmProvider,
+  mistralApiKey,
+  llmError,
+  onRetryLlm,
   setMessages,
   onConversationTitle,
   onConversationArtifact,
@@ -180,7 +185,9 @@ export function ChatPanel({
       }
       if (!model) {
         setError(
-          "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
+          llmProvider === "mistral"
+            ? "Aucun modèle Mistral disponible. Vérifie ta clé API dans Paramètres."
+            : "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
         );
         return;
       }
@@ -209,6 +216,8 @@ export function ChatPanel({
       try {
         const souls = loadAgentSouls();
         const raw = await applyDiscussionToArtifact({
+          llmProvider,
+          mistralApiKey,
           model,
           souls,
           discussionMessages: discussionForPatch,
@@ -243,6 +252,8 @@ export function ChatPanel({
       conversation.messages,
       conversation.artifactMarkdown,
       conversation.artifactDiscussionCutoffAfterId,
+      llmProvider,
+      mistralApiKey,
       model,
       setMessages,
       onConversationArtifact,
@@ -253,7 +264,11 @@ export function ChatPanel({
     const text = input.trim();
     if (!text || streaming || isRouting) return;
     if (!model) {
-      setError("Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2");
+      setError(
+        llmProvider === "mistral"
+          ? "Aucun modèle Mistral disponible. Vérifie ta clé API dans Paramètres."
+          : "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
+      );
       return;
     }
 
@@ -290,6 +305,8 @@ export function ChatPanel({
         resolveForcedResponderFromMessage(text, members) ?? undefined;
 
       const routing = await routeDiscussionMessage({
+        llmProvider,
+        mistralApiKey,
         model,
         souls,
         members,
@@ -317,6 +334,8 @@ export function ChatPanel({
 
       let assistantAccum = "";
       await streamDiscussionReply({
+        llmProvider,
+        mistralApiKey,
         model,
         souls,
         responderId: routing.responderId,
@@ -348,6 +367,8 @@ export function ChatPanel({
       const recentTranscript = formatHistoryForRouting(transcriptMessages, 6000);
       const convId = conversation.id;
       void generateDiscussionConversationTitle({
+        llmProvider,
+        mistralApiKey,
         model,
         souls,
         recentTranscript,
@@ -375,6 +396,8 @@ export function ChatPanel({
     input,
     streaming,
     isRouting,
+    llmProvider,
+    mistralApiKey,
     model,
     conversation.id,
     conversation.messages,
@@ -419,7 +442,7 @@ export function ChatPanel({
         </div>
         <div className="chat-toolbar-row">
           <label className="model-label">
-            Modèle Ollama
+            Modèle {llmProvider === "mistral" ? "(Mistral AI)" : "(Ollama local)"}
             <select
               className="model-select"
               value={model}
@@ -437,10 +460,10 @@ export function ChatPanel({
               )}
             </select>
           </label>
-          {ollamaError && (
+          {llmError && (
             <div className="banner banner-warn">
-              {ollamaError}
-              <button type="button" className="btn-link" onClick={onRetryOllama}>
+              {llmError}
+              <button type="button" className="btn-link" onClick={onRetryLlm}>
                 Réessayer
               </button>
             </div>
@@ -453,12 +476,15 @@ export function ChatPanel({
           state={activityState}
           variant="inline"
           linkedArtifact={linkedArtifactForActivity}
+          llmProvider={llmProvider}
         />
       </div>
 
       {mode === "mission" ? (
         <MissionWorkspace
           key={conversation.id}
+          llmProvider={llmProvider}
+          mistralApiKey={mistralApiKey}
           model={model}
           onActivityReport={reportMissionActivity}
           onArtifactProduced={(md) =>

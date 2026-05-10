@@ -2,10 +2,13 @@ import {
   interpolateSeedUserTemplate,
   loadAppSettings,
 } from "@/lib/appSettingsStorage";
-import { completeOllamaChat } from "@/lib/ollama";
+import { completeLlmChat } from "@/lib/llmChat";
+import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID } from "@/lib/teamTreeStorage";
 
 export interface GenerateSeedInput {
+  llmProvider: LlmProvider;
+  mistralApiKey?: string;
   model: string;
   memberLabel: string;
   parentId: string | null;
@@ -19,7 +22,15 @@ export interface GenerateSeedInput {
 export async function generateMemberSoulSeed(
   input: GenerateSeedInput,
 ): Promise<string> {
-  const { model, memberLabel, parentId, parentLabel, signal } = input;
+  const {
+    llmProvider,
+    mistralApiKey,
+    model,
+    memberLabel,
+    parentId,
+    parentLabel,
+    signal,
+  } = input;
   const place =
     parentId === ORCHESTRATOR_ID || parentId === null
       ? "Ce membre est **directement sous l’orchestrateur** (niveau directeur / pilier métier)."
@@ -33,7 +44,9 @@ export async function generateMemberSoulSeed(
     place,
   );
 
-  return completeOllamaChat(
+  return completeLlmChat(
+    llmProvider,
+    mistralApiKey,
     model,
     [
       { role: "system", content: system },

@@ -4,6 +4,29 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Mistral AI (défaut) et bascule Ollama
+
+### Objectif
+
+Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local, avec **Mistral par défaut** et la **clé API** saisie dans **Paramètres** (localStorage). Trafic navigateur via `/api/mistral` (proxy Vite / nginx) pour le même motif que Ollama : CORS et déploiement unifié.
+
+### Décisions
+
+- **Routeur** : `src/lib/llmChat.ts` (`completeLlmChat` / `streamLlmChat`) selon `LlmProvider` ; client Mistral dans `src/lib/mistral.ts` (OpenAI-compatible `/v1/chat/completions` + SSE stream).
+- **Réglages** : `AppSettings` étendu (`llmProvider`, `mistralApiKey`) dans `src/lib/appSettingsStorage.ts` ; UI dans `SettingsModal`.
+- **Clé** : stockée **uniquement côté navigateur** ; le proxy relaie l’en-tête `Authorization` vers `https://api.mistral.ai`.
+
+### Fichiers clés
+
+- `vite.config.ts`, `nginx.conf` — proxy `/api/mistral` → `api.mistral.ai`.
+- `src/App.tsx` — chargement modèles selon fournisseur, `refreshLlmModels` après enregistrement des paramètres.
+
+### Changelog (condensé)
+
+| Date | Changement |
+|------|------------|
+| 2026-05-10 | LLM : Mistral AI (défaut) + Ollama local ; clé API dans Paramètres ; proxies `/api/mistral` et doc |
+
 ## 2026-03-28 — Bootstrap UI + Chat Ollama
 
 ### Objectif
@@ -117,7 +140,7 @@ Créer des **membres** sous l’orchestrateur, les **réorganiser par glisser-d�
 
 ### Décisions
 
-- **`completeOllamaChat`** (`stream: false`) pour enchaîner les étapes sans parser plusieurs streams.
+- **`completeLlmChat`** (`stream: false`) pour enchaîner les étapes sans parser plusieurs streams (Ollama ou Mistral).
 - Prompts **system** = textes « âme et rôle » (`loadAgentSouls` + seeds).
 - **~11 appels** modèle par mission ; annulation via **`AbortController`**.
 - UI : mode **Mission équipe** (défaut) vs **Discussion** dans l’onglet Chat ; `docs/mission-orchestration.md` décrit le flux.

@@ -1,12 +1,12 @@
 # OpenSpace Localhost
 
-Interface web locale branchée sur **Ollama** : **mission d’équipe virtuelle** (orchestrateur, directeurs, sous-agents) qui produit un **README Markdown** téléchargeable, plus un mode **Discussion** orchestré par l’équipe (routage via l’orchestrateur).
+Interface web locale pour une **mission d’équipe virtuelle** (orchestrateur, directeurs, sous-agents) qui produit un **README Markdown** téléchargeable, plus un mode **Discussion** orchestré par l’équipe (routage via l’orchestrateur). Par défaut l’inférence passe par **Mistral AI** (API cloud) ; tu peux basculer sur **Ollama** local dans **Paramètres**.
 
 ## Prérequis
 
 - **Node.js** 20+ (LTS recommandé)
-- **Ollama** installé et démarré sur la même machine : [https://ollama.com](https://ollama.com)
-- Au moins un modèle téléchargé, par exemple :
+- **Mistral AI** (défaut) : compte sur [console.mistral.ai](https://console.mistral.ai/) et clé API collée dans **Paramètres** (stockage local du navigateur).
+- **Optionnel — Ollama** si tu choisis ce fournisseur dans Paramètres : [https://ollama.com](https://ollama.com) démarré sur la machine, et au moins un modèle, par exemple :
 
 ```bash
 ollama pull llama3.2
@@ -63,7 +63,7 @@ Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le c
 ### Mission équipe (onglet Chat, mode par défaut)
 
 - Saisie d’un **contexte** et ajout de **fichiers texte** (.txt, .md).
-- Enchaînement **Orchestrateur → 3 directeurs → 3 sous-agents → synthèses → document final**, chaque étape via Ollama en local.
+- Enchaînement **Orchestrateur → 3 directeurs → 3 sous-agents → synthèses → document final**, chaque étape via le **fournisseur LLM** choisi (Mistral ou Ollama).
 - Les **personas** sont ceux définis dans l’onglet **Équipe** (clic sur un rôle → texte « âme et rôle », stocké dans le navigateur).
 - **Télécharger le .md** une fois la mission terminée.
 
@@ -74,16 +74,19 @@ Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le c
 ### Équipe
 
 - Arbre **modifiable** : nouveaux membres sous l’orchestrateur, **glisser-déposer** sous l’orchestrateur ou sous un agent, suppression.
-- Modale **âme / rôle** par membre, avec bouton **Générer un seed** (Ollama, selon le nom et la place dans l’équipe — choisir le modèle dans l’onglet Chat).
+- Modale **âme / rôle** par membre, avec bouton **Générer un seed** (LLM configuré, selon le nom et la place dans l’équipe — choisir le modèle dans l’onglet Chat).
 
 ### Autres
 
-- **Colonne gauche** : conversations (mode Discussion), persistance `localStorage` ; icône **Paramètres** à droite du titre OpenSpace (prompts pour **Générer un seed**, stockés dans le navigateur).
+- **Colonne gauche** : conversations (mode Discussion), persistance `localStorage` ; icône **Paramètres** à droite du titre OpenSpace (fournisseur LLM, clé Mistral, prompts pour **Générer un seed**).
 - **Colonne droite** : réservée pour extensions.
 
-## Ollama et proxy
+## Proxy LLM
 
-Le navigateur appelle `/api/ollama/...` ; Vite redirige vers `http://127.0.0.1:11434`. Détails dans `docs/ollama.md`. Le mode mission utilise des appels **non stream** (`completeOllamaChat`) ; la discussion utilise le **stream** classique.
+- **Mistral** (défaut) : `/api/mistral/...` → `https://api.mistral.ai` (voir `docs/mistral.md`).
+- **Ollama** : `/api/ollama/...` → `http://127.0.0.1:11434` en local (voir `docs/ollama.md`).
+
+Le mode mission utilise des appels **non stream** ; la discussion utilise le **stream** (NDJSON côté Ollama, SSE côté Mistral).
 
 ## Documentation
 
@@ -91,7 +94,8 @@ Le navigateur appelle `/api/ollama/...` ; Vite redirige vers `http://127.0.0.1:1
 |--------|------|
 | `docs/DEVBOOK.md` | Journal technique et changelog |
 | `docs/mission-orchestration.md` | Pipeline mission, limites, fichiers concernés |
-| `docs/ollama.md` | API et dépannage |
+| `docs/mistral.md` | API Mistral, clé, proxy |
+| `docs/ollama.md` | API Ollama et dépannage |
 | `docs/architecture.md` | Structure du code |
 | `docs/docker.md` | Image Docker, compose, Ollama hôte |
 

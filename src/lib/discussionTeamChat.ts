@@ -1,8 +1,6 @@
-import {
-  completeOllamaChat,
-  streamOllamaChat,
-  type OllamaChatMessage,
-} from "@/lib/ollama";
+import { completeLlmChat, streamLlmChat } from "@/lib/llmChat";
+import type { OllamaChatMessage } from "@/lib/ollama";
+import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
 import type { ChatMessage } from "@/types";
 
@@ -108,6 +106,8 @@ export function buildDirectMentionBrief(
 }
 
 export async function routeDiscussionMessage(opts: {
+  llmProvider: LlmProvider;
+  mistralApiKey?: string;
   model: string;
   souls: Record<string, string>;
   members: TreeMember[];
@@ -117,6 +117,8 @@ export async function routeDiscussionMessage(opts: {
   forcedResponderId?: string | null;
 }): Promise<DiscussionRouting> {
   const {
+    llmProvider,
+    mistralApiKey,
     model,
     souls,
     members,
@@ -143,7 +145,9 @@ export async function routeDiscussionMessage(opts: {
 
   const userBlock = `## Membres de l’équipe (utilise les ids exacts ci-dessous)\n${roster}\n\n---\n## Fil de discussion\n${hist}\n\n---\nTâche : tu es **l’orchestrateur**. L’utilisateur s’adresse à **toute l’équipe** comme si c’était une réunion : **toi**, tu décides **qui est le plus qualifié** pour répondre au **dernier** message (sujet, compétence, contexte).\n\n- Si un **membre** doit répondre : mets son \`responderId\` et un \`brief\` concret pour lui.\n- Si **toi** l’orchestrateur dois répondre (synthèse, compte rendu, arbitrage, vision globale, ou l’utilisateur le demande explicitement) : \`responderId\` = \`${ORCHESTRATOR_ID}\`.\n\nRéponds par **un seul objet JSON** valide, sans markdown ni texte autour :\n{\n  "responderId": "…",\n  "brief": "…",\n  "userNote": "…"\n}\n\n\`userNote\` : une phrase **optionnelle** pour l’utilisateur (ex. qui prend la parole et pourquoi).`;
 
-  const raw = await completeOllamaChat(
+  const raw = await completeLlmChat(
+    llmProvider,
+    mistralApiKey,
     model,
     [
       { role: "system", content: orchSoul },
@@ -186,6 +190,8 @@ export function buildDiscussionStreamMessages(opts: {
 }
 
 export async function streamDiscussionReply(opts: {
+  llmProvider: LlmProvider;
+  mistralApiKey?: string;
   model: string;
   souls: Record<string, string>;
   responderId: string;
@@ -195,7 +201,9 @@ export async function streamDiscussionReply(opts: {
   signal?: AbortSignal;
 }): Promise<void> {
   const messages = buildDiscussionStreamMessages(opts);
-  await streamOllamaChat(
+  await streamLlmChat(
+    opts.llmProvider,
+    opts.mistralApiKey,
     opts.model,
     messages,
     opts.onToken,
@@ -216,6 +224,8 @@ function sanitizeConversationTitle(raw: string): string {
  * Titre court pour la liste des conversations (orchestrateur, après un échange).
  */
 export async function generateDiscussionConversationTitle(opts: {
+  llmProvider: LlmProvider;
+  mistralApiKey?: string;
   model: string;
   souls: Record<string, string>;
   /** Fil récent (markdown libre), déjà formaté. */
@@ -223,7 +233,9 @@ export async function generateDiscussionConversationTitle(opts: {
   signal?: AbortSignal;
 }): Promise<string> {
   const orchSoul = soul(opts.souls, ORCHESTRATOR_ID);
-  const raw = await completeOllamaChat(
+  const raw = await completeLlmChat(
+    opts.llmProvider,
+    opts.mistralApiKey,
     opts.model,
     [
       { role: "system", content: orchSoul },
@@ -256,6 +268,8 @@ Réponds par **le titre uniquement**, rien d’autre.`,
  * Titre court pour la liste des conversations (sidebar), après le cadre orchestrateur d’une mission.
  */
 export async function generateMissionConversationTitle(opts: {
+  llmProvider: LlmProvider;
+  mistralApiKey?: string;
   model: string;
   souls: Record<string, string>;
   /** Sortie de la première passe orchestrateur (brief pôles). */
@@ -267,7 +281,9 @@ export async function generateMissionConversationTitle(opts: {
   const orchSoul = soul(opts.souls, ORCHESTRATOR_ID);
   const briefSlice = opts.orchestratorBrief.slice(0, 6000);
   const ctxSlice = opts.userPayloadPreview.slice(0, 3500);
-  const raw = await completeOllamaChat(
+  const raw = await completeLlmChat(
+    opts.llmProvider,
+    opts.mistralApiKey,
     opts.model,
     [
       { role: "system", content: orchSoul },
@@ -308,13 +324,23 @@ const MAX_DISCUSS_FOR_PATCH = 48_000;
  * L’orchestrateur fusionne la discussion dans le livrable Markdown existant.
  */
 export async function applyDiscussionToArtifact(opts: {
+  llmProvider: LlmProvider;
+  mistralApiKey?: string;
   model: string;
   souls: Record<string, string>;
   discussionMessages: ChatMessage[];
   artifactMarkdown: string;
   signal?: AbortSignal;
 }): Promise<string> {
-  const { model, souls, discussionMessages, artifactMarkdown, signal } = opts;
+  const {
+    llmProvider,
+    mistralApiKey,
+    model,
+    souls,
+    discussionMessages,
+    artifactMarkdown,
+    signal,
+  } = opts;
   const orchSoul = soul(souls, ORCHESTRATOR_ID);
   const discussion = formatHistoryForRouting(
     discussionMessages,
@@ -353,7 +379,9 @@ ${doc}
 
 Réponds par **le document Markdown complet révisé**, sans préambule ni post-scriptum.`;
 
-  return completeOllamaChat(
+  return completeLlmChat(
+    llmProvider,
+    mistralApiKey,
     model,
     [
       { role: "system", content: orchSoul },

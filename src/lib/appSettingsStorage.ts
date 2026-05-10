@@ -1,3 +1,5 @@
+import { DEFAULT_LLM_PROVIDER, type LlmProvider } from "@/lib/llmProvider";
+
 const KEY = "openspace-app-settings-v1";
 
 /** Assistant virtuel métier : consignes techniques et qualité, pas de persona fictionnelle. */
@@ -57,12 +59,18 @@ Réponds **uniquement** avec le corps du champ, en respectant **exactement** ces
 export interface AppSettings {
   seedSystemPrompt: string;
   seedUserTemplate: string;
+  /** Fournisseur LLM : Mistral (cloud) par défaut, ou Ollama local. */
+  llmProvider: LlmProvider;
+  /** Stockée dans ce navigateur uniquement (localStorage). */
+  mistralApiKey: string;
 }
 
 function defaults(): AppSettings {
   return {
     seedSystemPrompt: DEFAULT_SEED_SYSTEM_PROMPT,
     seedUserTemplate: DEFAULT_SEED_USER_TEMPLATE,
+    llmProvider: DEFAULT_LLM_PROVIDER,
+    mistralApiKey: "",
   };
 }
 
@@ -82,7 +90,18 @@ export function loadAppSettings(): AppSettings {
       typeof o.seedUserTemplate === "string" && o.seedUserTemplate.trim()
         ? o.seedUserTemplate.trim()
         : base.seedUserTemplate;
-    return { seedSystemPrompt: sys, seedUserTemplate: usr };
+    const prov: LlmProvider =
+      o.llmProvider === "ollama" || o.llmProvider === "mistral"
+        ? o.llmProvider
+        : base.llmProvider;
+    const key =
+      typeof o.mistralApiKey === "string" ? o.mistralApiKey : base.mistralApiKey;
+    return {
+      seedSystemPrompt: sys,
+      seedUserTemplate: usr,
+      llmProvider: prov,
+      mistralApiKey: key,
+    };
   } catch {
     return base;
   }
@@ -94,6 +113,8 @@ export function saveAppSettings(s: AppSettings): void {
     JSON.stringify({
       seedSystemPrompt: s.seedSystemPrompt.trim(),
       seedUserTemplate: s.seedUserTemplate.trim(),
+      llmProvider: s.llmProvider,
+      mistralApiKey: s.mistralApiKey,
     }),
   );
 }

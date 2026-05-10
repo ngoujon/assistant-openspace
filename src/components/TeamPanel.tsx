@@ -14,6 +14,7 @@ import {
   type DisplayNode,
 } from "@/lib/teamTreeDisplay";
 import { loadAgentSouls, saveAgentSouls } from "@/lib/teamSoulsStorage";
+import type { LlmProvider } from "@/lib/llmProvider";
 import {
   ORCHESTRATOR_ID,
   addMemberUnder,
@@ -30,6 +31,8 @@ import {
 
 interface TeamPanelProps {
   model: string;
+  llmProvider: LlmProvider;
+  mistralApiKey: string;
 }
 
 function toSoulModalNode(node: DisplayNode): SoulModalNode {
@@ -216,7 +219,11 @@ function badgeForKind(kind: DisplayNode["kind"]): string {
   }
 }
 
-export function TeamPanel({ model }: TeamPanelProps) {
+export function TeamPanel({
+  model,
+  llmProvider,
+  mistralApiKey,
+}: TeamPanelProps) {
   const [members, setMembers] = useState(loadTeamMembers);
   const [souls, setSouls] = useState(loadAgentSouls);
   const [editing, setEditing] = useState<DisplayNode | null>(null);
@@ -397,6 +404,8 @@ export function TeamPanel({ model }: TeamPanelProps) {
             : []
         }
         model={model}
+        llmProvider={llmProvider}
+        mistralApiKey={mistralApiKey}
         onClose={handleCloseModal}
         onSave={handleSaveSoul}
       />

@@ -16,9 +16,9 @@ alwaysApply: true
 - Préférer les composants **contrôlés** et l’état local minimal ; remonter l’état quand plusieurs vues en dépendent.
 - Effets `useEffect` : dépendances complètes ; éviter les mises à jour d’état en cascade fragiles (préférer un seul flux de vérité).
 
-## Ollama et réseau
+## LLM et réseau
 
-- Ne pas appeler `11434` en dur depuis le navigateur : passer par **`/api/ollama`** (proxy Vite en dev) pour garder une seule stratégie CORS / déploiement.
+- Ne pas appeler `11434` ni `api.mistral.ai` en dur depuis le navigateur : passer par **`/api/ollama`** ou **`/api/mistral`** (proxies Vite / nginx) pour la stratégie CORS / déploiement.
 - Gérer **streaming** et **AbortController** pour ne pas laisser de requêtes pendantes ; messages d’erreur compréhensibles pour l’utilisateur.
 
 ## Style et UX

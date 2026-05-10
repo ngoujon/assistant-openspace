@@ -1,8 +1,7 @@
 import { generateMissionConversationTitle } from "@/lib/discussionTeamChat";
-import {
-  completeOllamaChat,
-  type OllamaChatMessage,
-} from "@/lib/ollama";
+import { completeLlmChat } from "@/lib/llmChat";
+import type { OllamaChatMessage } from "@/lib/ollama";
+import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
 
 export interface MissionFile {
@@ -11,6 +10,8 @@ export interface MissionFile {
 }
 
 export interface RunMissionOptions {
+  llmProvider: LlmProvider;
+  mistralApiKey?: string;
   model: string;
   context: string;
   files: MissionFile[];
@@ -69,7 +70,7 @@ function childrenOf(
 }
 
 /**
- * Nombre d’appels `completeOllamaChat` (chaque étape peut durer longtemps en local).
+ * Nombre d’appels au modèle (chaque étape peut durer longtemps en local ou en cloud).
  * @param withConversationTitle inclure l’appel « titre sidebar » après le brief orchestrateur (si activé côté UI).
  */
 export function countMissionModelCalls(
@@ -119,14 +120,18 @@ function slicePayloadForModel(payload: string): string {
 }
 
 async function missionComplete(
+  llmProvider: LlmProvider,
+  mistralApiKey: string | undefined,
   model: string,
   messages: OllamaChatMessage[],
   signal: AbortSignal | undefined,
   temperature: number,
 ): Promise<string> {
-  return completeOllamaChat(model, messages, signal, {
+  return completeLlmChat(llmProvider, mistralApiKey, model, messages, signal, {
     temperature,
-    keepAlive: MISSION_KEEP_ALIVE,
+    ...(llmProvider === "ollama"
+      ? { keepAlive: MISSION_KEEP_ALIVE }
+      : {}),
     timeoutMs: MISSION_CHAT_TIMEOUT_MS,
   });
 }
@@ -236,6 +241,8 @@ export async function runMissionPipeline(
   opts: RunMissionOptions,
 ): Promise<string> {
   const {
+    llmProvider,
+    mistralApiKey,
     model,
     context,
     files,
@@ -268,6 +275,8 @@ export async function runMissionPipeline(
   prog("Orchestrateur — analyse du contexte et des fichiers…");
   const payloadSlice = slicePayloadForModel(payload);
   const orchestratorBrief = await missionComplete(
+    llmProvider,
+    mistralApiKey,
     model,
     [
       { role: "system", content: soul(souls, ORCHESTRATOR_ID) },
@@ -284,6 +293,8 @@ export async function runMissionPipeline(
     prog("Orchestrateur — titre de la conversation (sidebar)…");
     try {
       const title = await generateMissionConversationTitle({
+        llmProvider,
+        mistralApiKey,
         model,
         souls,
         orchestratorBrief,
@@ -304,6 +315,8 @@ export async function runMissionPipeline(
     if (subs.length === 0) {
       prog(`${lead.label} — analyse directe (sans sous-agent)…`);
       const synthesis = await missionComplete(
+        llmProvider,
+        mistralApiKey,
         model,
         [
           { role: "system", content: soul(souls, lead.id) },
@@ -328,6 +341,8 @@ export async function runMissionPipeline(
     for (const sub of subs) {
       prog(`${lead.label} → ${sub.label} — consignes au sous-agent…`);
       const delegation = await missionComplete(
+        llmProvider,
+        mistralApiKey,
         model,
         [
           { role: "system", content: soul(souls, lead.id) },
@@ -342,6 +357,8 @@ export async function runMissionPipeline(
 
       prog(`${sub.label} — travail spécialisé…`);
       const subWork = await missionComplete(
+        llmProvider,
+        mistralApiKey,
         model,
         [
           { role: "system", content: soul(souls, sub.id) },
@@ -362,6 +379,8 @@ export async function runMissionPipeline(
     const subNameList = subs.map((s) => s.label).join(", ");
     prog(`${lead.label} — intégration des apports du pôle (reprise du détail)…`);
     const synthesis = await missionComplete(
+      llmProvider,
+      mistralApiKey,
       model,
       [
         { role: "system", content: soul(souls, lead.id) },
@@ -389,6 +408,8 @@ export async function runMissionPipeline(
   );
 
   const readme = await missionComplete(
+    llmProvider,
+    mistralApiKey,
     model,
     [
       {

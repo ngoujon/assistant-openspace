@@ -2,14 +2,16 @@
 
 ## Vue d’ensemble
 
-Application **SPA** React montée sur Vite. En **développement**, le serveur Vite sert les assets et proxy les appels Ollama. En **Docker**, nginx sert le build statique et reproduit le même proxy vers l’Ollama de l’hôte (`docs/docker.md`).
+Application **SPA** React montée sur Vite. En **développement**, le serveur Vite sert les assets et proxifie les appels **Mistral** (`/api/mistral`) et **Ollama** (`/api/ollama`). En **Docker**, nginx sert le build statique et les mêmes préfixes (`docs/docker.md`).
 
 ```mermaid
 flowchart LR
   Browser[Navigateur :3004]
   Vite[Vite dev server]
+  Mistral[Mistral API]
   Ollama[Ollama :11434]
   Browser --> Vite
+  Vite -->|"/api/mistral/*"| Mistral
   Vite -->|"/api/ollama/*"| Ollama
 ```
 
@@ -21,7 +23,7 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 
 | Élément | Rôle |
 |---------|------|
-| `App.tsx` | État global : conversations, conversation active, onglet principal, modèle Ollama |
+| `App.tsx` | État global : conversations, conversation active, onglet principal, fournisseur LLM, modèle |
 | `components/Layout.tsx` | Grille trois colonnes |
 | `components/Sidebar.tsx` | Liste conversations + actions |
 | `components/ChatPanel.tsx` | Mission équipe ; Discussion orchestrée (`discussionTeamChat`) |
@@ -30,11 +32,13 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 | `components/TeamPanel.tsx` | Arbre dynamique (ajout, DnD), modale âme/rôle + génération de seed |
 | `lib/teamTreeStorage.ts` | Membres, reparentage, profondeur max 3 (`openspace-team-tree-v1`) |
 | `lib/teamTreeDisplay.ts` | Conversion liste → arbre d’affichage (`DisplayNode`) |
-| `lib/generateMemberSeed.ts` | Appel Ollama pour proposer un texte « âme et rôle » |
+| `lib/generateMemberSeed.ts` | Appel LLM (Mistral ou Ollama) pour proposer un texte « âme et rôle » |
 | `components/AgentSoulModal.tsx` | Modale d’édition (Échap / Entrée / Maj+Entrée) |
 | `data/teamSeeds.ts` | Textes initiaux (seeds) par id de nœud |
 | `lib/teamSoulsStorage.ts` | Lecture / écriture `openspace-team-souls-v1` |
-| `lib/ollama.ts` | Tags, `streamOllamaChat`, `completeOllamaChat` (orchestration) |
+| `lib/ollama.ts` | Tags Ollama, `streamOllamaChat`, `completeOllamaChat` |
+| `lib/mistral.ts` | Modèles Mistral, chat complet et stream (SSE) |
+| `lib/llmChat.ts` | `completeLlmChat` / `streamLlmChat` selon le fournisseur |
 | `orchestration/pipeline.ts` | `runMissionPipeline` : orchestrateur → branches → README |
 | `lib/storage.ts` | Sérialisation conversations `localStorage` |
 | `types.ts` | Types partagés |
@@ -49,7 +53,7 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 ## Flux Mission équipe
 
 1. Contexte + fichiers texte ; `loadAgentSouls()` lit les prompts par rôle.
-2. `runMissionPipeline` enchaîne des `completeOllamaChat` (pas de stream) avec `system` = âme du nœud ; après le brief orchestrateur, un appel optionnel propose un **titre de conversation** (sidebar).
+2. `runMissionPipeline` enchaîne des `completeLlmChat` (pas de stream) avec `system` = âme du nœud ; après le brief orchestrateur, un appel optionnel propose un **titre de conversation** (sidebar).
 3. Sortie finale : markdown ; téléchargement blob côté client.
 
 Voir `docs/mission-orchestration.md`.
