@@ -257,7 +257,7 @@ export function ActivitySidebar({
       aria-busy={running}
     >
       <div className="activity-mission-main">
-        <h2 className="activity-sidebar-title">Mission en cours</h2>
+        <h2 className="activity-sidebar-title">Activité</h2>
         {running && (
           <p className="activity-sidebar-timer" aria-label="Durée écoulée">
             Durée : {fmt}
