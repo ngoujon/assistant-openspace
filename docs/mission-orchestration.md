@@ -13,12 +13,16 @@
 |-------|--------|------|
 | 1 | Orchestrateur | Analyse contexte + fichiers, brief par pôle (Artistique, Technique, Juridique). |
 | 1b | Orchestrateur | Titre court pour renommer la conversation dans la **sidebar** (liste des projets). |
-| 2 | Chaque directeur | Découpe pour son sous-agent (consignes). |
+| 2 | Chaque directeur (pilier) | Consignes au ou aux sous-agents du pôle. |
 | 3 | Chaque sous-agent | Travail spécialisé (extrait du contexte/fichiers, tronqué si très long). |
-| 4 | Chaque directeur | Synthèse / ajustements après retour du sous-agent. |
+| 4 | Chaque directeur (pilier) | **Après** tous les sous-agents du pôle : reçoit **l’ensemble** de leurs livrables ; **synchronise** (cohérence, doublons, trous) et **ajuste** **sans réduire** le contenu utile — double relecture IA avec **vision globale** du pôle avant le document final. |
 | 5 | Orchestrateur | Document unique type **README.md** pour lecteur externe. |
 
 Les **textes « âme et rôle »** configurés dans l’onglet **Équipe** (modale par nœud) sont injectés comme **system prompts** pour chaque appel correspondant.
+
+### Rôle du pilier par rapport aux sous-agents (étape 4)
+
+Le **pilier** intervient **après** les sous-agents qui lui sont rattachés : il voit **toutes** leurs versions de travail. Cela permet une **synchronisation** des informations entre spécialistes du même pôle **sans compression** abusive du texte : le modèle relit, recoupe, corrige ou complète, puis livre une matière encore **dense** pour l’orchestrateur. C’est une **deuxième passe** (relecture / arbitrage) au niveau du pôle, avec **connaissance globale** de ce que chaque sous-agent a produit, afin que le rapport final puisse s’appuyer sur un ensemble **cohérent** plutôt que sur des silos disjoints.
 
 ## Équipe dynamique
 
