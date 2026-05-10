@@ -1042,6 +1042,21 @@ body {
   padding: 0.45rem 0.65rem;
 }
 
+.discussion-queue-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+}
+
+.discussion-queue-toggle svg {
+  flex-shrink: 0;
+}
+
 .discussion-queue-badge {
   font-size: 0.8125rem;
   font-weight: 600;
@@ -1086,8 +1101,20 @@ body {
 }
 
 .discussion-queue-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  min-width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
   flex-shrink: 0;
   align-self: start;
+  border-radius: var(--radius-sm);
+}
+
+.discussion-queue-remove svg {
+  flex-shrink: 0;
 }
 
 .chat-actions--discussion {
