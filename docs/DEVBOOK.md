@@ -51,6 +51,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-05-09 | Gabarit seed : orientation assistant métier (Rôle + Pratiques et standards), sans persona |
 | 2026-05-10 | Activité : téléchargement du livrable .md (mission terminée ou discussion avec livrable) ; utilitaire `downloadMarkdown` ; prompts mission — angles « hors premier jet » |
 | 2026-05-10 | Mission : rapport final sans section annexes / fiches contributeurs (prompt orchestrateur final) |
+| 2026-05-10 | Changement de conversation : Activité / mission alignés sur le projet (key mission, reset état, abort discussion) |
 
 ---
 
@@ -262,6 +263,25 @@ Le document généré en fin de mission ne doit plus imposer une section **Annex
 ### Fichiers
 
 - `src/orchestration/pipeline.ts` — `buildFinalDocumentPrompt`
+
+---
+
+## 2026-05-10 — Activité synchronisée sur la conversation active
+
+### Objectif
+
+Nouveau projet ou changement de conversation : la colonne **Activité** (mission / discussion) et le formulaire **Mission équipe** ne doivent plus afficher l’état du projet précédent.
+
+### Décisions
+
+- `MissionWorkspace` remonté par `key={conversation.id}` (état contexte / résultat / progression isolés par conversation).
+- Au changement de `conversation.id` : annulation des envois Discussion en cours, réinitialisation streaming / routage ; si la conversation est vide, retour sur l’onglet **Mission équipe**.
+- En mode Mission, réinitialisation explicite de `rightActivity` vers une mission « vide » jusqu’à ce que le nouveau `MissionWorkspace` pousse la progression.
+- `MissionWorkspace` : `useEffect` de cleanup qui appelle `abort()` sur le contrôleur pour interrompre une mission si le composant est démonté (changement de projet).
+
+### Fichiers
+
+- `src/components/ChatPanel.tsx`, `src/components/MissionWorkspace.tsx`
 
 ---
 

@@ -39,6 +39,12 @@ export function MissionWorkspace({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!running) {
       setElapsedSec(0);
       return;

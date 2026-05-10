@@ -90,7 +90,25 @@ export function ChatPanel({
   useEffect(() => {
     setInput("");
     setError(null);
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStreaming(false);
+    setIsRouting(false);
+    if (conversation.messages.length === 0) {
+      setMode("mission");
+    }
   }, [conversation.id]);
+
+  /** Colonne Activité : en mode Mission, suivre le projet actif (pas le précédent). */
+  useEffect(() => {
+    if (mode !== "mission") return;
+    setRightActivity({
+      kind: "mission",
+      running: false,
+      progress: [],
+      elapsedSec: 0,
+    });
+  }, [conversation.id, mode, setRightActivity]);
 
   const reportMissionActivity = useCallback(
     (payload: {
@@ -440,6 +458,7 @@ export function ChatPanel({
 
       {mode === "mission" ? (
         <MissionWorkspace
+          key={conversation.id}
           model={model}
           onActivityReport={reportMissionActivity}
           onArtifactProduced={(md) =>
