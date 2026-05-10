@@ -31,6 +31,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Mission : zone glisser-déposer + clic pour fichiers .txt / .md (remplace le bouton « Ajouter des fichiers ») |
 | 2026-05-10 | Mission : actions « Lancer / Arrêter » alignées à droite |
 | 2026-05-10 | UI : suppression de l’onglet Équipe et de la barre d’onglets (contenu toujours le chat) ; modale âme montée à côté du `ChatPanel` |
+| 2026-05-10 | Mentions @ : insertion `@[Libellé]` (plus d’id seul) ; mention verrouillée (pas d’édition partielle, suppression du bloc) ; routage / mission inchangés côté résolution |
 | 2026-05-10 | Layout : colonne « Échanges en cours » retirée ; statuts discussion + .md dans **Activité** (bouton téléchargement en bas) |
 | 2026-05-10 | Layout : Organisation + Échanges en cours + Activité toujours à droite du contenu (plus réservé à l’onglet Équipe) ; `TeamWorkspaceProvider` global ; `ExchangesSidebar` |
 | 2026-05-10 | Activité : ne plus écraser l’état mission/discussion en visitant l’onglet Équipe ; affichage dérivé + mode chat initial selon la conversation |

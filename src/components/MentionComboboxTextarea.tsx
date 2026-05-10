@@ -7,13 +7,20 @@ import {
   type KeyboardEvent,
 } from "react";
 import type { TreeMember } from "@/lib/teamTreeStorage";
-import { filterMentionCandidates } from "@/lib/discussionMention";
+import {
+  filterMentionCandidates,
+  findBracketMentionSpans,
+  formatBracketMention,
+} from "@/lib/discussionMention";
 
 function getActiveMentionRange(
   value: string,
   cursor: number,
 ): { start: number; query: string } | null {
   if (cursor < 0) return null;
+  for (const sp of findBracketMentionSpans(value)) {
+    if (cursor > sp.start && cursor < sp.end) return null;
+  }
   const before = value.slice(0, cursor);
   const at = before.lastIndexOf("@");
   if (at === -1) return null;
@@ -23,8 +30,80 @@ function getActiveMentionRange(
   }
   const afterAt = before.slice(at + 1);
   if (afterAt.includes("@")) return null;
+  if (afterAt.includes("[")) return null;
   if (/\s/.test(afterAt)) return null;
   return { start: at, query: afterAt };
+}
+
+/**
+ * Retourne true si la touche a été gérée (mention verrouillée @[…] : pas d’édition partielle,
+ * suppression du bloc entier au retour arrière).
+ */
+function tryHandleLockedBracketMentionKey(
+  e: KeyboardEvent<HTMLTextAreaElement>,
+  value: string,
+  ta: HTMLTextAreaElement,
+  onChange: (v: string) => void,
+  setCursor: (n: number) => void,
+): boolean {
+  const spans = findBracketMentionSpans(value);
+  if (spans.length === 0) return false;
+
+  const selStart = ta.selectionStart;
+  const selEnd = ta.selectionEnd;
+
+  const inLabelInterior = (c: number) =>
+    spans.some((sp) => c > sp.start && c < sp.end);
+
+  if (e.key === "Backspace" || e.key === "Delete") {
+    if (selStart !== selEnd) return false;
+    const c = selStart;
+    for (const sp of spans) {
+      if (e.key === "Backspace" && sp.start < c && c <= sp.end) {
+        e.preventDefault();
+        const next = value.slice(0, sp.start) + value.slice(sp.end);
+        onChange(next);
+        requestAnimationFrame(() => {
+          ta.focus();
+          const pos = sp.start;
+          ta.setSelectionRange(pos, pos);
+          setCursor(pos);
+        });
+        return true;
+      }
+      if (e.key === "Delete" && c === sp.start) {
+        e.preventDefault();
+        const next = value.slice(0, sp.start) + value.slice(sp.end);
+        onChange(next);
+        requestAnimationFrame(() => {
+          ta.focus();
+          ta.setSelectionRange(sp.start, sp.start);
+          setCursor(sp.start);
+        });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (selStart !== selEnd) {
+      const overlaps = spans.some(
+        (sp) => selEnd > sp.start && selStart < sp.end,
+      );
+      if (overlaps) {
+        e.preventDefault();
+        return true;
+      }
+      return false;
+    }
+    if (inLabelInterior(selStart)) {
+      e.preventDefault();
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export interface MentionComboboxTextareaProps {
@@ -93,7 +172,7 @@ export function MentionComboboxTextarea({
       if (!liveCtx || liveCtx.start !== ctx.start) return;
       const before = value.slice(0, liveCtx.start);
       const after = value.slice(sel);
-      const insert = `@${m.id}`;
+      const insert = formatBracketMention(m);
       const spacer = after.length && !/^[\s@]/.test(after) ? " " : "";
       const newVal = before + insert + spacer + after;
       const newPos = before.length + insert.length + spacer.length;
@@ -109,6 +188,11 @@ export function MentionComboboxTextarea({
   );
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    const ta = textareaRef.current;
+    if (ta && tryHandleLockedBracketMentionKey(e, value, ta, onChange, setCursor)) {
+      return;
+    }
+
     if (menuOpen) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -177,7 +261,6 @@ export function MentionComboboxTextarea({
               onMouseEnter={() => setMentionIndex(i)}
             >
               <span className="mention-option-label">{m.label}</span>
-              <code className="mention-option-id">@{m.id}</code>
             </button>
           ))}
         </div>

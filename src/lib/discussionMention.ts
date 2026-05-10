@@ -1,5 +1,137 @@
 import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
 
+/** Mention verrouillée insérée depuis le menu : `@[Libellé visible]` (échappement \ et ]). */
+export function escapeMentionLabelForBracket(label: string): string {
+  return label.replace(/\\/g, "\\\\").replace(/\]/g, "\\]");
+}
+
+function unescapeMentionLabelFromBracket(raw: string): string {
+  let out = "";
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (c === "\\" && i + 1 < raw.length) {
+      out += raw[i + 1];
+      i++;
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+
+/** Insère une mention affichée par le libellé du membre (routage via le même libellé). */
+export function formatBracketMention(member: TreeMember): string {
+  return `@[${escapeMentionLabelForBracket(member.label)}]`;
+}
+
+/**
+ * Segment `@[…]` commençant à `at` (index du `@`).
+ * `innerEscaped` est le littéral entre crochets (avec `\]` / `\\` conservés) pour un seul `unescape`.
+ */
+export function parseBracketMentionAt(
+  text: string,
+  at: number,
+): { end: number; innerEscaped: string } | null {
+  if (text.slice(at, at + 2) !== "@[") return null;
+  let k = at + 2;
+  let innerEscaped = "";
+  while (k < text.length) {
+    if (text[k] === "\\") {
+      innerEscaped += text[k];
+      k++;
+      if (k >= text.length) return null;
+      innerEscaped += text[k];
+      k++;
+      continue;
+    }
+    if (text[k] === "]") {
+      return { end: k + 1, innerEscaped };
+    }
+    innerEscaped += text[k];
+    k++;
+  }
+  return null;
+}
+
+/** Plages `@[…]` complètes dans le texte (indices `[start, end)` end exclus). */
+export function findBracketMentionSpans(text: string): Array<{ start: number; end: number }> {
+  const spans: Array<{ start: number; end: number }> = [];
+  let i = 0;
+  while (i < text.length) {
+    if (text.slice(i, i + 2) !== "@[") {
+      i++;
+      continue;
+    }
+    const p = parseBracketMentionAt(text, i);
+    if (p) {
+      spans.push({ start: i, end: p.end });
+      i = p.end;
+    } else {
+      i++;
+    }
+  }
+  return spans;
+}
+
+/** Résout le libellé affiché dans `@[…]` vers un id membre. */
+export function resolveBracketMentionInner(
+  innerEscaped: string,
+  members: TreeMember[],
+): string | null {
+  const label = unescapeMentionLabelFromBracket(innerEscaped).trim();
+  if (!label) return null;
+  const exact = members.filter((m) => m.label.trim() === label);
+  if (exact.length === 1) return exact[0].id;
+  const n = normalizeKey(label);
+  const byNorm = members.filter((m) => normalizeKey(m.label) === n);
+  if (byNorm.length >= 1) return byNorm[0].id;
+  return null;
+}
+
+type ScannedMention =
+  | { kind: "bracket"; start: number; end: number; innerEscaped: string }
+  | { kind: "plain"; start: number; end: number; token: string };
+
+function scanMentionsInOrder(text: string): ScannedMention[] {
+  const out: ScannedMention[] = [];
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] !== "@") {
+      i++;
+      continue;
+    }
+    if (text.slice(i, i + 2) === "@[") {
+      const p = parseBracketMentionAt(text, i);
+      if (p) {
+        out.push({
+          kind: "bracket",
+          start: i,
+          end: p.end,
+          innerEscaped: p.innerEscaped,
+        });
+        i = p.end;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    const rest = text.slice(i + 1);
+    const m = /^([^\s@\[]+)/.exec(rest);
+    if (m) {
+      out.push({
+        kind: "plain",
+        start: i,
+        end: i + 1 + m[1].length,
+        token: m[1],
+      });
+      i += 1 + m[1].length;
+      continue;
+    }
+    i++;
+  }
+  return out;
+}
+
 function normalizeKey(s: string): string {
   return s
     .normalize("NFD")
@@ -94,9 +226,14 @@ export function resolveForcedResponderFromMessage(
   text: string,
   members: TreeMember[],
 ): string | null {
-  const match = /@([^\s@]+)/.exec(text);
-  if (!match) return null;
-  return resolveMentionToken(match[1], members);
+  for (const x of scanMentionsInOrder(text)) {
+    const id =
+      x.kind === "bracket"
+        ? resolveBracketMentionInner(x.innerEscaped, members)
+        : resolveMentionToken(x.token, members);
+    if (id) return id;
+  }
+  return null;
 }
 
 /** Tous les @tokens résolus, sans doublon, ordre d’apparition dans le texte. */
@@ -104,12 +241,13 @@ export function collectMentionedMemberIds(
   text: string,
   members: TreeMember[],
 ): string[] {
-  const re = /@([^\s@]+)/g;
   const seen = new Set<string>();
   const order: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const id = resolveMentionToken(m[1], members);
+  for (const x of scanMentionsInOrder(text)) {
+    const id =
+      x.kind === "bracket"
+        ? resolveBracketMentionInner(x.innerEscaped, members)
+        : resolveMentionToken(x.token, members);
     if (id && !seen.has(id)) {
       seen.add(id);
       order.push(id);
