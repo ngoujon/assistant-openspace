@@ -785,6 +785,12 @@ body {
   width: 100%;
 }
 
+/* Discussion : utiliser toute la largeur utile de shell-main (la mission reste centrée). */
+.chat-panel.chat-panel--discussion-fullwidth {
+  max-width: none;
+  margin: 0;
+}
+
 .chat-toolbar {
   flex-shrink: 0;
   padding: 0.875rem 0 0.5rem;

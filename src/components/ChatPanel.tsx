@@ -527,7 +527,9 @@ export function ChatPanel({
   }, []);
 
   return (
-    <div className="chat-panel">
+    <div
+      className={`chat-panel${mode === "free" ? " chat-panel--discussion-fullwidth" : ""}`}
+    >
       <header className="chat-toolbar chat-toolbar-stack">
         <div className="chat-toolbar-row chat-toolbar-row--phase">
           <p className="chat-phase-label" aria-live="polite">
