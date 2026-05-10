@@ -33,6 +33,11 @@ import type { ChatMessage, Conversation } from "@/types";
 
 type ChatMode = "mission" | "free";
 
+interface DiscussionQueuedMessage {
+  id: string;
+  text: string;
+}
+
 /** Messages à envoyer à l’orchestrateur pour une fusion : uniquement après la dernière mise à jour. */
 function messagesAfterArtifactCutoff(
   messages: ChatMessage[],
@@ -95,6 +100,18 @@ export function ChatPanel({
     loadTeamMembers(),
   );
   const abortRef = useRef<AbortController | null>(null);
+  const discussionQueueRef = useRef<DiscussionQueuedMessage[]>([]);
+  const pumpingRef = useRef(false);
+  const busyRef = useRef(false);
+  const runDiscussionSendOrPatchRef = useRef<(text: string) => Promise<void>>(
+    async () => {},
+  );
+  const pumpDiscussionQueueRef = useRef<() => Promise<void>>(async () => {});
+
+  const [discussionQueue, setDiscussionQueue] = useState<
+    DiscussionQueuedMessage[]
+  >([]);
+  const [discussionQueueOpen, setDiscussionQueueOpen] = useState(false);
 
   useEffect(() => {
     const refresh = () => setTeamMembers(loadTeamMembers());
@@ -114,6 +131,9 @@ export function ChatPanel({
     abortRef.current = null;
     setStreaming(false);
     setIsRouting(false);
+    discussionQueueRef.current = [];
+    setDiscussionQueue([]);
+    setDiscussionQueueOpen(false);
     if (conversation.messages.length === 0) {
       setMode("mission");
     }
@@ -220,7 +240,6 @@ export function ChatPanel({
         ),
         userMsg,
       ];
-      setInput("");
       setError(null);
       setMessages(() => historyWithUser);
 
@@ -275,9 +294,224 @@ export function ChatPanel({
     ],
   );
 
-  const sendDiscussion = useCallback(async () => {
+  const runDiscussionSendOrPatch = useCallback(
+    async (text: string) => {
+      let skipPump = false;
+      try {
+        if (!model) {
+          setError(
+            llmProvider === "mistral"
+              ? "Aucun modèle Mistral disponible. Vérifie ta clé API dans Paramètres."
+              : "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
+          );
+          skipPump = true;
+          return;
+        }
+
+        if (isArtifactApplyIntent(text)) {
+          if (!conversation.artifactMarkdown?.trim()) {
+            setError(
+              "Aucun livrable lié. Termine une mission pour produire un Markdown, puis reviens en Discussion.",
+            );
+            skipPump = true;
+            return;
+          }
+          await patchArtifactFromDiscussion(text);
+          return;
+        }
+
+        const userMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: text,
+        };
+        const historyWithUser = [...conversation.messages, userMsg];
+        setError(null);
+        setMessages(() => historyWithUser);
+
+        const ac = new AbortController();
+        abortRef.current = ac;
+        setIsRouting(true);
+        let assistantId: string | undefined;
+
+        try {
+          const members = teamMembers;
+          const souls = loadAgentSouls();
+          const forcedResponderId =
+            resolveForcedResponderFromMessage(text, members) ?? undefined;
+
+          const routing = await routeDiscussionMessage({
+            llmProvider,
+            mistralApiKey,
+            model,
+            souls,
+            members,
+            historyWithLatestUser: historyWithUser,
+            signal: ac.signal,
+            forcedResponderId,
+          });
+
+          const speakerLabel =
+            members.find((m) => m.id === routing.responderId)?.label ??
+            routing.responderId;
+
+          assistantId = crypto.randomUUID();
+          const assistantShell: ChatMessage = {
+            id: assistantId,
+            role: "assistant",
+            content: "",
+            speakerLabel,
+            routingNote: routing.userNote,
+          };
+
+          setMessages(() => [...historyWithUser, assistantShell]);
+          setIsRouting(false);
+          setStreaming(true);
+
+          let assistantAccum = "";
+          await streamDiscussionReply({
+            llmProvider,
+            mistralApiKey,
+            model,
+            souls,
+            responderId: routing.responderId,
+            brief: routing.brief,
+            historyWithLatestUser: historyWithUser,
+            onToken: (chunk) => {
+              assistantAccum += chunk;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? { ...m, content: m.content + chunk }
+                    : m,
+                ),
+              );
+            },
+            signal: ac.signal,
+          });
+
+          const transcriptMessages: ChatMessage[] = [
+            ...historyWithUser,
+            {
+              id: assistantId,
+              role: "assistant",
+              content: assistantAccum,
+              speakerLabel,
+              routingNote: routing.userNote,
+            },
+          ];
+          const recentTranscript =
+            formatHistoryForRouting(transcriptMessages, 6000);
+          const convId = conversation.id;
+          void generateDiscussionConversationTitle({
+            llmProvider,
+            mistralApiKey,
+            model,
+            souls,
+            recentTranscript,
+          })
+            .then((t) => {
+              if (t) onConversationTitle(convId, t);
+            })
+            .catch(() => {
+              /* titre optionnel : on garde l’extrait utilisateur si échec */
+            });
+        } catch (e) {
+          if ((e as Error).name === "AbortError") {
+            skipPump = true;
+            return;
+          }
+          setError((e as Error).message || "Erreur réseau");
+          setMessages((prev) =>
+            prev.filter(
+              (m) => m.id !== userMsg.id && m.id !== assistantId,
+            ),
+          );
+        } finally {
+          setIsRouting(false);
+          setStreaming(false);
+          abortRef.current = null;
+        }
+      } finally {
+        if (!skipPump) {
+          queueMicrotask(() => void pumpDiscussionQueueRef.current());
+        }
+      }
+    },
+    [
+      llmProvider,
+      mistralApiKey,
+      model,
+      conversation.id,
+      conversation.messages,
+      conversation.artifactMarkdown,
+      setMessages,
+      onConversationTitle,
+      patchArtifactFromDiscussion,
+      teamMembers,
+    ],
+  );
+
+  useEffect(() => {
+    runDiscussionSendOrPatchRef.current = runDiscussionSendOrPatch;
+  }, [runDiscussionSendOrPatch]);
+
+  const pumpDiscussionQueue = useCallback(async () => {
+    if (pumpingRef.current) return;
+    if (busyRef.current) return;
+    const head = discussionQueueRef.current[0];
+    if (!head) return;
+    pumpingRef.current = true;
+    const claimed = discussionQueueRef.current.shift()!;
+    setDiscussionQueue([...discussionQueueRef.current]);
+    let scheduleAgain = true;
+    try {
+      await runDiscussionSendOrPatchRef.current(claimed.text);
+    } catch {
+      discussionQueueRef.current = [claimed, ...discussionQueueRef.current];
+      setDiscussionQueue([...discussionQueueRef.current]);
+      scheduleAgain = false;
+    } finally {
+      pumpingRef.current = false;
+      if (scheduleAgain) {
+        queueMicrotask(() => void pumpDiscussionQueueRef.current());
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    pumpDiscussionQueueRef.current = pumpDiscussionQueue;
+  }, [pumpDiscussionQueue]);
+
+  const removeQueuedMessage = useCallback((id: string) => {
+    discussionQueueRef.current = discussionQueueRef.current.filter(
+      (x) => x.id !== id,
+    );
+    setDiscussionQueue([...discussionQueueRef.current]);
+  }, []);
+
+  const updateQueuedMessageText = useCallback((id: string, next: string) => {
+    discussionQueueRef.current = discussionQueueRef.current.map((x) =>
+      x.id === id ? { ...x, text: next } : x,
+    );
+    setDiscussionQueue([...discussionQueueRef.current]);
+  }, []);
+
+  const busy = streaming || isRouting;
+
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+
+  /** Reprend la file après routage / stream (ex. après « Arrêter » sans pompe). */
+  useEffect(() => {
+    if (busy) return;
+    void pumpDiscussionQueueRef.current();
+  }, [busy]);
+
+  const submitDiscussionComposer = useCallback(() => {
     const text = input.trim();
-    if (!text || streaming || isRouting) return;
+    if (!text) return;
     if (!model) {
       setError(
         llmProvider === "mistral"
@@ -286,148 +520,26 @@ export function ChatPanel({
       );
       return;
     }
-
-    if (isArtifactApplyIntent(text)) {
-      if (!conversation.artifactMarkdown?.trim()) {
-        setError(
-          "Aucun livrable lié. Termine une mission pour produire un Markdown, puis reviens en Discussion.",
-        );
-        return;
-      }
-      await patchArtifactFromDiscussion(text);
-      return;
-    }
-
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: text,
-    };
-    const historyWithUser = [...conversation.messages, userMsg];
     setInput("");
     setError(null);
-    setMessages(() => historyWithUser);
-
-    const ac = new AbortController();
-    abortRef.current = ac;
-    setIsRouting(true);
-    let assistantId: string | undefined;
-
-    try {
-      const members = teamMembers;
-      const souls = loadAgentSouls();
-      const forcedResponderId =
-        resolveForcedResponderFromMessage(text, members) ?? undefined;
-
-      const routing = await routeDiscussionMessage({
-        llmProvider,
-        mistralApiKey,
-        model,
-        souls,
-        members,
-        historyWithLatestUser: historyWithUser,
-        signal: ac.signal,
-        forcedResponderId,
-      });
-
-      const speakerLabel =
-        members.find((m) => m.id === routing.responderId)?.label ??
-        routing.responderId;
-
-      assistantId = crypto.randomUUID();
-      const assistantShell: ChatMessage = {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-        speakerLabel,
-        routingNote: routing.userNote,
-      };
-
-      setMessages(() => [...historyWithUser, assistantShell]);
-      setIsRouting(false);
-      setStreaming(true);
-
-      let assistantAccum = "";
-      await streamDiscussionReply({
-        llmProvider,
-        mistralApiKey,
-        model,
-        souls,
-        responderId: routing.responderId,
-        brief: routing.brief,
-        historyWithLatestUser: historyWithUser,
-        onToken: (chunk) => {
-          assistantAccum += chunk;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? { ...m, content: m.content + chunk }
-                : m,
-            ),
-          );
-        },
-        signal: ac.signal,
-      });
-
-      const transcriptMessages: ChatMessage[] = [
-        ...historyWithUser,
-        {
-          id: assistantId,
-          role: "assistant",
-          content: assistantAccum,
-          speakerLabel,
-          routingNote: routing.userNote,
-        },
-      ];
-      const recentTranscript = formatHistoryForRouting(transcriptMessages, 6000);
-      const convId = conversation.id;
-      void generateDiscussionConversationTitle({
-        llmProvider,
-        mistralApiKey,
-        model,
-        souls,
-        recentTranscript,
-      })
-        .then((t) => {
-          if (t) onConversationTitle(convId, t);
-        })
-        .catch(() => {
-          /* titre optionnel : on garde l’extrait utilisateur si échec */
-        });
-    } catch (e) {
-      if ((e as Error).name === "AbortError") return;
-      setError((e as Error).message || "Erreur réseau");
-      setMessages((prev) =>
-        prev.filter(
-          (m) => m.id !== userMsg.id && m.id !== assistantId,
-        ),
-      );
-    } finally {
-      setIsRouting(false);
-      setStreaming(false);
-      abortRef.current = null;
+    if (!busy && discussionQueueRef.current.length === 0) {
+      void runDiscussionSendOrPatchRef.current(text);
+      return;
     }
-  }, [
-    input,
-    streaming,
-    isRouting,
-    llmProvider,
-    mistralApiKey,
-    model,
-    conversation.id,
-    conversation.messages,
-    conversation.artifactMarkdown,
-    setMessages,
-    onConversationTitle,
-    patchArtifactFromDiscussion,
-    teamMembers,
-  ]);
+    discussionQueueRef.current = [
+      ...discussionQueueRef.current,
+      { id: crypto.randomUUID(), text },
+    ];
+    setDiscussionQueue([...discussionQueueRef.current]);
+    if (busy) {
+      setDiscussionQueueOpen(true);
+    }
+    void pumpDiscussionQueueRef.current();
+  }, [input, model, llmProvider, busy]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
   }, []);
-
-  const busy = streaming || isRouting;
 
   return (
     <div className="chat-panel">
@@ -556,7 +668,9 @@ export function ChatPanel({
             <strong>@mention</strong> : tape <kbd>@</kbd> pour la liste ({" "}
             <kbd>↑</kbd> <kbd>↓</kbd> puis <kbd>Entrée</kbd>), ou saisis{" "}
             <code>@orchestrateur</code> / id comme dans <strong>Équipe</strong>.
-            Sans @, l’orchestrateur choisit qui répond.
+            Sans @, l’orchestrateur choisit qui répond. Pendant une réponse,{" "}
+            <strong>Entrée</strong> ou <strong>Mettre en file</strong> enchaîne des
+            messages visibles au-dessus du champ (compteur même replié).
             {conversation.artifactMarkdown?.trim()
               ? " Pour intégrer la discussion dans le document : écris « appliquer la mise à jour » ou le bouton ci-dessus."
               : " Après une mission, le livrable est lié ici pour affinage."}
@@ -603,6 +717,57 @@ export function ChatPanel({
           {error && <div className="banner banner-error">{error}</div>}
 
           <footer className="chat-input-row">
+            {discussionQueue.length > 0 && (
+              <div className="discussion-queue-block">
+                <div className="discussion-queue-toolbar">
+                  <span className="discussion-queue-badge" aria-live="polite">
+                    {discussionQueue.length === 1
+                      ? "1 message en file"
+                      : `${discussionQueue.length} messages en file`}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-compact"
+                    aria-expanded={discussionQueueOpen}
+                    onClick={() => setDiscussionQueueOpen((o) => !o)}
+                  >
+                    {discussionQueueOpen
+                      ? "Replier la file"
+                      : "Voir / modifier la file"}
+                  </button>
+                </div>
+                {discussionQueueOpen && (
+                  <ol
+                    className="discussion-queue-list"
+                    aria-label="Messages en attente d’envoi"
+                  >
+                    {discussionQueue.map((item, index) => (
+                      <li key={item.id} className="discussion-queue-item">
+                        <span className="discussion-queue-item-index">
+                          {index + 1}.
+                        </span>
+                        <textarea
+                          className="discussion-queue-item-text"
+                          rows={2}
+                          value={item.text}
+                          onChange={(e) =>
+                            updateQueuedMessageText(item.id, e.target.value)
+                          }
+                          aria-label={`Message ${index + 1} en file`}
+                        />
+                        <button
+                          type="button"
+                          className="btn-secondary btn-compact discussion-queue-remove"
+                          onClick={() => removeQueuedMessage(item.id)}
+                        >
+                          Retirer
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            )}
             <MentionComboboxTextarea
               className="chat-input"
               rows={3}
@@ -610,20 +775,30 @@ export function ChatPanel({
               value={input}
               onChange={setInput}
               members={teamMembers}
-              disabled={busy}
+              disabled={false}
               submitOnEnter
-              onSubmit={() => void sendDiscussion()}
+              onSubmit={() => void submitDiscussionComposer()}
             />
-            <div className="chat-actions">
+            <div className="chat-actions chat-actions--discussion">
               {busy ? (
-                <button type="button" className="btn-secondary" onClick={stop}>
-                  Arrêter
-                </button>
+                <>
+                  <button type="button" className="btn-secondary" onClick={stop}>
+                    Arrêter
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => void submitDiscussionComposer()}
+                    disabled={!input.trim()}
+                  >
+                    Mettre en file
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"
                   className="btn-primary"
-                  onClick={() => void sendDiscussion()}
+                  onClick={() => void submitDiscussionComposer()}
                   disabled={!input.trim()}
                 >
                   Envoyer
