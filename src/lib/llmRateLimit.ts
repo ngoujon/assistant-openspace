@@ -1,3 +1,17 @@
+/**
+ * Pauses **Mistral uniquement** pour espacer les requêtes (429 / quotas).
+ * Ollama n’en a pas besoin : pas d’export utilisé côté `llmProvider === "ollama"`.
+ */
+export const MISTRAL_MISSION_INTER_STEP_MS = 780;
+/** Après l’appel « titre sidebar », avant le travail des pôles. */
+export const MISTRAL_MISSION_AFTER_TITLE_MS = 600;
+/** Entre consignes du pilier et travail du sous-agent (deux appels rapprochés). */
+export const MISTRAL_MISSION_LEAD_TO_SUB_MS = 520;
+/** Entre routage orchestrateur et stream du membre (discussion). */
+export const MISTRAL_DISCUSSION_ROUTE_TO_STREAM_MS = 680;
+/** Entre fin du stream et fusion livrable (discussion). */
+export const MISTRAL_DISCUSSION_STREAM_TO_MERGE_MS = 520;
+
 /** Statuts HTTP souvent liés à surcharge / limite de débit (retry raisonnable). */
 export function isRetryableRateLimitStatus(status: number): boolean {
   return status === 429 || status === 502 || status === 503;

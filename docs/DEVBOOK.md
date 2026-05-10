@@ -79,6 +79,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Mentions `@[Libellé]` : rendu type badge dans le compositeur (miroir sous le textarea) et dans les bulles de discussion (`MentionRichText`, `splitBracketMentionsForVisual`) |
 | 2026-05-10 | Discussion : si livrable + `missionUserBrief` mais fil vide, premier message utilisateur = brief mission (note « Mission équipe ») ; titre sidebar préservé s’il n’est plus « Nouveau projet » ; prompts sans doubler le brief (`missionBriefUnlessEchoedInHistory`) |
 | 2026-05-10 | Activité (discussion) : frise d’étapes cumulative (`discussionProgress`) + `MissionStepTimeline` ; journal à chaque envoi (routage, intervenant, stream, fusion) ; reset au changement de projet ; parse mission enrichi pour lignes discussion |
+| 2026-05-10 | Mistral : pauses mission / discussion centralisées (`llmRateLimit.ts`) — inter-étape ~780 ms, après titre, entre pilier et sous-agent, routage→stream et stream→fusion |
 
 ## 2026-03-28 — Bootstrap UI + Chat Ollama
 

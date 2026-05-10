@@ -18,7 +18,9 @@ La clé est **saisie et stockée dans le navigateur** (Paramètres → section �
 
 ## Limite de débit (429)
 
-L’API Mistral applique des **quotas** (requêtes par minute / par mois selon l’offre). Une **mission équipe** enchaîne de nombreux appels : en cas de `429` / surcharge (`502` / `503`), le client **`src/lib/mistral.ts`** relance automatiquement après une attente (en-tête **`Retry-After`** si présent, sinon backoff exponentiel, jusqu’à 6 essais). Le pipeline mission insère en outre une **pause courte** entre deux étapes Mistral pour limiter les rafales.
+L’API Mistral applique des **quotas** (requêtes par minute / par mois selon l’offre). Une **mission équipe** enchaîne de nombreux appels : en cas de `429` / surcharge (`502` / `503`), le client **`src/lib/mistral.ts`** relance automatiquement après une attente (en-tête **`Retry-After`** si présent, sinon backoff exponentiel, jusqu’à 6 essais).
+
+Côté **espacement des requêtes** (Mistral uniquement), les constantes dans **`src/lib/llmRateLimit.ts`** pilotent : pause après chaque étape mission (`MISTRAL_MISSION_INTER_STEP_MS`), après le titre sidebar avant les pôles (`MISTRAL_MISSION_AFTER_TITLE_MS`), entre consignes pilier et travail sous-agent (`MISTRAL_MISSION_LEAD_TO_SUB_MS`), et en discussion entre routage → stream et stream → fusion livrable (`MISTRAL_DISCUSSION_*`).
 
 Si l’erreur persiste : attendre quelques minutes, passer sur **Ollama en local** (Paramètres), ou monter de plan côté Mistral.
 

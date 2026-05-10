@@ -15,7 +15,11 @@ import {
   streamDiscussionReply,
 } from "@/lib/discussionTeamChat";
 import { resolveForcedResponderFromMessage } from "@/lib/discussionMention";
-import { sleepMs } from "@/lib/llmRateLimit";
+import {
+  MISTRAL_DISCUSSION_ROUTE_TO_STREAM_MS,
+  MISTRAL_DISCUSSION_STREAM_TO_MERGE_MS,
+  sleepMs,
+} from "@/lib/llmRateLimit";
 import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
 import { MentionRichText } from "@/components/MentionRichText";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
@@ -409,7 +413,7 @@ export function ChatPanel({
           });
 
           if (llmProvider === "mistral") {
-            await sleepMs(320, ac.signal);
+            await sleepMs(MISTRAL_DISCUSSION_ROUTE_TO_STREAM_MS, ac.signal);
           }
 
           const speakerLabel =
@@ -488,6 +492,9 @@ export function ChatPanel({
               transcriptMessages,
               turnCutoffAfterId,
             );
+            if (llmProvider === "mistral") {
+              await sleepMs(MISTRAL_DISCUSSION_STREAM_TO_MERGE_MS, ac.signal);
+            }
             setIsRouting(true);
             appendDiscussionProgressLine(
               "Application des retouches au livrable Markdown…",
