@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   appendTeamArchive,
   deleteTeamArchive,
@@ -26,6 +27,11 @@ export function TeamArchiveSection({
 }: TeamArchiveSectionProps) {
   const [archives, setArchives] = useState<TeamArchiveEntry[]>(loadTeamArchives);
   const [draftName, setDraftName] = useState("");
+  const [confirm, setConfirm] = useState<
+    | { kind: "restore"; entry: TeamArchiveEntry }
+    | { kind: "delete"; entry: TeamArchiveEntry }
+    | null
+  >(null);
 
   const refresh = useCallback(() => {
     setArchives(loadTeamArchives());
@@ -39,12 +45,8 @@ export function TeamArchiveSection({
     refresh();
   }, [draftName, members, souls, refresh]);
 
-  const handleRestore = useCallback(
+  const applyRestore = useCallback(
     (entry: TeamArchiveEntry) => {
-      const ok = window.confirm(
-        `Remplacer l’équipe active par « ${entry.name} » ? L’arbre et les âmes en cours seront écrasés (une copie reste dans les archives tant que tu ne la supprimes pas).`,
-      );
-      if (!ok) return;
       const nextMembers = structuredClone(entry.members);
       const nextSouls = soulsAfterRestore(nextMembers, entry.souls);
       onRestore(nextMembers, nextSouls);
@@ -52,12 +54,8 @@ export function TeamArchiveSection({
     [onRestore],
   );
 
-  const handleDelete = useCallback(
+  const applyDelete = useCallback(
     (entry: TeamArchiveEntry) => {
-      const ok = window.confirm(
-        `Supprimer l’archive « ${entry.name} » ? Cette action est définitive.`,
-      );
-      if (!ok) return;
       deleteTeamArchive(entry.id);
       refresh();
     },
@@ -113,14 +111,14 @@ export function TeamArchiveSection({
                 <button
                   type="button"
                   className="btn-primary btn-compact"
-                  onClick={() => handleRestore(a)}
+                  onClick={() => setConfirm({ kind: "restore", entry: a })}
                 >
                   Restaurer
                 </button>
                 <button
                   type="button"
                   className="btn-link team-archive-delete"
-                  onClick={() => handleDelete(a)}
+                  onClick={() => setConfirm({ kind: "delete", entry: a })}
                 >
                   Supprimer
                 </button>
@@ -129,6 +127,42 @@ export function TeamArchiveSection({
           ))}
         </ul>
       )}
+
+      {confirm ? (
+        <ConfirmDialog
+          open
+          title={
+            confirm.kind === "restore"
+              ? "Restaurer cette composition ?"
+              : "Supprimer cette archive ?"
+          }
+          description={
+            confirm.kind === "restore" ? (
+              <p className="modal-confirm-text">
+                Remplacer l’équipe active par «{" "}
+                <strong>{confirm.entry.name}</strong> » ? L’arbre et les âmes en
+                cours seront écrasés. Une copie reste dans les archives tant que tu
+                ne la supprimes pas.
+              </p>
+            ) : (
+              <p className="modal-confirm-text">
+                Supprimer définitivement «{" "}
+                <strong>{confirm.entry.name}</strong> » ? Cette action ne peut pas
+                être annulée.
+              </p>
+            )
+          }
+          confirmLabel={
+            confirm.kind === "restore" ? "Restaurer" : "Supprimer"
+          }
+          confirmTone={confirm.kind === "restore" ? "primary" : "danger"}
+          onClose={() => setConfirm(null)}
+          onConfirm={() => {
+            if (confirm.kind === "restore") applyRestore(confirm.entry);
+            else applyDelete(confirm.entry);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

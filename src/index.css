@@ -604,6 +604,29 @@ body {
   color: var(--text);
 }
 
+.btn-danger {
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.875rem;
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  background: var(--danger-bg);
+  color: var(--danger);
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.16);
+  border-color: rgba(248, 113, 113, 0.55);
+}
+
+.btn-danger:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .btn-compact {
   padding: 0.35rem 0.65rem;
   font-size: 0.8125rem;
@@ -1781,6 +1804,10 @@ body {
   padding: 1rem;
 }
 
+.modal-overlay--confirm {
+  z-index: 1100;
+}
+
 .modal-dialog {
   width: min(560px, 100%);
   max-height: min(88vh, 680px);
@@ -1799,6 +1826,32 @@ body {
 .modal-dialog-settings {
   width: min(720px, 100%);
   max-height: min(92vh, 820px);
+}
+
+.modal-dialog-confirm {
+  width: min(440px, 100%);
+  max-height: min(88vh, 420px);
+}
+
+.modal-header--confirm {
+  padding-bottom: 0.5rem;
+}
+
+.modal-confirm-body {
+  padding: 0 1.125rem 1rem;
+  flex-shrink: 0;
+}
+
+.modal-confirm-text {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.58;
+  color: var(--text-secondary);
+}
+
+.modal-confirm-text strong {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .modal-settings-scroll {
