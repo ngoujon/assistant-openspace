@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Conversations : plus de renommage auto (mission / discussion)
+
+### Objectif
+
+Le **titre** dans la sidebar (liste des conversations) **ne change plus** après la mission (plus d’appel LLM « titre orchestrateur ») ni après les échanges en **Discussion** (plus de titre dérivé du transcript).
+
+### Fichiers
+
+- `src/components/ChatPanel.tsx`, `src/components/MissionWorkspace.tsx`, `src/App.tsx`, `docs/architecture.md`, `docs/mission-orchestration.md`
+
+---
+
 ## 2026-05-10 — Seeds équipe : spécialisation stricte + prises de position techniques
 
 ### Objectif
@@ -86,6 +98,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 
 | Date | Changement |
 |------|------------|
+| 2026-05-10 | Conversations : **plus de renommage automatique** après mission ni après discussion (titre sidebar stable) |
 | 2026-05-10 | Seeds équipe (défaut) : **spécialisation** métier stricte, hors-sujet explicite, positions techniques ; aide Paramètres mise à jour |
 | 2026-05-10 | Compositeur @ : miroir **sans crochets** (`@Libellé`) + sync scroll / `ResizeObserver` + pastille métrique (`ch`, pas de bordure) pour réduire le décalage du curseur |
 | 2026-05-10 | Discussion : rendu **Markdown** (GFM) dans les bulles — titres, listes, code, tableaux ; mentions `@[…]` conservées ; liens http(s) / relatifs sûrs |
@@ -425,6 +438,8 @@ Dès le début d’une mission, renommer automatiquement l’entrée dans la **l
 - `src/orchestration/pipeline.ts` — option `onConversationTitleSuggested`, comptage d’étapes
 - `src/components/MissionWorkspace.tsx`, `src/components/ChatPanel.tsx`
 - `docs/mission-orchestration.md`, `docs/architecture.md`
+
+> **Évolution** : comportement **désactivé** ensuite — plus de titre LLM après mission ni après discussion (entrée DEVBOOK « Conversations : plus de renommage auto »). L’option `onConversationTitleSuggested` reste dans `runMissionPipeline` pour un usage programmatique éventuel ; l’UI ne l’utilise plus.
 
 ---
 

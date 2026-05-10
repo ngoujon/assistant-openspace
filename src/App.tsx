@@ -158,7 +158,7 @@ export default function App() {
             firstUser?.content.slice(0, 48).trim() ?? "";
           /**
            * Avant la 1ʳᵉ réponse : titre depuis le 1er message utilisateur,
-           * sauf si un titre réel existe déjà (ex. proposé pendant la mission).
+           * sauf si le titre a déjà été personnalisé (≠ « Nouveau projet »).
            */
           const title =
             !hasAssistant && firstUser
@@ -173,21 +173,6 @@ export default function App() {
             updatedAt: Date.now(),
           };
         }),
-      );
-    },
-    [],
-  );
-
-  const setConversationTitleById = useCallback(
-    (conversationId: string, newTitle: string) => {
-      const t = newTitle.trim();
-      if (!t) return;
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === conversationId
-            ? { ...c, title: t.slice(0, 80), updatedAt: Date.now() }
-            : c,
-        ),
       );
     },
     [],
@@ -307,7 +292,6 @@ export default function App() {
         llmError={llmError}
         onRetryLlm={refreshLlmModels}
         setMessages={setConversationMessages}
-        onConversationTitle={setConversationTitleById}
         onConversationArtifact={setConversationArtifactMarkdown}
         onMissionActivitySnapshot={persistMissionActivitySnapshot}
         setRightActivity={setRightActivity}

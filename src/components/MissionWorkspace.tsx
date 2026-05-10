@@ -35,8 +35,6 @@ interface MissionWorkspaceProps {
   }) => void;
   /** Quand une mission produit un Markdown, pour le lier à la conversation (Discussion). */
   onArtifactProduced?: (markdown: string, missionUserBrief: string) => void;
-  /** Après le brief orchestrateur : titre proposé pour la conversation (sidebar gauche). */
-  onConversationTitleSuggested?: (title: string) => void;
 }
 
 export function MissionWorkspace({
@@ -45,7 +43,6 @@ export function MissionWorkspace({
   model,
   onActivityReport,
   onArtifactProduced,
-  onConversationTitleSuggested,
 }: MissionWorkspaceProps) {
   const [context, setContext] = useState("");
   const [teamMembers, setTeamMembers] = useState<TreeMember[]>(() =>
@@ -219,10 +216,7 @@ export function MissionWorkspace({
       return;
     }
 
-    const planned = countMissionModelCalls(
-      membersTree,
-      !!onConversationTitleSuggested,
-    );
+    const planned = countMissionModelCalls(membersTree, false);
     setProgress([
       `Démarrage — ${planned} requête(s) vers le modèle « ${model} » (une par une). Tant qu’une étape est en cours (${
         llmProvider === "mistral" ? "API Mistral" : "Ollama local"
@@ -245,7 +239,6 @@ export function MissionWorkspace({
         onProgress: (label) => {
           setProgress((p) => [...p, label]);
         },
-        onConversationTitleSuggested,
       });
       const finalMd = unwrapMarkdownFence(md);
       setResultMd(finalMd);
@@ -269,7 +262,6 @@ export function MissionWorkspace({
     mistralApiKey,
     model,
     onArtifactProduced,
-    onConversationTitleSuggested,
   ]);
 
   const canStart = (context.trim().length > 0 || files.length > 0) && !!model;

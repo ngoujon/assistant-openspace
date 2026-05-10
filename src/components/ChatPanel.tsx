@@ -9,8 +9,6 @@ import {
 import { MissionWorkspace } from "@/components/MissionWorkspace";
 import {
   applyDiscussionToArtifact,
-  formatHistoryForRouting,
-  generateDiscussionConversationTitle,
   routeDiscussionMessage,
   streamDiscussionReply,
 } from "@/lib/discussionTeamChat";
@@ -74,8 +72,6 @@ interface ChatPanelProps {
     conversationId: string,
     fn: (prev: ChatMessage[]) => ChatMessage[],
   ) => void;
-  /** Titre court proposé par l’orchestrateur après une réponse (mode Discussion). */
-  onConversationTitle: (conversationId: string, title: string) => void;
   /** Met à jour le Markdown livrable lié à cette conversation (mission + fusions). */
   onConversationArtifact: (
     conversationId: string,
@@ -102,7 +98,6 @@ export function ChatPanel({
   llmError,
   onRetryLlm,
   setMessages,
-  onConversationTitle,
   onConversationArtifact,
   onMissionActivitySnapshot,
   setRightActivity,
@@ -487,22 +482,6 @@ export function ChatPanel({
               routingNote: routing.userNote,
             },
           ];
-          const recentTranscript =
-            formatHistoryForRouting(transcriptMessages, 6000);
-          void generateDiscussionConversationTitle({
-            llmProvider,
-            mistralApiKey,
-            model,
-            souls,
-            recentTranscript,
-          })
-            .then((t) => {
-              if (t) onConversationTitle(convId, t);
-            })
-            .catch(() => {
-              /* titre optionnel : on garde l’extrait utilisateur si échec */
-            });
-
           const art = turnArtifactMd?.trim();
           if (art && assistantId) {
             const discussionForPatch = messagesAfterArtifactCutoff(
@@ -585,7 +564,6 @@ export function ChatPanel({
       conversation.artifactDiscussionCutoffAfterId,
       conversation.missionUserBrief,
       setMessages,
-      onConversationTitle,
       artifactMergeFromDiscussion,
       teamMembers,
       appendDiscussionProgressLine,
@@ -725,9 +703,6 @@ export function ChatPanel({
                 setMode("free");
               }
             }}
-            onConversationTitleSuggested={(title) =>
-              onConversationTitle(conversation.id, title)
-            }
           />
         </div>
       ) : (

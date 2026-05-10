@@ -58,7 +58,7 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 ## Flux Mission équipe
 
 1. Contexte + fichiers texte ; `loadAgentSouls()` lit les prompts par rôle.
-2. `runMissionPipeline` enchaîne des `completeLlmChat` (pas de stream) avec `system` = âme du nœud ; après le brief orchestrateur, un appel optionnel propose un **titre de conversation** (sidebar).
+2. `runMissionPipeline` enchaîne des `completeLlmChat` (pas de stream) avec `system` = âme du nœud ; **pas** de renommage automatique de la conversation après le brief (le titre sidebar reste celui de l’utilisateur / le premier message).
 3. Sortie finale : markdown ; téléchargement blob côté client.
 
 Voir `docs/mission-orchestration.md`.

@@ -33,7 +33,7 @@ L’arbre (membres sous l’orchestrateur, sous-agents sous les piliers) est lu 
 
 ## Coût / performance
 
-Environ **12** requêtes modèle pour une équipe type à trois pôles avec sous-agents (1 brief + **1 titre** + 3×3 + 1 document final). Prévoir un modèle raisonnablement rapide sur machine locale ; le bouton **Arrêter la mission** annule via `AbortController`.
+Environ **11** requêtes modèle pour une équipe type à trois pôles avec un sous-agent chacun (1 brief + 3×3 + 1 document final) — **sans** appel LLM pour renommer la conversation. Prévoir un modèle raisonnablement rapide sur machine locale ; le bouton **Arrêter la mission** annule via `AbortController`.
 
 ## Limites
 
