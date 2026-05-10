@@ -171,7 +171,7 @@ export function ActivitySidebar({
 
     return (
       <div
-        className="activity-sidebar activity-sidebar--discussion"
+        className={`activity-sidebar activity-sidebar--discussion${hist ? " activity-sidebar--discussion-with-history" : ""}`}
         role="status"
         aria-live="polite"
         aria-busy={busy}
