@@ -65,6 +65,8 @@ export interface AppSettings {
   mistralApiKey: string;
   /** Modèle Mistral pour le chat / mission / équipe (choisi dans Paramètres uniquement). */
   mistralChatModel: string;
+  /** Modèle Ollama pour le chat / mission / équipe (choisi dans Paramètres uniquement). */
+  ollamaChatModel: string;
 }
 
 function defaults(): AppSettings {
@@ -74,6 +76,7 @@ function defaults(): AppSettings {
     llmProvider: DEFAULT_LLM_PROVIDER,
     mistralApiKey: "",
     mistralChatModel: "",
+    ollamaChatModel: "",
   };
 }
 
@@ -103,12 +106,17 @@ export function loadAppSettings(): AppSettings {
       typeof o.mistralChatModel === "string"
         ? o.mistralChatModel
         : base.mistralChatModel;
+    const ollamaModel =
+      typeof o.ollamaChatModel === "string"
+        ? o.ollamaChatModel
+        : base.ollamaChatModel;
     return {
       seedSystemPrompt: sys,
       seedUserTemplate: usr,
       llmProvider: prov,
       mistralApiKey: key,
       mistralChatModel: mistralModel,
+      ollamaChatModel: ollamaModel,
     };
   } catch {
     return base;
@@ -124,6 +132,7 @@ export function saveAppSettings(s: AppSettings): void {
       llmProvider: s.llmProvider,
       mistralApiKey: s.mistralApiKey,
       mistralChatModel: s.mistralChatModel,
+      ollamaChatModel: s.ollamaChatModel,
     }),
   );
 }

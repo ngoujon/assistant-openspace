@@ -55,7 +55,6 @@ export default function App() {
     return loaded.length ? loaded : [newConversation()];
   });
   const [activeId, setActiveId] = useState(() => conversations[0]!.id);
-  const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState("");
   const [llmProvider, setLlmProvider] = useState<LlmProvider>(
     () => loadAppSettings().llmProvider,
@@ -81,7 +80,6 @@ export default function App() {
     setMistralApiKey(s.mistralApiKey);
 
     if (s.llmProvider === "mistral" && !s.mistralApiKey.trim()) {
-      setModels([]);
       setModel("");
       setLlmError(
         "Mistral AI : renseigne ta clé API dans Paramètres (menu latéral).",
@@ -96,10 +94,13 @@ export default function App() {
 
     run()
       .then((m) => {
-        setModels(m);
         setModel((prev) => {
           if (s.llmProvider === "mistral") {
             const saved = s.mistralChatModel?.trim() ?? "";
+            if (saved && m.includes(saved)) return saved;
+          }
+          if (s.llmProvider === "ollama") {
+            const saved = s.ollamaChatModel?.trim() ?? "";
             if (saved && m.includes(saved)) return saved;
           }
           if (prev && m.includes(prev)) return prev;
@@ -290,9 +291,7 @@ export default function App() {
     <div className="main-body">
       <ChatPanel
         conversation={active}
-        models={models}
         model={model}
-        onModelChange={setModel}
         llmProvider={llmProvider}
         mistralApiKey={mistralApiKey}
         llmError={llmError}

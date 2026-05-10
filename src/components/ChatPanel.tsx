@@ -54,9 +54,7 @@ function messagesAfterArtifactCutoff(
 
 interface ChatPanelProps {
   conversation: Conversation;
-  models: string[];
   model: string;
-  onModelChange: (m: string) => void;
   llmProvider: LlmProvider;
   mistralApiKey: string;
   llmError: string | null;
@@ -86,9 +84,7 @@ interface ChatPanelProps {
 
 export function ChatPanel({
   conversation,
-  models,
   model,
-  onModelChange,
   llmProvider,
   mistralApiKey,
   llmError,
@@ -537,27 +533,6 @@ export function ChatPanel({
               ? "Mission équipe"
               : "Discussion"}
           </p>
-          {llmProvider === "ollama" && (
-            <label className="model-label">
-              Modèle (Ollama local)
-              <select
-                className="model-select"
-                value={model}
-                onChange={(e) => onModelChange(e.target.value)}
-                disabled={!models.length}
-              >
-                {models.length === 0 ? (
-                  <option value="">—</option>
-                ) : (
-                  models.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-          )}
           {llmError && (
             <div className="banner banner-warn">
               {llmError}

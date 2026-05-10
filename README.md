@@ -72,11 +72,11 @@ Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le c
 ### Équipe
 
 - L’**arbre** est visible en permanence dans la colonne **Organisation** (à droite du contenu) : nouveaux membres sous l’orchestrateur, **glisser-déposer** sous l’orchestrateur ou sous un agent, suppression.
-- **Clic sur un membre** : modale **âme / rôle** ; bouton **Générer un seed** (LLM configuré — modèle Ollama dans la barre du chat si besoin).
+- **Clic sur un membre** : modale **âme / rôle** ; bouton **Générer un seed** (LLM configuré — modèles Mistral et Ollama choisis dans **Paramètres**).
 
 ### Autres
 
-- **Colonne gauche** : conversations, persistance `localStorage` ; icône **Paramètres** à droite du titre OpenSpace (fournisseur LLM, clé Mistral, prompts pour **Générer un seed**).
+- **Colonne gauche** : conversations, persistance `localStorage` ; icône **Paramètres** à droite du titre OpenSpace (fournisseur LLM, clé Mistral, **modèles** Mistral / Ollama, prompts pour **Générer un seed**).
 - **À droite du chat** : **Organisation** (arbre) puis **Activité** (mission : étapes, durée ; en discussion : routage / stream ; bouton **Télécharger le .md** en bas de la colonne). Les **étapes de mission** sont **mémorisées par projet** (rafraîchissement, changement de conversation) et réaffichées en Discussion sous **Mission (historique)**.
 
 ## Proxy LLM

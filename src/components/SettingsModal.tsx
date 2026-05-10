@@ -8,6 +8,7 @@ import {
 import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { fetchMistralModels } from "@/lib/mistral";
+import { fetchOllamaModels } from "@/lib/ollama";
 
 interface SettingsModalProps {
   open: boolean;
@@ -20,6 +21,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
   const titleId = useId();
   const mistralKeyId = useId();
   const mistralModelSelectId = useId();
+  const ollamaModelSelectId = useId();
   const [seedSystem, setSeedSystem] = useState(DEFAULT_SEED_SYSTEM_PROMPT);
   const [seedUser, setSeedUser] = useState(DEFAULT_SEED_USER_TEMPLATE);
   const [llmProvider, setLlmProvider] = useState<LlmProvider>("mistral");
@@ -28,6 +30,12 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
   const [mistralModelChoice, setMistralModelChoice] = useState("");
   const [mistralModelsLoading, setMistralModelsLoading] = useState(false);
   const [mistralModelsError, setMistralModelsError] = useState<string | null>(
+    null,
+  );
+  const [ollamaModelsList, setOllamaModelsList] = useState<string[]>([]);
+  const [ollamaModelChoice, setOllamaModelChoice] = useState("");
+  const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
+  const [ollamaModelsError, setOllamaModelsError] = useState<string | null>(
     null,
   );
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -42,6 +50,9 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
     setMistralModelChoice(s.mistralChatModel?.trim() ?? "");
     setMistralModelsList([]);
     setMistralModelsError(null);
+    setOllamaModelChoice(s.ollamaChatModel?.trim() ?? "");
+    setOllamaModelsList([]);
+    setOllamaModelsError(null);
     setSaveError(null);
   }, [open]);
 
@@ -81,6 +92,43 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
       cancelled = true;
     };
   }, [open, llmProvider, mistralApiKey]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (llmProvider !== "ollama") {
+      setOllamaModelsLoading(false);
+      setOllamaModelsList([]);
+      setOllamaModelsError(null);
+      return;
+    }
+    let cancelled = false;
+    setOllamaModelsLoading(true);
+    setOllamaModelsError(null);
+    fetchOllamaModels()
+      .then((list) => {
+        if (cancelled) return;
+        setOllamaModelsList(list);
+        setOllamaModelChoice((cur) => {
+          const t = cur.trim();
+          if (t && list.includes(t)) return t;
+          const s = loadAppSettings();
+          const saved = s.ollamaChatModel?.trim() ?? "";
+          if (saved && list.includes(saved)) return saved;
+          return pickDefaultChatModel(list, "ollama");
+        });
+      })
+      .catch((e: Error) => {
+        if (cancelled) return;
+        setOllamaModelsList([]);
+        setOllamaModelsError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setOllamaModelsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, llmProvider]);
 
   useEffect(() => {
     if (!open) return;
@@ -132,6 +180,14 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
       setSaveError("Choisis un modèle Mistral dans la liste.");
       return;
     }
+    if (
+      llmProvider === "ollama" &&
+      ollamaModelsList.length > 0 &&
+      !ollamaModelChoice.trim()
+    ) {
+      setSaveError("Choisis un modèle Ollama dans la liste.");
+      return;
+    }
     const prev = loadAppSettings();
     saveAppSettings({
       seedSystemPrompt: sys,
@@ -142,6 +198,10 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
         llmProvider === "mistral"
           ? mistralModelChoice.trim()
           : prev.mistralChatModel,
+      ollamaChatModel:
+        llmProvider === "ollama"
+          ? ollamaModelChoice.trim()
+          : prev.ollamaChatModel,
     });
     setSaveError(null);
     onSaved?.();
@@ -280,6 +340,49 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
                       <option value="">—</option>
                     ) : (
                       mistralModelsList.map((id) => (
+                        <option key={id} value={id}>
+                          {id}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                )}
+              </>
+            )}
+            {llmProvider === "ollama" && (
+              <>
+                <label
+                  className="modal-field-label modal-settings-label-block"
+                  htmlFor={ollamaModelSelectId}
+                >
+                  Modèle (Ollama)
+                </label>
+                <p className="modal-settings-hint">
+                  Utilisé pour le chat, les missions et l’édition d’équipe (Organisation).
+                  Choix disponible ici uniquement — plus dans la barre du chat.
+                </p>
+                {ollamaModelsLoading && (
+                  <p className="modal-settings-hint" aria-live="polite">
+                    Chargement des modèles Ollama…
+                  </p>
+                )}
+                {ollamaModelsError && (
+                  <p className="modal-gen-error" role="alert">
+                    {ollamaModelsError}
+                  </p>
+                )}
+                {!ollamaModelsLoading && (
+                  <select
+                    id={ollamaModelSelectId}
+                    className="modal-settings-input"
+                    value={ollamaModelChoice}
+                    onChange={(e) => setOllamaModelChoice(e.target.value)}
+                    disabled={ollamaModelsList.length === 0}
+                  >
+                    {ollamaModelsList.length === 0 ? (
+                      <option value="">—</option>
+                    ) : (
+                      ollamaModelsList.map((id) => (
                         <option key={id} value={id}>
                           {id}
                         </option>

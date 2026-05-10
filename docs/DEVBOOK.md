@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Modèle Ollama : sélection dans Paramètres
+
+### Objectif
+
+Aligner Ollama sur Mistral : le **modèle de chat** est choisi dans **Paramètres** (`ollamaChatModel` en localStorage), listé via `fetchOllamaModels` ; suppression du sélecteur dans la barre du chat.
+
+### Fichiers
+
+- `src/lib/appSettingsStorage.ts`, `src/components/SettingsModal.tsx`, `src/App.tsx`, `src/components/ChatPanel.tsx`, `README.md`, `docs/ollama.md`
+
+---
+
 ## 2026-05-10 — Mistral AI (défaut) et bascule Ollama
 
 ### Objectif
@@ -13,7 +25,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 ### Décisions
 
 - **Routeur** : `src/lib/llmChat.ts` (`completeLlmChat` / `streamLlmChat`) selon `LlmProvider` ; client Mistral dans `src/lib/mistral.ts` (OpenAI-compatible `/v1/chat/completions` + SSE stream).
-- **Réglages** : `AppSettings` étendu (`llmProvider`, `mistralApiKey`, `mistralChatModel`) dans `src/lib/appSettingsStorage.ts` ; UI dans `SettingsModal`.
+- **Réglages** : `AppSettings` étendu (`llmProvider`, `mistralApiKey`, `mistralChatModel`, `ollamaChatModel`) dans `src/lib/appSettingsStorage.ts` ; UI dans `SettingsModal`.
 - **Clé** : stockée **uniquement côté navigateur** ; le proxy relaie l’en-tête `Authorization` vers `https://api.mistral.ai`.
 
 ### Fichiers clés
@@ -26,7 +38,8 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | Date | Changement |
 |------|------------|
 | 2026-05-10 | LLM : Mistral AI (défaut) + Ollama local ; clé API dans Paramètres ; proxies `/api/mistral` et doc |
-| 2026-05-10 | Mistral : choix du modèle uniquement dans Paramètres (`mistralChatModel`) ; barre du chat réservée au sélecteur Ollama |
+| 2026-05-10 | Mistral : choix du modèle uniquement dans Paramètres (`mistralChatModel`) |
+| 2026-05-10 | Ollama : choix du modèle dans Paramètres (`ollamaChatModel`) — plus de sélecteur dans la barre du chat |
 | 2026-05-10 | UI : typographie Plus Jakarta Sans, palette / rayons / ombres harmonisés, colonnes latérales vitrées, onglets et bulles de chat affinés |
 | 2026-05-10 | Mission : zone glisser-déposer + clic pour fichiers .txt / .md (remplace le bouton « Ajouter des fichiers ») |
 | 2026-05-10 | Mission : actions « Lancer / Arrêter » alignées à droite |

@@ -21,7 +21,7 @@ Le code client utilise la constante de base `/api/ollama` dans `src/lib/ollama.t
 
 ## Modèles proposés dans l’UI
 
-La liste démarre depuis `/api/tags`, puis exclut les modèles **sans chat** : noms contenant `embed` / `rerank`, ou capacités Ollama `embedding` sans `completion` (via `/api/show`). Ainsi `nomic-embed-text` n’apparaît pas dans le sélecteur.
+La liste démarre depuis `/api/tags`, puis exclut les modèles **sans chat** : noms contenant `embed` / `rerank`, ou capacités Ollama `embedding` sans `completion` (via `/api/show`). Ainsi `nomic-embed-text` n’apparaît pas dans la liste **Paramètres** (choix du modèle Ollama).
 
 ## Dépannage
 
@@ -29,7 +29,7 @@ La liste démarre depuis `/api/tags`, puis exclut les modèles **sans chat** : n
 |----------|--------|
 | Bannière « Ollama indisponible » | Vérifier `ollama serve` / app Ollama lancée ; `curl http://127.0.0.1:11434/api/tags` |
 | Liste de modèles vide | `ollama pull <modèle>` |
-| Erreur au premier message | Modèle non sélectionné ou nom incorrect ; vérifier la liste dans l’UI |
+| Erreur au premier message | Modèle non choisi dans **Paramètres** ou nom incorrect ; vérifier la liste Ollama |
 | Stream qui s’arrête net | Réseau, modèle trop lourd, ou annulation utilisateur (bouton Arrêter) |
 
 ## Production / hors Vite
