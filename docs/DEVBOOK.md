@@ -74,6 +74,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 
 | Date | Changement |
 |------|------------|
+| 2026-05-10 | Compositeur @ : miroir **sans crochets** (`@Libellé`) + sync scroll / `ResizeObserver` + pastille métrique (`ch`, pas de bordure) pour réduire le décalage du curseur |
 | 2026-05-10 | Discussion : rendu **Markdown** (GFM) dans les bulles — titres, listes, code, tableaux ; mentions `@[…]` conservées ; liens http(s) / relatifs sûrs |
 | 2026-05-10 | Discussion : prompts renforcés — réponse fil **5–10 lignes max**, résumé des **modifications** uniquement, questions courtes en fin ; routage JSON et fallbacks alignés |
 | 2026-05-10 | Activité : étapes « neutres » (gris) → pastille **SYSTEME** à la place du point ou d’une pastille vide |

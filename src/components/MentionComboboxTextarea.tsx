@@ -165,12 +165,24 @@ export function MentionComboboxTextarea({
     el?.scrollIntoView({ block: "nearest" });
   }, [menuOpen, mentionIndex]);
 
-  /** Garde le miroir aligné après insertion @ ou changement de valeur (onScroll ne couvre pas tout). */
+  /** Garde le miroir aligné (valeur, curseur, redimensionnement). */
   useLayoutEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     setMirrorScrollTop(ta.scrollTop);
-  }, [value]);
+  }, [value, cursor]);
+
+  useLayoutEffect(() => {
+    const ta = textareaRef.current;
+    const shell = ta?.parentElement;
+    if (!ta || !shell) return;
+    const ro = new ResizeObserver(() => {
+      setMirrorScrollTop(ta.scrollTop);
+    });
+    ro.observe(ta);
+    ro.observe(shell);
+    return () => ro.disconnect();
+  }, []);
 
   const pickMember = useCallback(
     (m: TreeMember) => {

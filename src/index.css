@@ -1274,6 +1274,9 @@ body {
   border-radius: var(--radius);
   padding: 0.75rem 1rem;
   line-height: 1.5;
+  letter-spacing: inherit;
+  tab-size: 8;
+  overflow-wrap: break-word;
 }
 
 .chat-input::placeholder {
@@ -1319,8 +1322,11 @@ body {
   font: inherit;
   font-size: 0.9375rem;
   line-height: 1.5;
+  letter-spacing: inherit;
+  tab-size: 8;
   color: var(--text);
   white-space: pre-wrap;
+  overflow-wrap: break-word;
   word-break: break-word;
   will-change: transform;
 }
@@ -1367,17 +1373,22 @@ body {
   -webkit-box-decoration-break: clone;
 }
 
-/* Même métrique que le textarea pour superposition du compositeur @ */
+/* Compositeur : même graisse que le textarea, pas de bordure (évite décalage curseur) */
 .agent-mention-badge--metric-mirror {
-  display: inline;
+  display: inline-block;
+  box-sizing: border-box;
   margin: 0;
-  padding: 0.08em 0.28em;
+  padding: 0.04em 0.22em;
+  max-width: 100%;
   font-size: inherit;
-  font-weight: 600;
+  font-weight: inherit;
   line-height: inherit;
   letter-spacing: inherit;
   vertical-align: baseline;
-  border-radius: 0.35em;
+  border: none;
+  border-radius: 0.3em;
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 
 .bubble-user .agent-mention-badge {
