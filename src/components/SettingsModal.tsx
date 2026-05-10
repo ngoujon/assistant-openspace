@@ -401,9 +401,10 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
             <p className="modal-settings-intro">
               Ces textes sont envoyés au <strong>fournisseur LLM</strong> choisi ci-dessus
               lorsque tu cliques sur « Générer un seed » dans la fiche d’un membre. Le
-              gabarit par défaut vise un <strong>assistant métier</strong> (pratiques,
-              précautions, qualité) plutôt qu’une persona fictionnelle — structure librement
-              inspirée des prompts <strong>OpenClaw</strong> (sections fixes).
+              gabarit par défaut vise un expert <strong>étroitement spécialisé</strong> dans
+              le métier déduit du libellé (périmètre clair, hors-sujet explicite), avec des{" "}
+              <strong>positions et arguments techniques</strong> possibles à l’intérieur de
+              ce domaine — pas une persona fictionnelle ; sections fixes type OpenClaw.
             </p>
             <label className="modal-field-label" htmlFor="settings-seed-system">
               Message système
@@ -414,7 +415,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
               value={seedSystem}
               onChange={(e) => setSeedSystem(e.target.value)}
               spellCheck={false}
-              rows={4}
+              rows={6}
             />
             <label
               className="modal-field-label modal-settings-label-block"

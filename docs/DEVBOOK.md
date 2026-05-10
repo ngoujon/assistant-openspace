@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Seeds équipe : spécialisation stricte + prises de position techniques
+
+### Objectif
+
+Prompts par défaut **Générer un seed** : domaine **principal** déduit du libellé, **hors-périmètre explicite** (ex. backend sans marketing), sous-agent **plus étroit** ; **arguments et choix techniques assumés** dans la discipline ; toujours sans persona fictionnelle.
+
+### Fichiers
+
+- `src/lib/appSettingsStorage.ts`, `src/components/SettingsModal.tsx`, `src/lib/generateMemberSeed.ts` (commentaire)
+
+---
+
 ## 2026-05-10 — Discussion : bulles en Markdown (GFM)
 
 ### Objectif
@@ -74,6 +86,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 
 | Date | Changement |
 |------|------------|
+| 2026-05-10 | Seeds équipe (défaut) : **spécialisation** métier stricte, hors-sujet explicite, positions techniques ; aide Paramètres mise à jour |
 | 2026-05-10 | Compositeur @ : miroir **sans crochets** (`@Libellé`) + sync scroll / `ResizeObserver` + pastille métrique (`ch`, pas de bordure) pour réduire le décalage du curseur |
 | 2026-05-10 | Discussion : rendu **Markdown** (GFM) dans les bulles — titres, listes, code, tableaux ; mentions `@[…]` conservées ; liens http(s) / relatifs sûrs |
 | 2026-05-10 | Discussion : prompts renforcés — réponse fil **5–10 lignes max**, résumé des **modifications** uniquement, questions courtes en fin ; routage JSON et fallbacks alignés |

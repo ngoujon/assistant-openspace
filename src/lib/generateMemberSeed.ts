@@ -17,7 +17,7 @@ export interface GenerateSeedInput {
 }
 
 /**
- * Propose un texte pour le champ « âme et rôle » (souvent **Rôle** + **Pratiques et standards** si gabarit par défaut), selon les réglages utilisateur.
+ * Propose un texte pour le champ « âme et rôle » (**Rôle** + **Pratiques et standards** si gabarit par défaut), spécialisation métier selon les réglages utilisateur.
  */
 export async function generateMemberSoulSeed(
   input: GenerateSeedInput,
