@@ -19,6 +19,7 @@ import {
   isArtifactApplyIntent,
   resolveForcedResponderFromMessage,
 } from "@/lib/discussionMention";
+import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
 import {
   markdownFilenameFromConversationTitle,
   triggerMarkdownDownload,
@@ -26,7 +27,7 @@ import {
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
-import { loadTeamMembers } from "@/lib/teamTreeStorage";
+import { loadTeamMembers, type TreeMember } from "@/lib/teamTreeStorage";
 import type { RightActivityState } from "@/types/activity";
 import type { ChatMessage, Conversation } from "@/types";
 
@@ -90,7 +91,21 @@ export function ChatPanel({
   const [streaming, setStreaming] = useState(false);
   const [isRouting, setIsRouting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TreeMember[]>(() =>
+    loadTeamMembers(),
+  );
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const refresh = () => setTeamMembers(loadTeamMembers());
+    window.addEventListener("storage", refresh);
+    const onTeamSaved = () => refresh();
+    window.addEventListener("openspace-team-updated", onTeamSaved);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("openspace-team-updated", onTeamSaved);
+    };
+  }, []);
 
   useEffect(() => {
     setInput("");
@@ -299,7 +314,7 @@ export function ChatPanel({
     let assistantId: string | undefined;
 
     try {
-      const members = loadTeamMembers();
+      const members = teamMembers;
       const souls = loadAgentSouls();
       const forcedResponderId =
         resolveForcedResponderFromMessage(text, members) ?? undefined;
@@ -405,6 +420,7 @@ export function ChatPanel({
     setMessages,
     onConversationTitle,
     patchArtifactFromDiscussion,
+    teamMembers,
   ]);
 
   const stop = useCallback(() => {
@@ -537,9 +553,10 @@ export function ChatPanel({
             </div>
           )}
           <p className="discussion-routing-hint" role="note">
-            <strong>@mention</strong> : cible un membre ou l’orchestrateur (
-            <code>@orchestrateur</code>, id ou nom tel qu’affiché dans{" "}
-            <strong>Équipe</strong>). Sans @, l’orchestrateur choisit qui répond.
+            <strong>@mention</strong> : tape <kbd>@</kbd> pour la liste ({" "}
+            <kbd>↑</kbd> <kbd>↓</kbd> puis <kbd>Entrée</kbd>), ou saisis{" "}
+            <code>@orchestrateur</code> / id comme dans <strong>Équipe</strong>.
+            Sans @, l’orchestrateur choisit qui répond.
             {conversation.artifactMarkdown?.trim()
               ? " Pour intégrer la discussion dans le document : écris « appliquer la mise à jour » ou le bouton ci-dessus."
               : " Après une mission, le livrable est lié ici pour affinage."}
@@ -586,19 +603,16 @@ export function ChatPanel({
           {error && <div className="banner banner-error">{error}</div>}
 
           <footer className="chat-input-row">
-            <textarea
+            <MentionComboboxTextarea
               className="chat-input"
               rows={3}
               placeholder="Message ou @membre… (ex. appliquer la mise à jour)"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void sendDiscussion();
-                }
-              }}
+              onChange={setInput}
+              members={teamMembers}
               disabled={busy}
+              submitOnEnter
+              onSubmit={() => void sendDiscussion()}
             />
             <div className="chat-actions">
               {busy ? (

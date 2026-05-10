@@ -1057,6 +1057,65 @@ body {
   justify-content: flex-end;
 }
 
+.mention-combobox-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.mention-combobox-wrap > .mention-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: 0.35rem;
+  z-index: 20;
+  max-height: 11rem;
+  overflow-y: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  box-shadow: 0 -4px 20px color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.mention-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  margin: 0;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mention-option:last-child {
+  border-bottom: none;
+}
+
+.mention-option:hover,
+.mention-option--active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.mention-option-label {
+  font-weight: 500;
+}
+
+.mention-option-id {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
 /* ——— Mission équipe (orchestration) ——— */
 .mission-workspace {
   flex: 1;

@@ -39,6 +39,7 @@ export function loadTeamMembers(): TreeMember[] {
 
 export function saveTeamMembers(members: TreeMember[]): void {
   localStorage.setItem(KEY, JSON.stringify(members));
+  window.dispatchEvent(new CustomEvent("openspace-team-updated"));
 }
 
 export function depthOf(id: string, members: TreeMember[]): number {

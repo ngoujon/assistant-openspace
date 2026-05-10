@@ -11,8 +11,14 @@ import {
   runMissionPipeline,
   type MissionFile,
 } from "@/orchestration/pipeline";
+import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
+import { buildMissionMentionPrefix } from "@/lib/discussionMention";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
-import { ORCHESTRATOR_ID, loadTeamMembers } from "@/lib/teamTreeStorage";
+import {
+  ORCHESTRATOR_ID,
+  loadTeamMembers,
+  type TreeMember,
+} from "@/lib/teamTreeStorage";
 import { triggerMarkdownDownload } from "@/lib/downloadMarkdown";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 import type { LlmProvider } from "@/lib/llmProvider";
@@ -42,6 +48,9 @@ export function MissionWorkspace({
   onConversationTitleSuggested,
 }: MissionWorkspaceProps) {
   const [context, setContext] = useState("");
+  const [teamMembers, setTeamMembers] = useState<TreeMember[]>(() =>
+    loadTeamMembers(),
+  );
   const [files, setFiles] = useState<
     { id: string; name: string; content: string }[]
   >([]);
@@ -58,6 +67,16 @@ export function MissionWorkspace({
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => setTeamMembers(loadTeamMembers());
+    window.addEventListener("storage", refresh);
+    window.addEventListener("openspace-team-updated", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("openspace-team-updated", refresh);
     };
   }, []);
 
@@ -184,13 +203,13 @@ export function MissionWorkspace({
     abortRef.current = ac;
 
     const souls = loadAgentSouls();
-    const teamMembers = loadTeamMembers();
+    const membersTree = teamMembers;
     const missionFiles: MissionFile[] = files.map(({ name, content }) => ({
       name,
       content,
     }));
 
-    const leads = teamMembers.filter((m) => m.parentId === ORCHESTRATOR_ID);
+    const leads = membersTree.filter((m) => m.parentId === ORCHESTRATOR_ID);
     if (leads.length === 0) {
       setError(
         "Aucun membre sous l’orchestrateur. Ajoute au moins un pilier dans l’onglet Équipe.",
@@ -201,7 +220,7 @@ export function MissionWorkspace({
     }
 
     const planned = countMissionModelCalls(
-      teamMembers,
+      membersTree,
       !!onConversationTitleSuggested,
     );
     setProgress([
@@ -210,15 +229,18 @@ export function MissionWorkspace({
       }), la liste ne grossit pas : c’est normal (plusieurs minutes possibles).`,
     ]);
 
+    const contextForPipeline =
+      buildMissionMentionPrefix(context, membersTree) + context;
+
     try {
       const md = await runMissionPipeline({
         llmProvider,
         mistralApiKey,
         model,
-        context,
+        context: contextForPipeline,
         files: missionFiles,
         souls,
-        teamMembers,
+        teamMembers: membersTree,
         signal: ac.signal,
         onProgress: (label) => {
           setProgress((p) => [...p, label]);
@@ -241,6 +263,7 @@ export function MissionWorkspace({
   }, [
     running,
     context,
+    teamMembers,
     files,
     llmProvider,
     mistralApiKey,
@@ -263,13 +286,14 @@ export function MissionWorkspace({
         <label className="mission-label" htmlFor="mission-context">
           Contexte
         </label>
-        <textarea
+        <MentionComboboxTextarea
           id="mission-context"
           className="chat-input mission-context"
           rows={10}
-          placeholder="Objectifs, contraintes, public visé, ce que tu attends du document…"
+          placeholder="Objectifs, @membre pour prioriser un angle, contraintes…"
           value={context}
-          onChange={(e) => setContext(e.target.value)}
+          onChange={setContext}
+          members={teamMembers}
           disabled={running}
         />
 
