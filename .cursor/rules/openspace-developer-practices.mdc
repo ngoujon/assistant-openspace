@@ -24,7 +24,7 @@ alwaysApply: true
 ## Style et UX
 
 - Interface et textes utilisateur en **français** sauf termes techniques usuels (Ollama, modèle, stream).
-- Respecter la grille existante (sidebar / centre / colonne droite) pour la cohérence visuelle.
+- Respecter la grille existante (sidebar / centre / HUD : Organisation · Échanges en cours · Activité) pour la cohérence visuelle.
 
 ## Documentation
 
