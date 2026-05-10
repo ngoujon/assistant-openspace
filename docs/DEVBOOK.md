@@ -28,6 +28,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | LLM : Mistral AI (défaut) + Ollama local ; clé API dans Paramètres ; proxies `/api/mistral` et doc |
 | 2026-05-10 | Mistral : choix du modèle uniquement dans Paramètres (`mistralChatModel`) ; barre du chat réservée au sélecteur Ollama |
 | 2026-05-10 | UI : typographie Plus Jakarta Sans, palette / rayons / ombres harmonisés, colonnes latérales vitrées, onglets et bulles de chat affinés |
+| 2026-05-10 | Mission : zone glisser-déposer + clic pour fichiers .txt / .md (remplace le bouton « Ajouter des fichiers ») |
 
 ## 2026-03-28 — Bootstrap UI + Chat Ollama
 

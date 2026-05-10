@@ -1046,21 +1046,95 @@ body {
   margin-bottom: 1rem;
 }
 
-.mission-files-row {
+.mission-files-block {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   margin-bottom: 0.65rem;
+}
+
+.mission-label--files {
+  margin-top: 0.25rem;
 }
 
 .mission-file-input {
   position: absolute;
-  width: 0.1px;
-  height: 0.1px;
-  opacity: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
-  z-index: -1;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.mission-drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 7.75rem;
+  padding: 1.1rem 1.25rem;
+  border: 2px dashed color-mix(in srgb, var(--text-tertiary) 35%, var(--border-strong));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-surface) 65%, transparent);
+  color: var(--text-secondary);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease,
+    color 0.15s ease;
+}
+
+.mission-drop-zone:hover:not(.mission-drop-zone--disabled) {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-strong));
+  background: color-mix(in srgb, var(--accent-muted) 50%, var(--bg-surface));
+}
+
+.mission-drop-zone--active:not(.mission-drop-zone--disabled) {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  box-shadow: 0 0 0 1px var(--accent-glow);
+}
+
+.mission-drop-zone--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.mission-drop-zone:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.mission-drop-zone-icon {
+  display: flex;
+  color: var(--text-tertiary);
+  transition: color 0.15s ease;
+}
+
+.mission-drop-zone:hover:not(.mission-drop-zone--disabled) .mission-drop-zone-icon,
+.mission-drop-zone--active:not(.mission-drop-zone--disabled) .mission-drop-zone-icon {
+  color: var(--accent);
+}
+
+.mission-drop-zone-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mission-drop-zone-hint {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  max-width: 22rem;
+}
+
+.mission-drop-zone:hover:not(.mission-drop-zone--disabled) .mission-drop-zone-hint {
+  color: var(--text-secondary);
 }
 
 .mission-file-chips {

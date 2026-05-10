@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react";
 import {
   countMissionModelCalls,
   runMissionPipeline,
@@ -45,6 +52,8 @@ export function MissionWorkspace({
   const [elapsedSec, setElapsedSec] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
+  const [fileDropActive, setFileDropActive] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -68,6 +77,15 @@ export function MissionWorkspace({
     onActivityReport?.({ running, progress, elapsedSec });
   }, [running, progress, elapsedSec, onActivityReport]);
 
+  useEffect(() => {
+    const onDragEnd = () => {
+      dragDepthRef.current = 0;
+      setFileDropActive(false);
+    };
+    window.addEventListener("dragend", onDragEnd);
+    return () => window.removeEventListener("dragend", onDragEnd);
+  }, []);
+
   const addFiles = useCallback(async (list: FileList | null) => {
     if (!list?.length) return;
     const next: { id: string; name: string; content: string }[] = [];
@@ -89,6 +107,55 @@ export function MissionWorkspace({
   const removeFile = useCallback((id: string) => {
     setFiles((f) => f.filter((x) => x.id !== id));
   }, []);
+
+  const onFileZoneDragEnter = useCallback((e: DragEvent) => {
+    if (running) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current += 1;
+    if (e.dataTransfer.types?.includes("Files")) {
+      e.dataTransfer.dropEffect = "copy";
+      setFileDropActive(true);
+    }
+  }, [running]);
+
+  const onFileZoneDragLeave = useCallback((e: DragEvent) => {
+    if (running) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setFileDropActive(false);
+  }, [running]);
+
+  const onFileZoneDragOver = useCallback(
+    (e: DragEvent) => {
+      if (running) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "copy";
+    },
+    [running],
+  );
+
+  const onFileZoneDrop = useCallback(
+    (e: DragEvent) => {
+      if (running) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dragDepthRef.current = 0;
+      setFileDropActive(false);
+      void addFiles(e.dataTransfer.files);
+    },
+    [running, addFiles],
+  );
+
+  const onFileZoneKeyDown = useCallback((e: KeyboardEvent<HTMLLabelElement>) => {
+    if (running) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileInputRef.current?.click();
+    }
+  }, [running]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -206,24 +273,53 @@ export function MissionWorkspace({
           disabled={running}
         />
 
-        <div className="mission-files-row">
+        <p className="mission-label mission-label--files" id="mission-files-label">
+          Fichiers de contexte
+        </p>
+        <div className="mission-files-block">
           <input
+            id="mission-files-input"
             ref={fileInputRef}
             type="file"
             accept=".txt,.md,.markdown,text/plain"
             multiple
             className="mission-file-input"
             disabled={running}
+            aria-labelledby="mission-files-label"
             onChange={(e) => void addFiles(e.target.files)}
           />
-          <button
-            type="button"
-            className="btn-secondary mission-file-btn"
-            disabled={running}
-            onClick={() => fileInputRef.current?.click()}
+          <label
+            className={
+              "mission-drop-zone" +
+              (fileDropActive ? " mission-drop-zone--active" : "") +
+              (running ? " mission-drop-zone--disabled" : "")
+            }
+            htmlFor="mission-files-input"
+            tabIndex={running ? -1 : 0}
+            onDragEnter={onFileZoneDragEnter}
+            onDragLeave={onFileZoneDragLeave}
+            onDragOver={onFileZoneDragOver}
+            onDrop={onFileZoneDrop}
+            onKeyDown={onFileZoneKeyDown}
           >
-            Ajouter des fichiers (.txt, .md)
-          </button>
+            <span className="mission-drop-zone-icon" aria-hidden="true">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 5v10M8 9l4-4 4 4M5 19h14"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <span className="mission-drop-zone-title">
+              Glisse-dépose des fichiers ici
+            </span>
+            <span className="mission-drop-zone-hint">
+              Fichiers texte : .txt, .md — ou clique pour parcourir
+            </span>
+          </label>
         </div>
 
         {files.length > 0 && (
