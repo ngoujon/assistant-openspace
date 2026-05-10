@@ -33,6 +33,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Équipe : « Nouveau membre » à droite du titre « Organisation » |
 | 2026-05-10 | Équipe : colonne Organisation pleine hauteur à gauche de l’activité (`shell-org`, `TeamWorkspaceProvider`) |
 | 2026-05-10 | Archives équipe : confirmation Restaurer / Supprimer via modale `ConfirmDialog` (plus de `window.confirm`) |
+| 2026-05-10 | Archives équipe : accès par icône coffre → modale (nom, liste, actions) ; modale âme au-dessus (`modal-overlay--soul`) |
 
 ## 2026-03-28 — Bootstrap UI + Chat Ollama
 

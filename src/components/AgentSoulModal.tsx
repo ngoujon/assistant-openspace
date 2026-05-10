@@ -137,7 +137,7 @@ export function AgentSoulModal({
 
   return (
     <div
-      className="modal-overlay"
+      className="modal-overlay modal-overlay--soul"
       role="presentation"
       onMouseDown={handleOverlayMouseDown}
     >

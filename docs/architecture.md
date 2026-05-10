@@ -31,7 +31,8 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 | `components/MissionWorkspace.tsx` | Contexte, fichiers, pipeline, aperçu MD, téléchargement |
 | `components/TeamWorkspaceContext.tsx` | État partagé équipe (membres, âmes, DnD) |
 | `components/TeamOrganisationAside.tsx` | Colonne Organisation (arbre pleine hauteur à gauche de l’activité) |
-| `components/TeamCentrePanel.tsx` | Zone centrale Équipe : archives + modale âme/rôle |
+| `components/TeamCentrePanel.tsx` | Zone centrale Équipe : icône archives → modale + modale âme/rôle |
+| `components/TeamArchiveModal.tsx` | Modale listant les compositions archivées (s’appuie sur `TeamArchiveSection`) |
 | `lib/teamTreeStorage.ts` | Membres, reparentage, profondeur max 3 (`openspace-team-tree-v1`) |
 | `lib/teamTreeDisplay.ts` | Conversion liste → arbre d’affichage (`DisplayNode`) |
 | `lib/generateMemberSeed.ts` | Appel LLM (Mistral ou Ollama) pour proposer un texte « âme et rôle » |

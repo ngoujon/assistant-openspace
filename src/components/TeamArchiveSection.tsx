@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   appendTeamArchive,
@@ -13,6 +13,8 @@ interface TeamArchiveSectionProps {
   members: TreeMember[];
   souls: Record<string, string>;
   onRestore: (members: TreeMember[], souls: Record<string, string>) => void;
+  /** Affichage dans la modale archives (sans carte ni titre « Archives » dupliqué). */
+  variant?: "default" | "modal";
 }
 
 const dateFmt = new Intl.DateTimeFormat("fr-FR", {
@@ -24,7 +26,9 @@ export function TeamArchiveSection({
   members,
   souls,
   onRestore,
+  variant = "default",
 }: TeamArchiveSectionProps) {
+  const nameFieldId = useId();
   const [archives, setArchives] = useState<TeamArchiveEntry[]>(loadTeamArchives);
   const [draftName, setDraftName] = useState("");
   const [confirm, setConfirm] = useState<
@@ -62,16 +66,23 @@ export function TeamArchiveSection({
     [refresh],
   );
 
+  const wrapClass =
+    variant === "modal"
+      ? "team-archive-wrap team-archive-wrap--modal"
+      : "team-archive-wrap";
+
   return (
-    <div className="team-archive-wrap">
-      <h3 className="team-tree-title">Archives</h3>
+    <div className={wrapClass}>
+      {variant === "default" ? (
+        <h3 className="team-tree-title">Archives</h3>
+      ) : null}
       <div className="team-archive-form">
-        <label className="team-archive-label" htmlFor="team-archive-name">
+        <label className="team-archive-label" htmlFor={nameFieldId}>
           Nom de la composition
         </label>
         <div className="team-archive-form-row">
           <input
-            id="team-archive-name"
+            id={nameFieldId}
             type="text"
             className="team-archive-input"
             placeholder="Ex. Équipe minimale, POC juridique…"
