@@ -8,13 +8,18 @@ const MAX_MISSION_BRIEF_IN_CTX = 8000;
 const MAX_ARTIFACT_EXCERPT_ROUTING = 5000;
 const MAX_ARTIFACT_EXCERPT_STREAM = 14_000;
 
+/** Cible de brièveté pour une réponse assistant **dans le fil** (le détail va dans le .md après fusion). */
+export const DISCUSSION_FIL_LINES_FR = "3 à 7 lignes maximum";
+export const DISCUSSION_FIL_LINES_JSON = "3–7 lignes max";
+
 /** Consignes : après une 1ʳᵉ version du rapport, le chat pilote le .md — pas un chatbot générique. */
 const DISCUSSION_REPLY_STYLE_RULES = `## Règles pour ce canal discussion (livrable déjà existant)
 
 - **Ce n’est pas** un assistant conversationnel : **pas** de ton générique, **pas** de long préambule, **pas** de reprise du rapport dans le chat, **pas** de « cours » ni d’explication large hors sujet.
-- **Plafond strict pour ta réponse dans le fil** : **5 à 10 lignes au maximum** (équivalent : jusqu’à **10 puces courtes**). Si tu as besoin de détail, il va dans le **Markdown** (fusion), pas dans le chat.
-- **Contenu attendu** : uniquement un **résumé** de **ce que tu as modifié / ce que tu demandes de modifier** dans le document (sections ou points touchés, en une formulation sèche). **Pas** de paraphrase du livrable, **pas** de rappel du contexte mission.
-- **Questions** : seulement si nécessaire, **en fin de message**, **quelques questions courtes** ; l’utilisateur y répondra au tour suivant.
+- **Style télégraphique** : phrases courtes, **pas** d’introduction ni de conclusion de politesse ; enchaîne faits → actions.
+- **Plafond strict pour ta réponse dans le fil** : **${DISCUSSION_FIL_LINES_FR}** (équivalent : jusqu’à **6 puces** très courtes). Au-delà, le détail va dans le **Markdown** (fusion), pas dans le chat.
+- **Contenu attendu** : uniquement un **résumé** de **ce que tu as modifié / ce que tu demandes de modifier** dans le document (sections ou points touchés, formulation sèche). **Pas** de paraphrase du livrable, **pas** de rappel du contexte mission.
+- **Questions** : seulement si nécessaire, **en fin de message**, **1 à 3 questions courtes** maximum ; l’utilisateur y répondra au tour suivant.
 - **Le détail des modifications** est dans le **fichier .md** (mis à jour après fusion) ; l’utilisateur lit le résultat surtout via **téléchargement** (Activité).
 - Au plus **une** référence de section (\`## …\`) si indispensable — pas de longues citations.`;
 
@@ -133,7 +138,7 @@ function parseRouting(raw: string): DiscussionRouting {
     brief:
       typeof obj.brief === "string" && obj.brief.trim()
         ? obj.brief.trim()
-        : "Réponse dans le fil : 5–10 lignes max — résumé des retouches appliquées ou demandées ; questions courtes en fin si besoin. Pas de long texte.",
+        : `Réponse dans le fil : ${DISCUSSION_FIL_LINES_JSON} — résumé des retouches appliquées ou demandées ; 1–3 questions courtes en fin si besoin. Pas de long texte.`,
     userNote:
       typeof obj.userNote === "string" && obj.userNote.trim()
         ? obj.userNote.trim()
@@ -152,14 +157,14 @@ export function buildDirectMentionBrief(
 ): string {
   const m = members.find((x) => x.id === responderId);
   if (responderId === ORCHESTRATOR_ID || !m) {
-    return `L’utilisateur t’a ciblé avec une **@mention** (orchestrateur). **Priorité** : piloter les **retouches du livrable Markdown**. Dans le **fil** uniquement : **5–10 lignes max** — résumé **des modifications** (ce qui change dans le .md), puis **questions courtes** en fin si besoin. Pas de long texte, pas de reprise du rapport dans le chat.`;
+    return `L’utilisateur t’a ciblé avec une **@mention** (orchestrateur). **Priorité** : piloter les **retouches du livrable Markdown**. Dans le **fil** uniquement : **${DISCUSSION_FIL_LINES_JSON}** — résumé **des modifications** (ce qui change dans le .md), puis **1–3 questions courtes** en fin si besoin. Pas de long texte, pas de reprise du rapport dans le chat.`;
   }
   const subs = members.filter((c) => c.parentId === responderId);
   if (subs.length > 0) {
     const names = subs.map((s) => s.label).join(", ");
-    return `L’utilisateur t’a **mentionné·e** (@). Tu es **${m.label}** (directeur·rice de pôle). **Objectif** : consignes pour la **retouche du .md** (mis à jour après ton message). Dans le **fil** : **5–10 lignes max** — ce qui est modifié ou demandé (sections, données, ton) ; **questions courtes** en fin si utile ; une phrase max sur comment **${names}** peut affiner — **sans** dialogue long ni noyer le chat.`;
+    return `L’utilisateur t’a **mentionné·e** (@). Tu es **${m.label}** (directeur·rice de pôle). **Objectif** : consignes pour la **retouche du .md** (mis à jour après ton message). Dans le **fil** : **${DISCUSSION_FIL_LINES_JSON}** — ce qui est modifié ou demandé (sections, données, ton) ; **1–3 questions courtes** en fin si utile ; une phrase max sur comment **${names}** peut affiner — **sans** dialogue long ni noyer le chat.`;
   }
-  return `L’utilisateur t’a **mentionné·e** (@). Tu es **${m.label}**. **Oriente la retouche du rapport** : dans le **fil**, **5–10 lignes max** — résumé des modifications + **questions courtes** en fin si besoin ; **sans** refaire le document dans le chat.`;
+  return `L’utilisateur t’a **mentionné·e** (@). Tu es **${m.label}**. **Oriente la retouche du rapport** : dans le **fil**, **${DISCUSSION_FIL_LINES_JSON}** — résumé des modifications + **1–3 questions courtes** en fin si besoin ; **sans** refaire le document dans le chat.`;
 }
 
 export async function routeDiscussionMessage(opts: {
@@ -219,7 +224,7 @@ export async function routeDiscussionMessage(opts: {
     ? `## Mentions multiples (dernier message utilisateur)\n\n${multiMentionRoutingHint}\n\n---\n\n`
     : "";
 
-  const userBlock = `${docCtx}${multiSection}## Membres de l’équipe (utilise les ids exacts ci-dessous)\n${roster}\n\n---\n## Fil de discussion\n${hist}\n\n---\nTâche : tu es **l’orchestrateur**. **Priorité absolue** : la discussion sert à **faire évoluer le rapport Markdown** — **pas** une conversation générique ni un long compte rendu dans le chat.\n\nL’utilisateur s’adresse à l’équipe : **toi**, tu choisis **un seul** \`responderId\` pour la réponse **dans le fil** ce tour. Cette réponse doit tenir en **5 à 10 lignes maximum** : **résumé des modifications** (ce qui change dans le .md), puis **questions courtes** en fin si nécessaire. Le **détail** est dans le **fichier** après **fusion**. Un **livrable** et le **brief initial** peuvent figurer plus haut : sers-t’en pour le routage.\n\n- Le champ JSON \`brief\` doit **répéter explicitement** cette contrainte : **5–10 lignes max**, résumé des retouches, questions en fin — **interdit** de demander un « rapport détaillé » ou un texte long dans le fil.\n- Si une section **Mentions multiples** figure plus haut : un **seul** membre parle dans le chat, mais son \`brief\` intègre les angles de **toutes** les personnes nommées.\n- Si un **membre** répond : \`brief\` = consigne stricte **brièveté** + résumé modifications + questions optionnelles.\n- Si **toi** l’orchestrateur réponds : \`responderId\` = \`${ORCHESTRATOR_ID}\`.\n\nRéponds par **un seul objet JSON** valide, sans markdown ni texte autour :\n{\n  "responderId": "…",\n  "brief": "…",\n  "userNote": "…"\n}\n\n\`userNote\` : une phrase **optionnelle** pour l’utilisateur (ex. qui répond ce tour).`;
+  const userBlock = `${docCtx}${multiSection}## Membres de l’équipe (utilise les ids exacts ci-dessous)\n${roster}\n\n---\n## Fil de discussion\n${hist}\n\n---\nTâche : tu es **l’orchestrateur**. **Priorité absolue** : la discussion sert à **faire évoluer le rapport Markdown** — **pas** une conversation générique ni un long compte rendu dans le chat.\n\nL’utilisateur s’adresse à l’équipe : **toi**, tu choisis **un seul** \`responderId\` pour la réponse **dans le fil** ce tour. Cette réponse doit tenir en **${DISCUSSION_FIL_LINES_FR}** : **résumé des modifications** (ce qui change dans le .md), puis **1 à 3 questions courtes** en fin si nécessaire. Le **détail** est dans le **fichier** après **fusion**. Un **livrable** et le **brief initial** peuvent figurer plus haut : sers-t’en pour le routage.\n\n- Le champ JSON \`brief\` doit **répéter explicitement** cette contrainte : **${DISCUSSION_FIL_LINES_JSON}**, style télégraphique, résumé des retouches, questions en fin — **interdit** de demander un « rapport détaillé » ou un texte long dans le fil.\n- Si une section **Mentions multiples** figure plus haut : un **seul** membre parle dans le chat, mais son \`brief\` intègre les angles de **toutes** les personnes nommées.\n- Si un **membre** répond : \`brief\` = consigne stricte **brièveté** + résumé modifications + questions optionnelles.\n- Si **toi** l’orchestrateur réponds : \`responderId\` = \`${ORCHESTRATOR_ID}\`.\n\nRéponds par **un seul objet JSON** valide, sans markdown ni texte autour :\n{\n  "responderId": "…",\n  "brief": "…",\n  "userNote": "…"\n}\n\n\`userNote\` : une phrase **optionnelle** pour l’utilisateur (ex. qui répond ce tour).`;
 
   const raw = await completeLlmChat(
     llmProvider,
@@ -240,7 +245,7 @@ export async function routeDiscussionMessage(opts: {
     routing = {
       responderId: ORCHESTRATOR_ID,
       brief:
-        "5–10 lignes max dans le fil : résumé des modifications dans le .md ; questions courtes en fin si besoin. Pas de long développement.",
+        `${DISCUSSION_FIL_LINES_JSON} dans le fil : résumé des modifications dans le .md ; 1–3 questions courtes en fin si besoin. Pas de long développement.`,
       userNote:
         "L’orchestrateur reprend la main (routage indisponible, réponse par défaut).",
     };
@@ -281,7 +286,7 @@ export function buildDiscussionStreamMessages(opts: {
     docBlock
       ? `## Contexte documentaire (pour t’orienter — ne pas recopier dans le chat)\n\n${docBlock}`
       : "",
-    `— Canal **équipe** : l’orchestrateur t’a désigné·e pour ce tour. **Consigne :** ${brief}\n\n**Rappel impératif** : ta réponse visible dans le fil = **5 à 10 lignes maximum** ; uniquement **résumé des changements** dans le document ; **questions courtes** en fin si utile. Tout le reste va dans le **.md** (fusion), pas dans le chat.`,
+    `— Canal **équipe** : l’orchestrateur t’a désigné·e pour ce tour. **Consigne :** ${brief}\n\n**Rappel impératif** : ta réponse visible dans le fil = **${DISCUSSION_FIL_LINES_FR}** ; uniquement **résumé des changements** dans le document ; **1 à 3 questions courtes** en fin si utile. Tout le reste va dans le **.md** (fusion), pas dans le chat.`,
   ].filter((p) => p.trim().length > 0);
   const systemContent = systemParts.join("\n\n");
   const rest: OllamaChatMessage[] = historyWithLatestUser.map((m) => ({

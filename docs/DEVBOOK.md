@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Discussion : réponses fil plus concises (3–7 lignes)
+
+### Objectif
+
+Resserrer les consignes routage / stream : plafond **3–7 lignes** dans le fil (au lieu de 5–10), style **télégraphique**, **1–3 questions** max en fin ; constantes exportées `DISCUSSION_FIL_LINES_*` pour aligner prompts et mentions multiples.
+
+### Fichiers
+
+- `src/lib/discussionTeamChat.ts`, `src/components/ChatPanel.tsx`, `docs/DEVBOOK.md`
+
+---
+
 ## 2026-05-10 — Compositeur @ : miroir mesuré sur le littéral + curseur hors mention
 
 ### Objectif
@@ -140,7 +152,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Activité : étape **analyse directe** (sans sous-agent) — pastille **membre** uniquement (plus de libellé « Pôle ») ; parse tolérant `—` / `–` / ` - ` |
 | 2026-05-10 | Compositeur @ : miroir **sans crochets** — pastille sur **copie invisible du littéral** `@[…]` (plus d’approximation `ch`) + curseur repoussé hors mention + flèches ← → en bloc |
 | 2026-05-10 | Discussion : rendu **Markdown** (GFM) dans les bulles — titres, listes, code, tableaux ; mentions `@[…]` conservées ; liens http(s) / relatifs sûrs |
-| 2026-05-10 | Discussion : prompts renforcés — réponse fil **5–10 lignes max**, résumé des **modifications** uniquement, questions courtes en fin ; routage JSON et fallbacks alignés |
+| 2026-05-10 | Discussion : réponses fil **3–7 lignes max**, style télégraphique, **1–3 questions** en fin ; routage / stream / mentions multiples alignés |
 | 2026-05-10 | Activité : étapes « neutres » (gris) → pastille **SYSTEME** à la place du point ou d’une pastille vide |
 | 2026-05-10 | Compositeur @ : miroir aligné sur le littéral `@[…]` + sync scroll ; Activité discussion : une seule timeline (mission + session) |
 | 2026-05-10 | LLM : Mistral AI (défaut) + Ollama local ; clé API dans Paramètres ; proxies `/api/mistral` et doc |

@@ -9,6 +9,7 @@ import {
 import { MissionWorkspace } from "@/components/MissionWorkspace";
 import {
   applyDiscussionToArtifact,
+  DISCUSSION_FIL_LINES_JSON,
   routeDiscussionMessage,
   streamDiscussionReply,
 } from "@/lib/discussionTeamChat";
@@ -407,7 +408,8 @@ export function ChatPanel({
               .join(", ");
             multiMentionRoutingHint =
               `L’utilisateur a mentionné **plusieurs** membres dans ce message : **${labels}**. ` +
-              `Désigne **un seul** \`responderId\` pour la réponse **dans le fil** ; dans \`brief\`, fais **combiner** leurs angles pour **guider la retouche du livrable** (pas une conversation séparée par personne). La fusion du .md lira tout le fil.`;
+              `Désigne **un seul** \`responderId\` pour la réponse **dans le fil** ; dans \`brief\`, fais **combiner** leurs angles pour **guider la retouche du livrable** (pas une conversation séparée par personne). La fusion du .md lira tout le fil. ` +
+              `Réponse **dans le fil** : **${DISCUSSION_FIL_LINES_JSON}**, style télégraphique ; le détail reste pour le .md.`;
           }
 
           const routing = await routeDiscussionMessage({
