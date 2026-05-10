@@ -141,11 +141,15 @@ export default function App() {
     };
   }, [active.artifactMarkdown, active.title]);
 
-  const setActiveMessages = useCallback(
-    (updater: (prev: Conversation["messages"]) => Conversation["messages"]) => {
+  /** Toujours passer `conversationId` (tour async) — ne pas se fier à `active` au moment du flush. */
+  const setConversationMessages = useCallback(
+    (
+      conversationId: string,
+      updater: (prev: Conversation["messages"]) => Conversation["messages"],
+    ) => {
       setConversations((prev) =>
         prev.map((c) => {
-          if (c.id !== active?.id) return c;
+          if (c.id !== conversationId) return c;
           const messages = updater(c.messages);
           const hasAssistant = messages.some((m) => m.role === "assistant");
           const firstUser = messages.find((m) => m.role === "user");
@@ -165,7 +169,7 @@ export default function App() {
         }),
       );
     },
-    [active?.id],
+    [],
   );
 
   const setConversationTitleById = useCallback(
@@ -296,7 +300,7 @@ export default function App() {
         mistralApiKey={mistralApiKey}
         llmError={llmError}
         onRetryLlm={refreshLlmModels}
-        setMessages={setActiveMessages}
+        setMessages={setConversationMessages}
         onConversationTitle={setConversationTitleById}
         onConversationArtifact={setConversationArtifactMarkdown}
         onMissionActivitySnapshot={persistMissionActivitySnapshot}

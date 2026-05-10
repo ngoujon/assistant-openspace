@@ -823,13 +823,14 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  animation: chat-phase-surface-in 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Pas de opacity:0 initial (évite un fil de discussion « vide » si l’anim est interrompue). */
+  animation: chat-phase-surface-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes chat-phase-surface-in {
   from {
-    opacity: 0;
-    transform: translateY(12px);
+    opacity: 0.92;
+    transform: translateY(10px);
   }
 
   to {

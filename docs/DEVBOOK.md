@@ -75,6 +75,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Discussion : suppression du paragraphe d’aide sous le livrable (`discussion-routing-hint`) |
 | 2026-05-10 | Discussion : suppression du message vide (`chat-empty`) au-dessus du fil |
 | 2026-05-10 | Activité (discussion) : texte au-dessus du bouton téléchargement livrable retiré |
+| 2026-05-10 | Discussion : `setConversationMessages(id, …)` pour que les mises à jour async ciblent toujours la bonne conversation (évite un fil vide au retour) ; animation `.chat-phase-surface` sans état initial `opacity: 0` |
 
 ## 2026-03-28 — Bootstrap UI + Chat Ollama
 

@@ -59,7 +59,9 @@ interface ChatPanelProps {
   mistralApiKey: string;
   llmError: string | null;
   onRetryLlm: () => void;
+  /** Premier argument = conversation ciblée (obligatoire pour les tours async). */
   setMessages: (
+    conversationId: string,
     fn: (prev: ChatMessage[]) => ChatMessage[],
   ) => void;
   /** Titre court proposé par l’orchestrateur après une réponse (mode Discussion). */
@@ -254,6 +256,8 @@ export function ChatPanel({
   /** Fusion discussion → livrable (sans message factice dans le fil). */
   const artifactMergeFromDiscussion = useCallback(
     async (opts: {
+      conversationId: string;
+      missionUserBrief?: string | null;
       discussionMessages: ChatMessage[];
       artifactMarkdown: string;
       cutoffAfterAssistantId: string;
@@ -267,22 +271,15 @@ export function ChatPanel({
         souls,
         discussionMessages: opts.discussionMessages,
         artifactMarkdown: opts.artifactMarkdown,
-        missionUserBrief: conversation.missionUserBrief,
+        missionUserBrief: opts.missionUserBrief ?? undefined,
         signal: opts.signal,
       });
       const finalMd = unwrapMarkdownFence(raw);
-      onConversationArtifact(conversation.id, finalMd, {
+      onConversationArtifact(opts.conversationId, finalMd, {
         discussionCutoffAfterId: opts.cutoffAfterAssistantId,
       });
     },
-    [
-      conversation.id,
-      conversation.missionUserBrief,
-      llmProvider,
-      mistralApiKey,
-      model,
-      onConversationArtifact,
-    ],
+    [llmProvider, mistralApiKey, model, onConversationArtifact],
   );
 
   const runDiscussionSendOrPatch = useCallback(
@@ -299,14 +296,20 @@ export function ChatPanel({
           return;
         }
 
+        const convId = conversation.id;
+        const turnMessages = conversation.messages;
+        const turnMissionBrief = conversation.missionUserBrief;
+        const turnArtifactMd = conversation.artifactMarkdown;
+        const turnCutoffAfterId = conversation.artifactDiscussionCutoffAfterId;
+
         const userMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: "user",
           content: text,
         };
-        const historyWithUser = [...conversation.messages, userMsg];
+        const historyWithUser = [...turnMessages, userMsg];
         setError(null);
-        setMessages(() => historyWithUser);
+        setMessages(convId, () => historyWithUser);
 
         const ac = new AbortController();
         abortRef.current = ac;
@@ -328,8 +331,8 @@ export function ChatPanel({
             historyWithLatestUser: historyWithUser,
             signal: ac.signal,
             forcedResponderId,
-            missionUserBrief: conversation.missionUserBrief,
-            artifactMarkdown: conversation.artifactMarkdown,
+            missionUserBrief: turnMissionBrief,
+            artifactMarkdown: turnArtifactMd,
           });
 
           if (llmProvider === "mistral") {
@@ -349,7 +352,7 @@ export function ChatPanel({
             routingNote: routing.userNote,
           };
 
-          setMessages(() => [...historyWithUser, assistantShell]);
+          setMessages(convId, () => [...historyWithUser, assistantShell]);
           setIsRouting(false);
           setStreaming(true);
 
@@ -362,11 +365,11 @@ export function ChatPanel({
             responderId: routing.responderId,
             brief: routing.brief,
             historyWithLatestUser: historyWithUser,
-            missionUserBrief: conversation.missionUserBrief,
-            artifactMarkdown: conversation.artifactMarkdown,
+            missionUserBrief: turnMissionBrief,
+            artifactMarkdown: turnArtifactMd,
             onToken: (chunk) => {
               assistantAccum += chunk;
-              setMessages((prev) =>
+              setMessages(convId, (prev) =>
                 prev.map((m) =>
                   m.id === assistantId
                     ? { ...m, content: m.content + chunk }
@@ -389,7 +392,6 @@ export function ChatPanel({
           ];
           const recentTranscript =
             formatHistoryForRouting(transcriptMessages, 6000);
-          const convId = conversation.id;
           void generateDiscussionConversationTitle({
             llmProvider,
             mistralApiKey,
@@ -404,15 +406,17 @@ export function ChatPanel({
               /* titre optionnel : on garde l’extrait utilisateur si échec */
             });
 
-          const art = conversation.artifactMarkdown?.trim();
+          const art = turnArtifactMd?.trim();
           if (art && assistantId) {
             const discussionForPatch = messagesAfterArtifactCutoff(
               transcriptMessages,
-              conversation.artifactDiscussionCutoffAfterId,
+              turnCutoffAfterId,
             );
             setIsRouting(true);
             try {
               await artifactMergeFromDiscussion({
+                conversationId: convId,
+                missionUserBrief: turnMissionBrief,
                 discussionMessages: discussionForPatch,
                 artifactMarkdown: art,
                 cutoffAfterAssistantId: assistantId,
@@ -437,7 +441,7 @@ export function ChatPanel({
             return;
           }
           setError((e as Error).message || "Erreur réseau");
-          setMessages((prev) =>
+          setMessages(convId, (prev) =>
             prev.filter(
               (m) => m.id !== userMsg.id && m.id !== assistantId,
             ),
