@@ -48,7 +48,7 @@ export function Sidebar({
             </svg>
           </button>
         </div>
-        <p className="sidebar-sub">Local · Ollama</p>
+        <p className="sidebar-sub">Chat · Mission · Équipe</p>
         <button type="button" className="btn-primary sidebar-new" onClick={onNew}>
           Nouveau projet
         </button>
