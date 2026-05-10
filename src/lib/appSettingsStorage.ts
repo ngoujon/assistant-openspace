@@ -63,6 +63,8 @@ export interface AppSettings {
   llmProvider: LlmProvider;
   /** Stockée dans ce navigateur uniquement (localStorage). */
   mistralApiKey: string;
+  /** Modèle Mistral pour le chat / mission / équipe (choisi dans Paramètres uniquement). */
+  mistralChatModel: string;
 }
 
 function defaults(): AppSettings {
@@ -71,6 +73,7 @@ function defaults(): AppSettings {
     seedUserTemplate: DEFAULT_SEED_USER_TEMPLATE,
     llmProvider: DEFAULT_LLM_PROVIDER,
     mistralApiKey: "",
+    mistralChatModel: "",
   };
 }
 
@@ -96,11 +99,16 @@ export function loadAppSettings(): AppSettings {
         : base.llmProvider;
     const key =
       typeof o.mistralApiKey === "string" ? o.mistralApiKey : base.mistralApiKey;
+    const mistralModel =
+      typeof o.mistralChatModel === "string"
+        ? o.mistralChatModel
+        : base.mistralChatModel;
     return {
       seedSystemPrompt: sys,
       seedUserTemplate: usr,
       llmProvider: prov,
       mistralApiKey: key,
+      mistralChatModel: mistralModel,
     };
   } catch {
     return base;
@@ -115,6 +123,7 @@ export function saveAppSettings(s: AppSettings): void {
       seedUserTemplate: s.seedUserTemplate.trim(),
       llmProvider: s.llmProvider,
       mistralApiKey: s.mistralApiKey,
+      mistralChatModel: s.mistralChatModel,
     }),
   );
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadAppSettings } from "@/lib/appSettingsStorage";
+import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { fetchMistralModels } from "@/lib/mistral";
 import { ActivitySidebar } from "@/components/ActivitySidebar";
@@ -13,21 +14,6 @@ import { fetchOllamaModels } from "@/lib/ollama";
 import { loadConversations, saveConversations } from "@/lib/storage";
 import type { RightActivityState } from "@/types/activity";
 import type { Conversation, MainTab } from "@/types";
-
-function pickDefaultModel(models: string[], provider: LlmProvider): string {
-  if (!models.length) return "";
-  if (provider === "mistral") {
-    const preferred = [
-      "mistral-small-latest",
-      "open-mistral-nemo",
-      "mistral-large-latest",
-    ];
-    for (const id of preferred) {
-      if (models.includes(id)) return id;
-    }
-  }
-  return models[0] ?? "";
-}
 
 function newConversation(): Conversation {
   const id = crypto.randomUUID();
@@ -88,9 +74,14 @@ export default function App() {
     run()
       .then((m) => {
         setModels(m);
-        setModel((prev) =>
-          prev && m.includes(prev) ? prev : pickDefaultModel(m, s.llmProvider),
-        );
+        setModel((prev) => {
+          if (s.llmProvider === "mistral") {
+            const saved = s.mistralChatModel?.trim() ?? "";
+            if (saved && m.includes(saved)) return saved;
+          }
+          if (prev && m.includes(prev)) return prev;
+          return pickDefaultChatModel(m, s.llmProvider);
+        });
         setLlmError(null);
       })
       .catch((e: Error) => setLlmError(e.message));

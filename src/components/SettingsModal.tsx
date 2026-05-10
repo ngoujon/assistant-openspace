@@ -5,7 +5,9 @@ import {
   loadAppSettings,
   saveAppSettings,
 } from "@/lib/appSettingsStorage";
+import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
+import { fetchMistralModels } from "@/lib/mistral";
 
 interface SettingsModalProps {
   open: boolean;
@@ -17,10 +19,17 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
   const titleId = useId();
   const mistralKeyId = useId();
+  const mistralModelSelectId = useId();
   const [seedSystem, setSeedSystem] = useState(DEFAULT_SEED_SYSTEM_PROMPT);
   const [seedUser, setSeedUser] = useState(DEFAULT_SEED_USER_TEMPLATE);
   const [llmProvider, setLlmProvider] = useState<LlmProvider>("mistral");
   const [mistralApiKey, setMistralApiKey] = useState("");
+  const [mistralModelsList, setMistralModelsList] = useState<string[]>([]);
+  const [mistralModelChoice, setMistralModelChoice] = useState("");
+  const [mistralModelsLoading, setMistralModelsLoading] = useState(false);
+  const [mistralModelsError, setMistralModelsError] = useState<string | null>(
+    null,
+  );
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,8 +39,48 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
     setSeedUser(s.seedUserTemplate);
     setLlmProvider(s.llmProvider);
     setMistralApiKey(s.mistralApiKey);
+    setMistralModelChoice(s.mistralChatModel?.trim() ?? "");
+    setMistralModelsList([]);
+    setMistralModelsError(null);
     setSaveError(null);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (llmProvider !== "mistral" || !mistralApiKey.trim()) {
+      setMistralModelsLoading(false);
+      setMistralModelsList([]);
+      setMistralModelsError(null);
+      return;
+    }
+    let cancelled = false;
+    setMistralModelsLoading(true);
+    setMistralModelsError(null);
+    fetchMistralModels(mistralApiKey.trim())
+      .then((list) => {
+        if (cancelled) return;
+        setMistralModelsList(list);
+        setMistralModelChoice((cur) => {
+          const t = cur.trim();
+          if (t && list.includes(t)) return t;
+          const s = loadAppSettings();
+          const saved = s.mistralChatModel?.trim() ?? "";
+          if (saved && list.includes(saved)) return saved;
+          return pickDefaultChatModel(list, "mistral");
+        });
+      })
+      .catch((e: Error) => {
+        if (cancelled) return;
+        setMistralModelsList([]);
+        setMistralModelsError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setMistralModelsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, llmProvider, mistralApiKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -74,11 +123,25 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
       );
       return;
     }
+    if (
+      llmProvider === "mistral" &&
+      mistralApiKey.trim() &&
+      mistralModelsList.length > 0 &&
+      !mistralModelChoice.trim()
+    ) {
+      setSaveError("Choisis un modèle Mistral dans la liste.");
+      return;
+    }
+    const prev = loadAppSettings();
     saveAppSettings({
       seedSystemPrompt: sys,
       seedUserTemplate: usr,
       llmProvider,
       mistralApiKey: mistralApiKey.trim(),
+      mistralChatModel:
+        llmProvider === "mistral"
+          ? mistralModelChoice.trim()
+          : prev.mistralChatModel,
     });
     setSaveError(null);
     onSaved?.();
@@ -185,6 +248,45 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
                   (localStorage), pas sur un serveur OpenSpace. Pour la rotation ou la
                   révocation, utilise la console Mistral.
                 </p>
+                <label
+                  className="modal-field-label modal-settings-label-block"
+                  htmlFor={mistralModelSelectId}
+                >
+                  Modèle (Mistral AI)
+                </label>
+                <p className="modal-settings-hint">
+                  Utilisé pour le chat, les missions et l’onglet Équipe. Tu ne peux pas le
+                  changer depuis la barre du chat.
+                </p>
+                {mistralModelsLoading && (
+                  <p className="modal-settings-hint" aria-live="polite">
+                    Chargement des modèles…
+                  </p>
+                )}
+                {mistralModelsError && (
+                  <p className="modal-gen-error" role="alert">
+                    {mistralModelsError}
+                  </p>
+                )}
+                {!mistralModelsLoading && mistralApiKey.trim() && (
+                  <select
+                    id={mistralModelSelectId}
+                    className="modal-settings-input"
+                    value={mistralModelChoice}
+                    onChange={(e) => setMistralModelChoice(e.target.value)}
+                    disabled={mistralModelsList.length === 0}
+                  >
+                    {mistralModelsList.length === 0 ? (
+                      <option value="">—</option>
+                    ) : (
+                      mistralModelsList.map((id) => (
+                        <option key={id} value={id}>
+                          {id}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                )}
               </>
             )}
           </section>

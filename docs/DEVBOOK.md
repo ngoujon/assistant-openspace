@@ -13,7 +13,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 ### Décisions
 
 - **Routeur** : `src/lib/llmChat.ts` (`completeLlmChat` / `streamLlmChat`) selon `LlmProvider` ; client Mistral dans `src/lib/mistral.ts` (OpenAI-compatible `/v1/chat/completions` + SSE stream).
-- **Réglages** : `AppSettings` étendu (`llmProvider`, `mistralApiKey`) dans `src/lib/appSettingsStorage.ts` ; UI dans `SettingsModal`.
+- **Réglages** : `AppSettings` étendu (`llmProvider`, `mistralApiKey`, `mistralChatModel`) dans `src/lib/appSettingsStorage.ts` ; UI dans `SettingsModal`.
 - **Clé** : stockée **uniquement côté navigateur** ; le proxy relaie l’en-tête `Authorization` vers `https://api.mistral.ai`.
 
 ### Fichiers clés
@@ -26,6 +26,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | Date | Changement |
 |------|------------|
 | 2026-05-10 | LLM : Mistral AI (défaut) + Ollama local ; clé API dans Paramètres ; proxies `/api/mistral` et doc |
+| 2026-05-10 | Mistral : choix du modèle uniquement dans Paramètres (`mistralChatModel`) ; barre du chat réservée au sélecteur Ollama |
 
 ## 2026-03-28 — Bootstrap UI + Chat Ollama
 
