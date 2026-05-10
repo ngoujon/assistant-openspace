@@ -203,7 +203,7 @@ Tu produis un **rapport long** (souvent **plusieurs milliers de mots** si la mat
 
 - Sous chaque grand titre, du **texte rédigé** : paragraphes complets, listes dont **chaque puce** est une phrase ou un segment informatif (pas « - [point à traiter] »).
 - **Analyses par domaine** : pour chaque pôle, section **longue** ; pour chaque spécialiste listé ci-dessus, un sous-titre \`####\` avec **le nom réel** du membre (comme dans le bloc 1), suivi de **plusieurs paragraphes** repris ou étroitement dérivés de son texte.
-- **Annexes** : pour chaque contributeur, une fiche **substantielle** (beaucoup de lignes utiles), en reprenant positions et détails du bloc 1.
+- **Interdit** : section \`## Annexes\`, « fiches contributeurs », ou tout équivalent en fin de document — intègre la matière dans le corps du rapport (notamment sous **Analyses par domaine**), sans dupliquer en annexe.
 
 Structure type (adapte les titres au sujet, mais **remplis** chaque partie) :
 
@@ -212,7 +212,6 @@ Structure type (adapte les titres au sujet, mais **remplis** chaque partie) :
 - \`## Analyses par domaine\` puis \`###\` par pôle puis \`####\` par spécialiste avec contenu dense
 - \`## Synthèse transversale et arbitrages\`
 - \`## Recommandations et plan d’action\`
-- \`## Annexes — fiches contributeurs\`
 
 Renvoie **uniquement** le Markdown du rapport, du premier \`#\` jusqu’à la fin, sans texte avant ni après.`;
 }

@@ -50,6 +50,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-05-09 | Gabarit seed par défaut : structure type OpenClaw (contexte / mission / format / contraintes) |
 | 2026-05-09 | Gabarit seed : orientation assistant métier (Rôle + Pratiques et standards), sans persona |
 | 2026-05-10 | Activité : téléchargement du livrable .md (mission terminée ou discussion avec livrable) ; utilitaire `downloadMarkdown` ; prompts mission — angles « hors premier jet » |
+| 2026-05-10 | Mission : rapport final sans section annexes / fiches contributeurs (prompt orchestrateur final) |
 
 ---
 
@@ -249,6 +250,18 @@ Rapprocher l’UI du flux « recherche multi-agents → cahier des charges Markd
 - `src/lib/downloadMarkdown.ts` — `triggerMarkdownDownload`, `markdownFilenameFromConversationTitle`
 - `src/components/ActivitySidebar.tsx`, `src/App.tsx`, `src/components/ChatPanel.tsx`, `src/components/MissionWorkspace.tsx`, `src/index.css`
 - `src/orchestration/pipeline.ts` — brief orchestrateur + consignes sous-agent / pôle solo
+
+---
+
+## 2026-05-10 — Rapport final sans fiches contributeurs
+
+### Objectif
+
+Le document généré en fin de mission ne doit plus imposer une section **Annexes — fiches contributeurs** : la matière reste dans le corps du rapport (analyses par domaine).
+
+### Fichiers
+
+- `src/orchestration/pipeline.ts` — `buildFinalDocumentPrompt`
 
 ---
 
