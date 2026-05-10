@@ -466,6 +466,9 @@ export function ChatPanel({
               clearDiscussionCutoff: true,
             })
           }
+          onConversationTitleSuggested={(title) =>
+            onConversationTitle(conversation.id, title)
+          }
         />
       ) : (
         <>

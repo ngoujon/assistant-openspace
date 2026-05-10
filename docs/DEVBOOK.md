@@ -52,6 +52,7 @@ Première version utilisable : shell trois colonnes (sidebar conversations, zone
 | 2026-05-10 | Activité : téléchargement du livrable .md (mission terminée ou discussion avec livrable) ; utilitaire `downloadMarkdown` ; prompts mission — angles « hors premier jet » |
 | 2026-05-10 | Mission : rapport final sans section annexes / fiches contributeurs (prompt orchestrateur final) |
 | 2026-05-10 | Changement de conversation : Activité / mission alignés sur le projet (key mission, reset état, abort discussion) |
+| 2026-05-10 | Mission : titre de conversation (sidebar) proposé par l’orchestrateur après le brief initial |
 
 ---
 
@@ -263,6 +264,21 @@ Le document généré en fin de mission ne doit plus imposer une section **Annex
 ### Fichiers
 
 - `src/orchestration/pipeline.ts` — `buildFinalDocumentPrompt`
+
+---
+
+## 2026-05-10 — Titre de conversation après brief mission
+
+### Objectif
+
+Dès le début d’une mission, renommer automatiquement l’entrée dans la **liste des conversations** (sidebar) avec un titre court généré par l’orchestrateur, à partir du brief initial et du contexte.
+
+### Fichiers
+
+- `src/lib/discussionTeamChat.ts` — `generateMissionConversationTitle`
+- `src/orchestration/pipeline.ts` — option `onConversationTitleSuggested`, comptage d’étapes
+- `src/components/MissionWorkspace.tsx`, `src/components/ChatPanel.tsx`
+- `docs/mission-orchestration.md`, `docs/architecture.md`
 
 ---
 

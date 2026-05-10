@@ -19,12 +19,15 @@ interface MissionWorkspaceProps {
   }) => void;
   /** Quand une mission produit un Markdown, pour le lier à la conversation (Discussion). */
   onArtifactProduced?: (markdown: string) => void;
+  /** Après le brief orchestrateur : titre proposé pour la conversation (sidebar gauche). */
+  onConversationTitleSuggested?: (title: string) => void;
 }
 
 export function MissionWorkspace({
   model,
   onActivityReport,
   onArtifactProduced,
+  onConversationTitleSuggested,
 }: MissionWorkspaceProps) {
   const [context, setContext] = useState("");
   const [files, setFiles] = useState<
@@ -121,7 +124,10 @@ export function MissionWorkspace({
       return;
     }
 
-    const planned = countMissionModelCalls(teamMembers);
+    const planned = countMissionModelCalls(
+      teamMembers,
+      !!onConversationTitleSuggested,
+    );
     setProgress([
       `Démarrage — ${planned} requête(s) vers le modèle « ${model} » (une par une). Tant qu’une étape tourne chez Ollama, la liste ne grossit pas : c’est normal (plusieurs minutes possibles).`,
     ]);
@@ -137,6 +143,7 @@ export function MissionWorkspace({
         onProgress: (label) => {
           setProgress((p) => [...p, label]);
         },
+        onConversationTitleSuggested,
       });
       const finalMd = unwrapMarkdownFence(md);
       setResultMd(finalMd);
@@ -151,7 +158,14 @@ export function MissionWorkspace({
       setRunning(false);
       abortRef.current = null;
     }
-  }, [running, context, files, model, onArtifactProduced]);
+  }, [
+    running,
+    context,
+    files,
+    model,
+    onArtifactProduced,
+    onConversationTitleSuggested,
+  ]);
 
   const canStart = (context.trim().length > 0 || files.length > 0) && !!model;
 

@@ -252,6 +252,55 @@ Réponds par **le titre uniquement**, rien d’autre.`,
   return sanitizeConversationTitle(raw);
 }
 
+/**
+ * Titre court pour la liste des conversations (sidebar), après le cadre orchestrateur d’une mission.
+ */
+export async function generateMissionConversationTitle(opts: {
+  model: string;
+  souls: Record<string, string>;
+  /** Sortie de la première passe orchestrateur (brief pôles). */
+  orchestratorBrief: string;
+  /** Contexte + fichiers (tronqué comme dans le pipeline mission). */
+  userPayloadPreview: string;
+  signal?: AbortSignal;
+}): Promise<string | null> {
+  const orchSoul = soul(opts.souls, ORCHESTRATOR_ID);
+  const briefSlice = opts.orchestratorBrief.slice(0, 6000);
+  const ctxSlice = opts.userPayloadPreview.slice(0, 3500);
+  const raw = await completeOllamaChat(
+    opts.model,
+    [
+      { role: "system", content: orchSoul },
+      {
+        role: "user",
+        content: `Tu pilotes une **mission équipe** : un rapport long va être produit à partir du cadre ci-dessous.
+
+Choisis un **titre très court** pour nommer **cette conversation** dans un menu latéral gauche (liste de projets), comme un titre de ticket ou d’objet d’e-mail.
+
+Contraintes :
+- **Une seule ligne**, sans guillemets ni préfixe du type « Titre : »
+- **Maximum 8 mots** (idéalement 4 à 7)
+- En français, **concret**, orienté produit / sujet (évite seul « Mission », « Rapport », « Projet », « Nouveau projet »)
+- Pas de ponctuation finale inutile (point, deux-points)
+
+## Cadre orchestrateur (première passe)
+
+${briefSlice}
+
+## Rappel contexte utilisateur / fichiers (extrait)
+
+${ctxSlice}
+
+Réponds par **le titre uniquement**, rien d’autre.`,
+      },
+    ],
+    opts.signal,
+    { temperature: 0.25 },
+  );
+  const t = sanitizeConversationTitle(raw);
+  return t.length >= 3 ? t : null;
+}
+
 const MAX_ARTIFACT = 120_000;
 const MAX_DISCUSS_FOR_PATCH = 48_000;
 

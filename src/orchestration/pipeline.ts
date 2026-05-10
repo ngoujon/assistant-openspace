@@ -1,3 +1,4 @@
+import { generateMissionConversationTitle } from "@/lib/discussionTeamChat";
 import {
   completeOllamaChat,
   type OllamaChatMessage,
@@ -19,6 +20,11 @@ export interface RunMissionOptions {
   teamMembers: TreeMember[];
   signal?: AbortSignal;
   onProgress: (label: string) => void;
+  /**
+   * Après le brief orchestrateur : titre pour la sidebar (liste des conversations).
+   * Si absent, aucun appel supplémentaire.
+   */
+  onConversationTitleSuggested?: (title: string) => void;
 }
 
 function soul(souls: Record<string, string>, id: string): string {
@@ -62,8 +68,14 @@ function childrenOf(
     .sort((a, b) => a.order - b.order);
 }
 
-/** Nombre d’appels `completeOllamaChat` (chaque étape peut durer longtemps en local). */
-export function countMissionModelCalls(teamMembers: TreeMember[]): number {
+/**
+ * Nombre d’appels `completeOllamaChat` (chaque étape peut durer longtemps en local).
+ * @param withConversationTitle inclure l’appel « titre sidebar » après le brief orchestrateur (si activé côté UI).
+ */
+export function countMissionModelCalls(
+  teamMembers: TreeMember[],
+  withConversationTitle = true,
+): number {
   const leads = leadsOf(teamMembers);
   let n = 1;
   for (const lead of leads) {
@@ -72,6 +84,7 @@ export function countMissionModelCalls(teamMembers: TreeMember[]): number {
     else n += subs.length * 2 + 1;
   }
   n += 1;
+  if (withConversationTitle) n += 1;
   return n;
 }
 
@@ -222,8 +235,16 @@ Renvoie **uniquement** le Markdown du rapport, du premier \`#\` jusqu’à la fi
 export async function runMissionPipeline(
   opts: RunMissionOptions,
 ): Promise<string> {
-  const { model, context, files, souls, teamMembers, signal, onProgress } =
-    opts;
+  const {
+    model,
+    context,
+    files,
+    souls,
+    teamMembers,
+    signal,
+    onProgress,
+    onConversationTitleSuggested,
+  } = opts;
   const payload = bundleUserPayload(context, files);
   const leads = leadsOf(teamMembers);
 
@@ -258,6 +279,22 @@ export async function runMissionPipeline(
     signal,
     TEMP,
   );
+
+  if (onConversationTitleSuggested) {
+    prog("Orchestrateur — titre de la conversation (sidebar)…");
+    try {
+      const title = await generateMissionConversationTitle({
+        model,
+        souls,
+        orchestratorBrief,
+        userPayloadPreview: slicePayloadForModel(payload),
+        signal,
+      });
+      if (title) onConversationTitleSuggested(title);
+    } catch {
+      /* titre optionnel : ne pas interrompre la mission */
+    }
+  }
 
   const branchOutputs: BranchOutput[] = [];
 
