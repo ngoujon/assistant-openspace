@@ -232,8 +232,8 @@ export function ActivitySidebar({
       )}
       {!running && progress.length === 0 && (
         <p className="activity-sidebar-muted">
-          Lance une mission depuis l’onglet <strong>Mission équipe</strong> pour voir
-          la progression ici.
+          Lance une mission en phase <strong>Mission équipe</strong> pour voir la
+          progression ici.
         </p>
       )}
       {!running && progress.length > 0 && (

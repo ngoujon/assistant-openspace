@@ -7,7 +7,7 @@ interface LayoutProps {
   organisationAside: ReactNode;
   /** Routage / stream discussion (entre Organisation et Activité). */
   exchangesAside: ReactNode;
-  /** Mission, idle, onglet équipe : colonne la plus à droite. */
+  /** Mission, idle : colonne la plus à droite. */
   activityAside: ReactNode;
 }
 

@@ -16,7 +16,7 @@ import { TeamWorkspaceProvider } from "@/components/TeamWorkspaceContext";
 import { fetchOllamaModels } from "@/lib/ollama";
 import { loadConversations, saveConversations } from "@/lib/storage";
 import type { RightActivityState } from "@/types/activity";
-import type { Conversation, MainTab } from "@/types";
+import type { Conversation } from "@/types";
 
 function newConversation(): Conversation {
   const id = crypto.randomUUID();
@@ -34,7 +34,6 @@ export default function App() {
     return loaded.length ? loaded : [newConversation()];
   });
   const [activeId, setActiveId] = useState(() => conversations[0]?.id ?? "");
-  const [mainTab, setMainTab] = useState<MainTab>("chat");
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState("");
   const [llmProvider, setLlmProvider] = useState<LlmProvider>(
@@ -49,13 +48,11 @@ export default function App() {
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  /** Colonne droite : sur l’onglet Équipe on affiche « équipe » sans écraser l’état chat (mission / discussion). */
+  /** Colonne Activité : éviter un état « équipe » résiduel qui masquerait mission / discussion. */
   const activityForShell = useMemo<RightActivityState>(() => {
-    if (mainTab === "team") return { kind: "team" };
-    if (rightActivity.kind === "team")
-      return { kind: "idle" };
+    if (rightActivity.kind === "team") return { kind: "idle" };
     return rightActivity;
-  }, [mainTab, rightActivity]);
+  }, [rightActivity]);
 
   const refreshLlmModels = useCallback(() => {
     const s = loadAppSettings();
@@ -206,12 +203,10 @@ export default function App() {
     const c = newConversation();
     setConversations((prev) => [c, ...prev]);
     setActiveId(c.id);
-    setMainTab("chat");
   }, []);
 
   const handleSelectConversation = useCallback((id: string) => {
     setActiveId(id);
-    setMainTab("chat");
   }, []);
 
   const handleDeleteConversation = useCallback((id: string) => {
@@ -252,44 +247,23 @@ export default function App() {
   );
 
   const mainEl = (
-    <>
-      <nav className="main-tabs" aria-label="Zones principales">
-        <button
-          type="button"
-          className={mainTab === "chat" ? "tab active" : "tab"}
-          onClick={() => setMainTab("chat")}
-        >
-          Chat
-        </button>
-        <button
-          type="button"
-          className={mainTab === "team" ? "tab active" : "tab"}
-          onClick={() => setMainTab("team")}
-        >
-          Équipe
-        </button>
-      </nav>
-      <div className="main-body">
-        {mainTab === "chat" ? (
-          <ChatPanel
-            conversation={active}
-            models={models}
-            model={model}
-            onModelChange={setModel}
-            llmProvider={llmProvider}
-            mistralApiKey={mistralApiKey}
-            llmError={llmError}
-            onRetryLlm={refreshLlmModels}
-            setMessages={setActiveMessages}
-            onConversationTitle={setConversationTitleById}
-            onConversationArtifact={setConversationArtifactMarkdown}
-            setRightActivity={setRightActivity}
-          />
-        ) : (
-          <TeamCentrePanel />
-        )}
-      </div>
-    </>
+    <div className="main-body">
+      <ChatPanel
+        conversation={active}
+        models={models}
+        model={model}
+        onModelChange={setModel}
+        llmProvider={llmProvider}
+        mistralApiKey={mistralApiKey}
+        llmError={llmError}
+        onRetryLlm={refreshLlmModels}
+        setMessages={setActiveMessages}
+        onConversationTitle={setConversationTitleById}
+        onConversationArtifact={setConversationArtifactMarkdown}
+        setRightActivity={setRightActivity}
+      />
+      <TeamCentrePanel />
+    </div>
   );
 
   return (

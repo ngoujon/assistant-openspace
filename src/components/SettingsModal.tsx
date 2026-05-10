@@ -255,8 +255,8 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
                   Modèle (Mistral AI)
                 </label>
                 <p className="modal-settings-hint">
-                  Utilisé pour le chat, les missions et l’onglet Équipe. Tu ne peux pas le
-                  changer depuis la barre du chat.
+                  Utilisé pour le chat, les missions et l’édition d’équipe (Organisation).
+                  Tu ne peux pas le changer depuis la barre du chat.
                 </p>
                 {mistralModelsLoading && (
                   <p className="modal-settings-hint" aria-live="polite">

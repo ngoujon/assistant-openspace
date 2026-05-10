@@ -60,7 +60,7 @@ Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le c
 
 ## Fonctionnalités principales
 
-### Mission équipe puis Discussion (onglet Chat)
+### Mission équipe puis Discussion
 
 - À l’ouverture d’une **nouvelle conversation** (ou d’un projet sans historique ni livrable), l’écran affiche la **mission** : contexte, fichiers .txt / .md, lancement du pipeline.
 - Enchaînement **Orchestrateur → 3 directeurs → 3 sous-agents → synthèses → document final**, chaque étape via le **fournisseur LLM** choisi (Mistral ou Ollama).
@@ -72,7 +72,7 @@ Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le c
 ### Équipe
 
 - L’**arbre** est visible en permanence dans la colonne **Organisation** (à droite du contenu) : nouveaux membres sous l’orchestrateur, **glisser-déposer** sous l’orchestrateur ou sous un agent, suppression.
-- L’onglet **Équipe** ouvre la zone centrale (titre « Équipe virtuelle ») pour la modale **âme / rôle** ; bouton **Générer un seed** (LLM configuré — modèle Ollama dans la barre du chat si besoin).
+- **Clic sur un membre** : modale **âme / rôle** ; bouton **Générer un seed** (LLM configuré — modèle Ollama dans la barre du chat si besoin).
 
 ### Autres
 

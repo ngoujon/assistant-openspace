@@ -18,7 +18,7 @@ export interface RunMissionOptions {
   files: MissionFile[];
   /** Textes « âme et rôle » par id de nœud. */
   souls: Record<string, string>;
-  /** Arbre courant (onglet Équipe). */
+  /** Arbre courant (colonne Organisation). */
   teamMembers: TreeMember[];
   signal?: AbortSignal;
   onProgress: (label: string) => void;
@@ -265,7 +265,7 @@ export async function runMissionPipeline(
 
   if (leads.length === 0) {
     throw new Error(
-      "Aucun membre sous l’orchestrateur. Ajoute au moins un pilier dans l’onglet Équipe.",
+      "Aucun membre sous l’orchestrateur. Ajoute au moins un pilier dans la colonne Organisation.",
     );
   }
 

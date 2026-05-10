@@ -212,7 +212,7 @@ export function MissionWorkspace({
     const leads = membersTree.filter((m) => m.parentId === ORCHESTRATOR_ID);
     if (leads.length === 0) {
       setError(
-        "Aucun membre sous l’orchestrateur. Ajoute au moins un pilier dans l’onglet Équipe.",
+        "Aucun membre sous l’orchestrateur. Ajoute au moins un pilier dans la colonne Organisation.",
       );
       setRunning(false);
       abortRef.current = null;

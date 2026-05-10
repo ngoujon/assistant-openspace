@@ -82,7 +82,7 @@ export function ExchangesSidebar({
     state.kind === "mission"
       ? "Après le livrable, en mode Discussion, les réponses de l’équipe s’affichent ici."
       : state.kind === "team"
-        ? "Ouvre l’onglet Chat sur un projet pour suivre la discussion."
+        ? "Ouvre un projet pour suivre la discussion."
         : "Ouvre un projet et passe en Discussion pour suivre les échanges de l’équipe.";
 
   if (isInline) {

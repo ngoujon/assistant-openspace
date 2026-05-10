@@ -9,7 +9,7 @@ function toSoulModalNode(node: DisplayNode): SoulModalNode {
   return { id: node.id, label: node.label, kind: node.kind };
 }
 
-/** Zone centrale onglet Équipe : titre, modale âme (sans l’arbre). Archives : colonne Organisation. */
+/** Modale âme / rôle (ouverture depuis un membre dans la colonne Organisation). */
 export function TeamCentrePanel() {
   const {
     members,
@@ -25,28 +25,22 @@ export function TeamCentrePanel() {
   } = useTeamWorkspace();
 
   return (
-    <div className="team-panel team-panel--centre">
-      <header className="team-centre-head">
-        <h2 className="team-heading">Équipe virtuelle</h2>
-      </header>
-
-      <AgentSoulModal
-        node={editing ? toSoulModalNode(editing) : null}
-        initialText={editing ? souls[editing.id] ?? "" : ""}
-        initialLabel={editing?.label ?? ""}
-        parentId={editingMember?.parentId ?? null}
-        parentLabel={editParentLabel}
-        parentOptions={
-          editing && editing.kind !== "master"
-            ? validParentTargetsForMember(editing.id, members)
-            : []
-        }
-        model={model}
-        llmProvider={llmProvider}
-        mistralApiKey={mistralApiKey}
-        onClose={handleCloseModal}
-        onSave={handleSaveSoul}
-      />
-    </div>
+    <AgentSoulModal
+      node={editing ? toSoulModalNode(editing) : null}
+      initialText={editing ? souls[editing.id] ?? "" : ""}
+      initialLabel={editing?.label ?? ""}
+      parentId={editingMember?.parentId ?? null}
+      parentLabel={editParentLabel}
+      parentOptions={
+        editing && editing.kind !== "master"
+          ? validParentTargetsForMember(editing.id, members)
+          : []
+      }
+      model={model}
+      llmProvider={llmProvider}
+      mistralApiKey={mistralApiKey}
+      onClose={handleCloseModal}
+      onSave={handleSaveSoul}
+    />
   );
 }

@@ -212,7 +212,7 @@ export function ChatPanel({
       const art = conversation.artifactMarkdown?.trim();
       if (!art) {
         setError(
-          "Aucun livrable lié. Termine une mission (onglet Mission équipe), puis reviens en Discussion.",
+          "Aucun livrable lié. Termine une mission (phase Mission équipe), puis reviens en Discussion.",
         );
         return;
       }

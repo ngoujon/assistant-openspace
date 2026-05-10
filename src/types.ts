@@ -33,5 +33,3 @@ export interface Conversation {
    */
   artifactDiscussionCutoffAfterId?: string;
 }
-
-export type MainTab = "chat" | "team";
