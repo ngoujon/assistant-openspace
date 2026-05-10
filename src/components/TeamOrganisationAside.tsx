@@ -250,7 +250,7 @@ export function TeamOrganisationAside() {
           className="btn-primary team-org-aside-add"
           onClick={addUnderOrchestrator}
         >
-          Nouveau membre (sous orchestrateur)
+          Nouveau membre
         </button>
       </header>
       <TeamArchiveModal
