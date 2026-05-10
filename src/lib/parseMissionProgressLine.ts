@@ -39,14 +39,15 @@ export function parseMissionProgressLine(raw: string): ParsedMissionStep {
   } else if (
     d.includes("document final") ||
     d.includes("readme") ||
+    d.includes("livrable markdown") ||
     (d.startsWith("orchestrateur") && d.includes("rédaction"))
   ) {
     kind = "final-doc";
-  } else if (d.startsWith("orchestrateur")) {
+  } else if (d.startsWith("orchestrateur") || d.startsWith("routage")) {
     kind = "orchestrator";
   } else if (d.includes("consignes au sous-agent")) {
     kind = "delegation";
-  } else if (d.includes("travail spécialisé")) {
+  } else if (d.includes("travail spécialisé") || d.startsWith("intervenant :")) {
     kind = "specialist";
   } else if (d.includes("synthèse et ajustements")) {
     kind = "synthesis";

@@ -14,6 +14,8 @@ export type RightActivityState =
       streaming: boolean;
       panelError: string | null;
       streamingSpeaker: string | null;
+      /** Étapes cumulées (routage, réponse, fusion livrable) — défilent comme la mission. */
+      discussionProgress: string[];
     }
   | {
       kind: "mission";

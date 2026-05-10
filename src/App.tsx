@@ -28,6 +28,7 @@ function deriveInitialRightActivity(c: Conversation): RightActivityState {
       streaming: false,
       panelError: null,
       streamingSpeaker: null,
+      discussionProgress: [],
     };
   }
   const snap = c.missionActivitySnapshot;

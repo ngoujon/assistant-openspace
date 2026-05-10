@@ -42,6 +42,8 @@ interface DiscussionQueuedMessage {
   text: string;
 }
 
+const DISCUSSION_ACTIVITY_MAX_LINES = 100;
+
 /** Messages à envoyer à l’orchestrateur pour une fusion : uniquement après la dernière mise à jour. */
 function messagesAfterArtifactCutoff(
   messages: ChatMessage[],
@@ -125,6 +127,7 @@ export function ChatPanel({
   const [showMissionDraftHint, setShowMissionDraftHint] = useState(false);
   const discussionRootRef = useRef<HTMLDivElement | null>(null);
   const prevModeRef = useRef<ChatMode>(initialChatMode(conversation));
+  const discussionActivityConvIdRef = useRef(conversation.id);
 
   useEffect(() => {
     const refresh = () => setTeamMembers(loadTeamMembers());
@@ -251,6 +254,34 @@ export function ChatPanel({
     [conversation.id, onMissionActivitySnapshot, setRightActivity],
   );
 
+  const appendDiscussionProgressLine = useCallback(
+    (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      setRightActivity((prev) => {
+        const cap = (lines: string[]) =>
+          lines.length > DISCUSSION_ACTIVITY_MAX_LINES
+            ? lines.slice(-DISCUSSION_ACTIVITY_MAX_LINES)
+            : lines;
+        if (prev.kind !== "discussion") {
+          return {
+            kind: "discussion",
+            isRouting: false,
+            streaming: false,
+            panelError: null,
+            streamingSpeaker: null,
+            discussionProgress: cap([trimmed]),
+          };
+        }
+        return {
+          ...prev,
+          discussionProgress: cap([...prev.discussionProgress, trimmed]),
+        };
+      });
+    },
+    [setRightActivity],
+  );
+
   useEffect(() => {
     if (mode === "mission") {
       return;
@@ -261,12 +292,25 @@ export function ChatPanel({
       streaming && lastAssistant?.speakerLabel
         ? lastAssistant.speakerLabel
         : null;
-    setRightActivity({
-      kind: "discussion",
-      isRouting,
-      streaming,
-      panelError: error,
-      streamingSpeaker,
+
+    setRightActivity((prev) => {
+      const idChanged =
+        discussionActivityConvIdRef.current !== conversation.id;
+      if (idChanged) {
+        discussionActivityConvIdRef.current = conversation.id;
+      }
+      const discussionProgress =
+        !idChanged && prev.kind === "discussion"
+          ? prev.discussionProgress
+          : [];
+      return {
+        kind: "discussion",
+        isRouting,
+        streaming,
+        panelError: error,
+        streamingSpeaker,
+        discussionProgress,
+      };
     });
   }, [
     mode,
@@ -335,10 +379,14 @@ export function ChatPanel({
         const historyWithUser = [...turnMessages, userMsg];
         setError(null);
         setMessages(convId, () => historyWithUser);
+        appendDiscussionProgressLine("Consigne enregistrée dans le fil.");
 
         const ac = new AbortController();
         abortRef.current = ac;
         setIsRouting(true);
+        appendDiscussionProgressLine(
+          "Routage — l’orchestrateur choisit le membre le plus qualifié pour répondre.",
+        );
         let assistantId: string | undefined;
 
         try {
@@ -367,6 +415,7 @@ export function ChatPanel({
           const speakerLabel =
             members.find((m) => m.id === routing.responderId)?.label ??
             routing.responderId;
+          appendDiscussionProgressLine(`Intervenant : ${speakerLabel}`);
 
           assistantId = crypto.randomUUID();
           const assistantShell: ChatMessage = {
@@ -380,6 +429,7 @@ export function ChatPanel({
           setMessages(convId, () => [...historyWithUser, assistantShell]);
           setIsRouting(false);
           setStreaming(true);
+          appendDiscussionProgressLine("Rédaction de la réponse (flux du modèle)…");
 
           let assistantAccum = "";
           await streamDiscussionReply({
@@ -404,6 +454,7 @@ export function ChatPanel({
             },
             signal: ac.signal,
           });
+          appendDiscussionProgressLine("Réponse de l’équipe reçue.");
 
           const transcriptMessages: ChatMessage[] = [
             ...historyWithUser,
@@ -438,6 +489,9 @@ export function ChatPanel({
               turnCutoffAfterId,
             );
             setIsRouting(true);
+            appendDiscussionProgressLine(
+              "Application des retouches au livrable Markdown…",
+            );
             try {
               await artifactMergeFromDiscussion({
                 conversationId: convId,
@@ -447,11 +501,18 @@ export function ChatPanel({
                 cutoffAfterAssistantId: assistantId,
                 signal: ac.signal,
               });
+              appendDiscussionProgressLine("Livrable Markdown mis à jour.");
             } catch (mergeErr) {
               if ((mergeErr as Error).name === "AbortError") {
+                appendDiscussionProgressLine(
+                  "Mise à jour du livrable interrompue.",
+                );
                 skipPump = true;
                 return;
               }
+              appendDiscussionProgressLine(
+                `Échec fusion livrable : ${((mergeErr as Error).message || "?").slice(0, 100)}`,
+              );
               setError(
                 (mergeErr as Error).message ||
                   "La mise à jour automatique du livrable a échoué ; télécharge le .md existant depuis Activité si besoin.",
@@ -459,12 +520,20 @@ export function ChatPanel({
             } finally {
               setIsRouting(false);
             }
+          } else {
+            appendDiscussionProgressLine(
+              "Pas de fusion automatique : aucun livrable Markdown lié à ce projet.",
+            );
           }
         } catch (e) {
           if ((e as Error).name === "AbortError") {
+            appendDiscussionProgressLine("Échange interrompu.");
             skipPump = true;
             return;
           }
+          appendDiscussionProgressLine(
+            `Erreur : ${((e as Error).message || "réseau").slice(0, 120)}`,
+          );
           setError((e as Error).message || "Erreur réseau");
           setMessages(convId, (prev) =>
             prev.filter(
@@ -495,6 +564,7 @@ export function ChatPanel({
       onConversationTitle,
       artifactMergeFromDiscussion,
       teamMembers,
+      appendDiscussionProgressLine,
     ],
   );
 

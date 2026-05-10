@@ -165,7 +165,7 @@ export function ActivitySidebar({
 
   if (state.kind === "discussion") {
     if (isInline) return null;
-    const { isRouting, streaming, panelError, streamingSpeaker } = state;
+    const { isRouting, streaming, panelError } = state;
     const busy = isRouting || streaming;
     const hist = missionHistory?.progress?.length ? missionHistory : null;
 
@@ -193,25 +193,25 @@ export function ActivitySidebar({
               {panelError}
             </p>
           )}
-          {!panelError && isRouting && (
-            <p className="activity-sidebar-status">
-              L’orchestrateur choisit le membre le plus qualifié pour répondre…
-            </p>
-          )}
-          {!panelError && !isRouting && streaming && (
-            <p className="activity-sidebar-status">
-              {streamingSpeaker ? (
-                <>
-                  Réponse en cours de <strong>{streamingSpeaker}</strong>…
-                </>
-              ) : (
-                "Réponse en cours de génération…"
-              )}
-            </p>
-          )}
+          {state.discussionProgress.length > 0 ? (
+            <div className="activity-discussion-session">
+              <h3 className="activity-discussion-session-title">
+                Discussion (cette session)
+              </h3>
+              <MissionStepTimeline
+                progress={state.discussionProgress}
+                running={busy}
+                compact
+              />
+            </div>
+          ) : !panelError && busy ? (
+            <p className="activity-sidebar-status">En cours…</p>
+          ) : null}
           {!panelError && !busy && !linkedArtifact && (
             <p className="activity-sidebar-muted">
-              Aucun envoi en cours. Écris un message et envoie pour lancer l’équipe.
+              {state.discussionProgress.length === 0
+                ? "Aucun envoi en cours. Écris un message et envoie pour lancer l’équipe."
+                : "Prêt pour le prochain message."}
             </p>
           )}
         </div>

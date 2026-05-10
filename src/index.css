@@ -221,9 +221,20 @@ body {
 }
 
 .activity-sidebar.activity-sidebar--discussion-with-history .activity-discussion-main {
-  flex: 0 0 auto;
-  overflow: visible;
+  flex: 1 1 42%;
   min-height: 0;
+  overflow: auto;
+}
+
+.activity-discussion-session {
+  margin: 0 0 0.5rem;
+}
+
+.activity-discussion-session-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .activity-sidebar.activity-sidebar--discussion-with-history
