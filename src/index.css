@@ -1067,6 +1067,7 @@ body {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 0.65rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
@@ -1078,6 +1079,10 @@ body {
 }
 
 .chat-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   font: inherit;
   font-size: 0.9375rem;
   resize: vertical;
