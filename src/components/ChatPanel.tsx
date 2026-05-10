@@ -134,9 +134,9 @@ export function ChatPanel({
     discussionQueueRef.current = [];
     setDiscussionQueue([]);
     setDiscussionQueueOpen(false);
-    if (conversation.messages.length === 0) {
-      setMode("mission");
-    }
+    const hasArtifact = !!conversation.artifactMarkdown?.trim();
+    const hasMessages = conversation.messages.length > 0;
+    setMode(hasArtifact || hasMessages ? "free" : "mission");
   }, [conversation.id]);
 
   /** Colonne Activité : en mode Mission, suivre le projet actif (pas le précédent). */
@@ -544,31 +544,12 @@ export function ChatPanel({
   return (
     <div className="chat-panel">
       <header className="chat-toolbar chat-toolbar-stack">
-        <div
-          className="chat-mode-switch"
-          role="tablist"
-          aria-label="Mode du chat"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "mission"}
-            className={mode === "mission" ? "chat-mode-tab active" : "chat-mode-tab"}
-            onClick={() => setMode("mission")}
-          >
-            Mission équipe
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "free"}
-            className={mode === "free" ? "chat-mode-tab active" : "chat-mode-tab"}
-            onClick={() => setMode("free")}
-          >
-            Discussion
-          </button>
-        </div>
-        <div className="chat-toolbar-row">
+        <div className="chat-toolbar-row chat-toolbar-row--phase">
+          <p className="chat-phase-label" aria-live="polite">
+            {mode === "mission"
+              ? "Mission équipe"
+              : "Discussion"}
+          </p>
           {llmProvider === "ollama" && (
             <label className="model-label">
               Modèle (Ollama local)
@@ -617,11 +598,14 @@ export function ChatPanel({
           mistralApiKey={mistralApiKey}
           model={model}
           onActivityReport={reportMissionActivity}
-          onArtifactProduced={(md) =>
+          onArtifactProduced={(md) => {
             onConversationArtifact(conversation.id, md, {
               clearDiscussionCutoff: true,
-            })
-          }
+            });
+            if (md.trim()) {
+              setMode("free");
+            }
+          }}
           onConversationTitleSuggested={(title) =>
             onConversationTitle(conversation.id, title)
           }

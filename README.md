@@ -60,25 +60,23 @@ Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le c
 
 ## Fonctionnalités principales
 
-### Mission équipe (onglet Chat, mode par défaut)
+### Mission équipe puis Discussion (onglet Chat)
 
-- Saisie d’un **contexte** et ajout de **fichiers texte** (.txt, .md).
+- À l’ouverture d’une **nouvelle conversation** (ou d’un projet sans historique ni livrable), l’écran affiche la **mission** : contexte, fichiers .txt / .md, lancement du pipeline.
 - Enchaînement **Orchestrateur → 3 directeurs → 3 sous-agents → synthèses → document final**, chaque étape via le **fournisseur LLM** choisi (Mistral ou Ollama).
 - Les **personas** sont ceux définis dans l’onglet **Équipe** (clic sur un rôle → texte « âme et rôle », stocké dans le navigateur).
-- **Télécharger le .md** une fois la mission terminée.
-
-### Discussion
-
-- Même onglet **Chat**, mode **Discussion** : message à **toute l’équipe** ; l’**orchestrateur** désigne le **membre le plus qualifié** (ou répond lui-même pour synthèse / compte rendu si pertinent ou demandé), puis réponse en streaming avec l’âme de ce membre.
+- **Télécharger le .md** une fois la mission terminée ; dès qu’un **livrable** est produit, l’interface passe **automatiquement** en **Discussion** (plus de bascule manuelle Mission / Discussion).
+- En **Discussion** : message à **toute l’équipe** ; l’**orchestrateur** désigne le **membre le plus qualifié** (ou répond lui-même pour synthèse / compte rendu si pertinent ou demandé), puis réponse en streaming avec l’âme de ce membre.
+- Rouvrir une conversation qui a déjà des **messages** ou un **livrable** ouvre directement la Discussion.
 
 ### Équipe
 
 - Arbre **modifiable** : nouveaux membres sous l’orchestrateur, **glisser-déposer** sous l’orchestrateur ou sous un agent, suppression.
-- Modale **âme / rôle** par membre, avec bouton **Générer un seed** (LLM configuré, selon le nom et la place dans l’équipe — choisir le modèle dans l’onglet Chat).
+- Modale **âme / rôle** par membre, avec bouton **Générer un seed** (LLM configuré, selon le nom et la place dans l’équipe — choisir le modèle Ollama dans la barre du chat si besoin).
 
 ### Autres
 
-- **Colonne gauche** : conversations (mode Discussion), persistance `localStorage` ; icône **Paramètres** à droite du titre OpenSpace (fournisseur LLM, clé Mistral, prompts pour **Générer un seed**).
+- **Colonne gauche** : conversations, persistance `localStorage` ; icône **Paramètres** à droite du titre OpenSpace (fournisseur LLM, clé Mistral, prompts pour **Générer un seed**).
 - **Colonne droite** : réservée pour extensions.
 
 ## Proxy LLM
