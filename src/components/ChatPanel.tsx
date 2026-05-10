@@ -14,7 +14,10 @@ import {
   routeDiscussionMessage,
   streamDiscussionReply,
 } from "@/lib/discussionTeamChat";
-import { resolveForcedResponderFromMessage } from "@/lib/discussionMention";
+import {
+  collectMentionedMemberIds,
+  resolveForcedResponderFromMessage,
+} from "@/lib/discussionMention";
 import {
   MISTRAL_DISCUSSION_ROUTE_TO_STREAM_MS,
   MISTRAL_DISCUSSION_STREAM_TO_MERGE_MS,
@@ -396,8 +399,21 @@ export function ChatPanel({
         try {
           const members = teamMembers;
           const souls = loadAgentSouls();
+          const mentionedIds = collectMentionedMemberIds(text, members);
           const forcedResponderId =
-            resolveForcedResponderFromMessage(text, members) ?? undefined;
+            mentionedIds.length <= 1
+              ? (resolveForcedResponderFromMessage(text, members) ??
+                undefined)
+              : undefined;
+          let multiMentionRoutingHint: string | undefined;
+          if (mentionedIds.length > 1) {
+            const labels = mentionedIds
+              .map((id) => members.find((m) => m.id === id)?.label ?? id)
+              .join(", ");
+            multiMentionRoutingHint =
+              `L’utilisateur a mentionné **plusieurs** membres dans ce message : **${labels}**. ` +
+              `Désigne **un seul** \`responderId\` pour la réponse **dans le fil** ; dans \`brief\`, fais **combiner** leurs angles pour **guider la retouche du livrable** (pas une conversation séparée par personne). La fusion du .md lira tout le fil.`;
+          }
 
           const routing = await routeDiscussionMessage({
             llmProvider,
@@ -408,6 +424,7 @@ export function ChatPanel({
             historyWithLatestUser: historyWithUser,
             signal: ac.signal,
             forcedResponderId,
+            multiMentionRoutingHint,
             missionUserBrief: turnMissionBrief,
             artifactMarkdown: turnArtifactMd,
           });
