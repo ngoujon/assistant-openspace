@@ -23,6 +23,11 @@ export interface Conversation {
    */
   artifactMarkdown?: string;
   /**
+   * Texte saisi dans « Contexte » (mission équipe) au moment où le livrable
+   * a été produit — repris en Discussion et lors des fusions document.
+   */
+  missionUserBrief?: string;
+  /**
    * Id du dernier message après une fusion livrable : les prochaines fusions
    * n’incluent que les messages **après** celui-ci (limite le contexte).
    */

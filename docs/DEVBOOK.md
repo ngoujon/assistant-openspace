@@ -37,6 +37,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Mentions `@` : combobox (↑ ↓ Entrée) dans Discussion et Mission équipe ; préfixe brief mission (`buildMissionMentionPrefix`) ; sync équipe via `openspace-team-updated` |
 | 2026-05-10 | Discussion : file d’attente au-dessus du compositeur (compteur, repli, édition, retrait) ; envoi séquentiel après réponse ou « Arrêter » |
 | 2026-05-10 | Chat projet : plus d’onglets Mission / Discussion ; mission au départ puis passage auto en discussion après livrable ; libellé de phase non cliquable |
+| 2026-05-10 | Discussion : persistance `missionUserBrief` + contexte routage/stream/fusion ; consignes anti-recopie du livrable dans le chat |
 
 ## 2026-03-28 — Bootstrap UI + Chat Ollama
 

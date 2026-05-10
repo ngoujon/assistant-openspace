@@ -49,9 +49,10 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 ## Flux Chat (mode Discussion)
 
 1. L’utilisateur envoie un message → enregistrement du message `user`.
-2. **`routeDiscussionMessage`** (`src/lib/discussionTeamChat.ts`) : appel non stream avec prompt **orchestrateur** + liste des membres (`loadTeamMembers`) + fil ; réponse JSON `responderId`, `brief`, `userNote`.
+2. **`routeDiscussionMessage`** (`src/lib/discussionTeamChat.ts`) : appel non stream avec prompt **orchestrateur** + liste des membres (`loadTeamMembers`) + fil + **brief mission** (`missionUserBrief`) et **extrait du livrable** ; réponse JSON `responderId`, `brief`, `userNote`.
 3. Création d’une bulle `assistant` avec `speakerLabel` et `routingNote`.
-4. **`streamDiscussionReply`** : `system` = âme du membre choisi + consigne orchestrateur ; historique user/assistant en contexte ; streaming des tokens.
+4. **`streamDiscussionReply`** : `system` = âme du membre + consignes **réponses courtes** (pas de recopie du document) + même contexte mission/livrable (tronqué) + consigne orchestrateur ; historique user/assistant ; streaming des tokens.
+5. **`applyDiscussionToArtifact`** (intention ou bouton) : fusion avec brief mission + discussion + document complet.
 
 ## Flux Mission équipe
 

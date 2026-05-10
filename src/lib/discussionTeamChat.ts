@@ -4,6 +4,46 @@ import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
 import type { ChatMessage } from "@/types";
 
+const MAX_MISSION_BRIEF_IN_CTX = 8000;
+const MAX_ARTIFACT_EXCERPT_ROUTING = 5000;
+const MAX_ARTIFACT_EXCERPT_STREAM = 14_000;
+
+/** Consignes communes : le chat n’est pas le canal du document complet. */
+const DISCUSSION_REPLY_STYLE_RULES = `## Règles pour tes messages dans ce chat
+
+- Réponses **courtes** : questions de clarification, confirmation que tu as compris, points encore flous — quelques phrases, pas un rapport long.
+- **Ne recopie pas** le livrable Markdown ni de longues portions du document : la version fichier à jour est produite par la **fusion** (formulation du type « appliquer la mise à jour » ou le bouton dédié) ; l’utilisateur récupère le fichier via **Télécharger**.
+- Tu peux citer **au plus** une courte phrase ou un titre de section si indispensable pour poser une question ciblée.`;
+
+function sliceText(s: string, max: number): string {
+  const t = s.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 24).trimEnd()}\n\n[… tronqué …]`;
+}
+
+/**
+ * Brief mission + extrait du livrable pour le routage ou le stream discussion.
+ */
+export function formatMissionAndArtifactForDiscussion(
+  missionUserBrief: string | undefined | null,
+  artifactMarkdown: string | undefined | null,
+  artifactMaxChars: number,
+): string {
+  const parts: string[] = [];
+  if (missionUserBrief?.trim()) {
+    parts.push(
+      `### Brief initial de la mission (première demande utilisateur)\n\n${sliceText(missionUserBrief, MAX_MISSION_BRIEF_IN_CTX)}`,
+    );
+  }
+  if (artifactMarkdown?.trim()) {
+    parts.push(
+      `### Livrable Markdown (extrait — le document en interface peut être plus long)\n\n\`\`\`markdown\n${sliceText(artifactMarkdown, artifactMaxChars)}\n\`\`\``,
+    );
+  }
+  if (!parts.length) return "";
+  return `${parts.join("\n\n---\n\n")}\n\n---\n\n`;
+}
+
 export interface DiscussionRouting {
   responderId: string;
   brief: string;
@@ -115,6 +155,10 @@ export async function routeDiscussionMessage(opts: {
   signal?: AbortSignal;
   /** Si défini (ex. @mention résolue), pas d’appel LLM pour le routage. */
   forcedResponderId?: string | null;
+  /** Texte « Contexte » de la mission (première demande). */
+  missionUserBrief?: string | null;
+  /** Livrable actuel (tronqué côté prompt). */
+  artifactMarkdown?: string | null;
 }): Promise<DiscussionRouting> {
   const {
     llmProvider,
@@ -125,6 +169,8 @@ export async function routeDiscussionMessage(opts: {
     historyWithLatestUser,
     signal,
     forcedResponderId,
+    missionUserBrief,
+    artifactMarkdown,
   } = opts;
 
   if (forcedResponderId) {
@@ -134,7 +180,7 @@ export async function routeDiscussionMessage(opts: {
       (id === ORCHESTRATOR_ID ? "Orchestrateur" : id);
     return {
       responderId: id,
-      brief: buildDirectMentionBrief(id, members),
+      brief: `${buildDirectMentionBrief(id, members)}\n\n${DISCUSSION_REPLY_STYLE_RULES}`,
       userNote: `Message adressé à **${label}** (@mention).`,
     };
   }
@@ -142,8 +188,13 @@ export async function routeDiscussionMessage(opts: {
   const roster = formatRoster(members);
   const hist = formatHistoryForRouting(historyWithLatestUser);
   const orchSoul = soul(souls, ORCHESTRATOR_ID);
+  const docCtx = formatMissionAndArtifactForDiscussion(
+    missionUserBrief,
+    artifactMarkdown,
+    MAX_ARTIFACT_EXCERPT_ROUTING,
+  );
 
-  const userBlock = `## Membres de l’équipe (utilise les ids exacts ci-dessous)\n${roster}\n\n---\n## Fil de discussion\n${hist}\n\n---\nTâche : tu es **l’orchestrateur**. L’utilisateur s’adresse à **toute l’équipe** comme si c’était une réunion : **toi**, tu décides **qui est le plus qualifié** pour répondre au **dernier** message (sujet, compétence, contexte).\n\n- Si un **membre** doit répondre : mets son \`responderId\` et un \`brief\` concret pour lui.\n- Si **toi** l’orchestrateur dois répondre (synthèse, compte rendu, arbitrage, vision globale, ou l’utilisateur le demande explicitement) : \`responderId\` = \`${ORCHESTRATOR_ID}\`.\n\nRéponds par **un seul objet JSON** valide, sans markdown ni texte autour :\n{\n  "responderId": "…",\n  "brief": "…",\n  "userNote": "…"\n}\n\n\`userNote\` : une phrase **optionnelle** pour l’utilisateur (ex. qui prend la parole et pourquoi).`;
+  const userBlock = `${docCtx}## Membres de l’équipe (utilise les ids exacts ci-dessous)\n${roster}\n\n---\n## Fil de discussion\n${hist}\n\n---\nTâche : tu es **l’orchestrateur**. L’utilisateur s’adresse à **toute l’équipe** comme si c’était une réunion : **toi**, tu décides **qui est le plus qualifié** pour répondre au **dernier** message (sujet, compétence, contexte). Un **livrable Markdown** et le **brief initial** peuvent apparaître ci-dessus : sers-t’en pour le routage ; les réponses dans le fil restent **courtes** (pas de recopie du document dans le chat).\n\n- Si un **membre** doit répondre : mets son \`responderId\` et un \`brief\` concret pour lui (rappelle-lui de rester bref dans le chat, pas de livrable complet).\n- Si **toi** l’orchestrateur dois répondre (synthèse, compte rendu, arbitrage, vision globale, ou l’utilisateur le demande explicitement) : \`responderId\` = \`${ORCHESTRATOR_ID}\`.\n\nRéponds par **un seul objet JSON** valide, sans markdown ni texte autour :\n{\n  "responderId": "…",\n  "brief": "…",\n  "userNote": "…"\n}\n\n\`userNote\` : une phrase **optionnelle** pour l’utilisateur (ex. qui prend la parole et pourquoi).`;
 
   const raw = await completeLlmChat(
     llmProvider,
@@ -178,10 +229,32 @@ export function buildDiscussionStreamMessages(opts: {
   responderId: string;
   brief: string;
   historyWithLatestUser: ChatMessage[];
+  missionUserBrief?: string | null;
+  artifactMarkdown?: string | null;
 }): OllamaChatMessage[] {
-  const { souls, responderId, brief, historyWithLatestUser } = opts;
+  const {
+    souls,
+    responderId,
+    brief,
+    historyWithLatestUser,
+    missionUserBrief,
+    artifactMarkdown,
+  } = opts;
   const responderSoul = soul(souls, responderId);
-  const systemContent = `${responderSoul}\n\n— Canal **équipe** : l’orchestrateur t’a désigné·e pour ce tour. **Consigne :** ${brief}`;
+  const docBlock = formatMissionAndArtifactForDiscussion(
+    missionUserBrief,
+    artifactMarkdown,
+    MAX_ARTIFACT_EXCERPT_STREAM,
+  );
+  const systemParts = [
+    responderSoul,
+    DISCUSSION_REPLY_STYLE_RULES,
+    docBlock
+      ? `## Contexte documentaire (pour t’orienter — ne pas recopier dans le chat)\n\n${docBlock}`
+      : "",
+    `— Canal **équipe** : l’orchestrateur t’a désigné·e pour ce tour. **Consigne :** ${brief}`,
+  ].filter((p) => p.trim().length > 0);
+  const systemContent = systemParts.join("\n\n");
   const rest: OllamaChatMessage[] = historyWithLatestUser.map((m) => ({
     role: m.role as "user" | "assistant",
     content: m.content,
@@ -197,6 +270,8 @@ export async function streamDiscussionReply(opts: {
   responderId: string;
   brief: string;
   historyWithLatestUser: ChatMessage[];
+  missionUserBrief?: string | null;
+  artifactMarkdown?: string | null;
   onToken: (chunk: string) => void;
   signal?: AbortSignal;
 }): Promise<void> {
@@ -330,6 +405,8 @@ export async function applyDiscussionToArtifact(opts: {
   souls: Record<string, string>;
   discussionMessages: ChatMessage[];
   artifactMarkdown: string;
+  /** Brief « Contexte » de la mission (première demande), pour ancrer les retouches. */
+  missionUserBrief?: string | null;
   signal?: AbortSignal;
 }): Promise<string> {
   const {
@@ -339,6 +416,7 @@ export async function applyDiscussionToArtifact(opts: {
     souls,
     discussionMessages,
     artifactMarkdown,
+    missionUserBrief,
     signal,
   } = opts;
   const orchSoul = soul(souls, ORCHESTRATOR_ID);
@@ -351,7 +429,11 @@ export async function applyDiscussionToArtifact(opts: {
     doc = doc.slice(0, MAX_ARTIFACT) + "\n\n[… document tronqué pour le contexte …]";
   }
 
-  const userBlock = `Tu es l’**orchestrateur**. L’utilisateur a discuté avec l’équipe pour **ajuster** un livrable Markdown déjà produit (mission / rapport).
+  const missionSection = missionUserBrief?.trim()
+    ? `## Brief initial de la mission (première demande utilisateur)\n\n${sliceText(missionUserBrief, MAX_MISSION_BRIEF_IN_CTX)}\n\n---\n\n`
+    : "";
+
+  const userBlock = `${missionSection}Tu es l’**orchestrateur**. L’utilisateur a discuté avec l’équipe pour **ajuster** un livrable Markdown déjà produit (mission / rapport).
 
 ---
 
@@ -371,7 +453,7 @@ ${doc}
 
 **Tâche**
 
-1. Synthétise **implicitement** les demandes de la discussion dans le document révisé (pas besoin de répéter toute la conversation dans le fichier).
+1. **Respecte l’intention** du brief initial ci-dessus quand tu interprètes les retouches ; synthétise **implicitement** la discussion dans le document révisé (pas besoin de répéter toute la conversation dans le fichier).
 2. **Modifie le Markdown** aux bons endroits : sections concernées, ajouts, suppressions, reformulations, listes, tableaux.
 3. **Conserve** la structure générale (\`#\` \`##\` \`###\`) sauf si la discussion impose une réorganisation claire.
 4. **Ne mets pas** le document dans un bloc de code : renvoie **uniquement** le Markdown final, prêt à enregistrer en \`.md\`.

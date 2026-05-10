@@ -34,7 +34,7 @@ interface MissionWorkspaceProps {
     elapsedSec: number;
   }) => void;
   /** Quand une mission produit un Markdown, pour le lier à la conversation (Discussion). */
-  onArtifactProduced?: (markdown: string) => void;
+  onArtifactProduced?: (markdown: string, missionUserBrief: string) => void;
   /** Après le brief orchestrateur : titre proposé pour la conversation (sidebar gauche). */
   onConversationTitleSuggested?: (title: string) => void;
 }
@@ -249,7 +249,7 @@ export function MissionWorkspace({
       });
       const finalMd = unwrapMarkdownFence(md);
       setResultMd(finalMd);
-      onArtifactProduced?.(finalMd);
+      onArtifactProduced?.(finalMd, context);
     } catch (e) {
       if ((e as Error).name === "AbortError") {
         setProgress((p) => [...p, "Interrompu."]);

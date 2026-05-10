@@ -168,6 +168,8 @@ export default function App() {
         discussionCutoffAfterId?: string;
         /** Nouveau livrable (mission) : annule la coupure pour le prochain apply. */
         clearDiscussionCutoff?: boolean;
+        /** Contexte mission au moment du livrable (première demande utilisateur). */
+        missionUserBrief?: string;
       },
     ) => {
       setConversations((prev) =>
@@ -180,11 +182,16 @@ export default function App() {
           if (opts?.discussionCutoffAfterId !== undefined) {
             artifactDiscussionCutoffAfterId = opts.discussionCutoffAfterId;
           }
+          const missionUserBrief =
+            opts?.missionUserBrief !== undefined
+              ? opts.missionUserBrief
+              : c.missionUserBrief;
           return {
             ...c,
             artifactMarkdown: markdown,
             updatedAt: Date.now(),
             artifactDiscussionCutoffAfterId,
+            missionUserBrief,
           };
         }),
       );

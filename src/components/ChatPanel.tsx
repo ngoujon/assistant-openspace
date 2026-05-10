@@ -70,6 +70,7 @@ interface ChatPanelProps {
     opts?: {
       discussionCutoffAfterId?: string;
       clearDiscussionCutoff?: boolean;
+      missionUserBrief?: string;
     },
   ) => void;
   activityState: RightActivityState;
@@ -256,6 +257,7 @@ export function ChatPanel({
           souls,
           discussionMessages: discussionForPatch,
           artifactMarkdown: art,
+          missionUserBrief: conversation.missionUserBrief,
           signal: ac.signal,
         });
         const finalMd = unwrapMarkdownFence(raw);
@@ -263,9 +265,9 @@ export function ChatPanel({
           id: crypto.randomUUID(),
           role: "assistant",
           content:
-            "Le livrable Markdown a été révisé d’après la discussion. Tu peux le télécharger depuis la barre « Livrable lié » ou poursuivre les échanges.",
+            "Le fichier Markdown lié a été mis à jour d’après la discussion. Utilise **Télécharger .md** pour voir le document complet à jour ; ici on reste sur les échanges (questions, clarifications), pas sur le corps du livrable.",
           speakerLabel: "Orchestrateur",
-          routingNote: "Synthèse de la discussion intégrée au document.",
+          routingNote: "Fusion discussion → livrable.",
           artifactPatchNote: true,
         };
         onConversationArtifact(conversation.id, finalMd, {
@@ -286,6 +288,7 @@ export function ChatPanel({
       conversation.messages,
       conversation.artifactMarkdown,
       conversation.artifactDiscussionCutoffAfterId,
+      conversation.missionUserBrief,
       llmProvider,
       mistralApiKey,
       model,
@@ -349,6 +352,8 @@ export function ChatPanel({
             historyWithLatestUser: historyWithUser,
             signal: ac.signal,
             forcedResponderId,
+            missionUserBrief: conversation.missionUserBrief,
+            artifactMarkdown: conversation.artifactMarkdown,
           });
 
           const speakerLabel =
@@ -377,6 +382,8 @@ export function ChatPanel({
             responderId: routing.responderId,
             brief: routing.brief,
             historyWithLatestUser: historyWithUser,
+            missionUserBrief: conversation.missionUserBrief,
+            artifactMarkdown: conversation.artifactMarkdown,
             onToken: (chunk) => {
               assistantAccum += chunk;
               setMessages((prev) =>
@@ -445,6 +452,7 @@ export function ChatPanel({
       conversation.id,
       conversation.messages,
       conversation.artifactMarkdown,
+      conversation.missionUserBrief,
       setMessages,
       onConversationTitle,
       patchArtifactFromDiscussion,
@@ -598,9 +606,10 @@ export function ChatPanel({
           mistralApiKey={mistralApiKey}
           model={model}
           onActivityReport={reportMissionActivity}
-          onArtifactProduced={(md) => {
+          onArtifactProduced={(md, missionUserBrief) => {
             onConversationArtifact(conversation.id, md, {
               clearDiscussionCutoff: true,
+              missionUserBrief,
             });
             if (md.trim()) {
               setMode("free");
@@ -652,11 +661,14 @@ export function ChatPanel({
             <strong>@mention</strong> : tape <kbd>@</kbd> pour la liste ({" "}
             <kbd>↑</kbd> <kbd>↓</kbd> puis <kbd>Entrée</kbd>), ou saisis{" "}
             <code>@orchestrateur</code> / id comme dans <strong>Équipe</strong>.
-            Sans @, l’orchestrateur choisit qui répond. Pendant une réponse,{" "}
+            Sans @, l’orchestrateur choisit qui répond. L’équipe voit ton **brief
+            mission** et un **extrait du livrable** ; les réponses du chat restent
+            **courtes** (questions, clarté) — le texte révisé du fichier passe par{" "}
+            <strong>Télécharger</strong> après fusion. Pendant une réponse,{" "}
             <strong>Entrée</strong> ou <strong>Mettre en file</strong> enchaîne des
-            messages visibles au-dessus du champ (compteur même replié).
+            messages au-dessus du champ.
             {conversation.artifactMarkdown?.trim()
-              ? " Pour intégrer la discussion dans le document : écris « appliquer la mise à jour » ou le bouton ci-dessus."
+              ? " Pour mettre à jour le document : « appliquer la mise à jour » ou le bouton ci-dessus."
               : " Après une mission, le livrable est lié ici pour affinage."}
           </p>
           <div className="chat-messages" role="log" aria-live="polite">
