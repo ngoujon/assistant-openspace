@@ -4,6 +4,7 @@ import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { fetchMistralModels } from "@/lib/mistral";
 import { ActivitySidebar } from "@/components/ActivitySidebar";
+import { ExchangesSidebar } from "@/components/ExchangesSidebar";
 import { markdownFilenameFromConversationTitle } from "@/lib/downloadMarkdown";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Layout } from "@/components/Layout";
@@ -235,7 +236,14 @@ export default function App() {
     />
   );
 
-  const rightAsideEl = (
+  const exchangesAsideEl = (
+    <ExchangesSidebar
+      state={activityForShell}
+      linkedArtifact={activityLinkedArtifact}
+    />
+  );
+
+  const activityAsideEl = (
     <ActivitySidebar
       state={activityForShell}
       linkedArtifact={activityLinkedArtifact}
@@ -275,7 +283,6 @@ export default function App() {
             setMessages={setActiveMessages}
             onConversationTitle={setConversationTitleById}
             onConversationArtifact={setConversationArtifactMarkdown}
-            activityState={activityForShell}
             setRightActivity={setRightActivity}
           />
         ) : (
@@ -285,12 +292,6 @@ export default function App() {
     </>
   );
 
-  const layoutShared = {
-    sidebar: sidebarEl,
-    main: mainEl,
-    rightAside: rightAsideEl,
-  };
-
   return (
     <>
       <SettingsModal
@@ -298,20 +299,19 @@ export default function App() {
         onClose={() => setSettingsOpen(false)}
         onSaved={refreshLlmModels}
       />
-      {mainTab === "team" ? (
-        <TeamWorkspaceProvider
-          model={model}
-          llmProvider={llmProvider}
-          mistralApiKey={mistralApiKey}
-        >
-          <Layout
-            {...layoutShared}
-            midAside={<TeamOrganisationAside />}
-          />
-        </TeamWorkspaceProvider>
-      ) : (
-        <Layout {...layoutShared} />
-      )}
+      <TeamWorkspaceProvider
+        model={model}
+        llmProvider={llmProvider}
+        mistralApiKey={mistralApiKey}
+      >
+        <Layout
+          sidebar={sidebarEl}
+          main={mainEl}
+          organisationAside={<TeamOrganisationAside />}
+          exchangesAside={exchangesAsideEl}
+          activityAside={activityAsideEl}
+        />
+      </TeamWorkspaceProvider>
     </>
   );
 }

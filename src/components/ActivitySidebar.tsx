@@ -6,13 +6,9 @@ import {
   type MissionStepVisualKind,
 } from "@/lib/parseMissionProgressLine";
 import type { LlmProvider } from "@/lib/llmProvider";
-import type { RightActivityState } from "@/types/activity";
+import type { ActivityLinkedArtifact, RightActivityState } from "@/types/activity";
 
-/** Livrable Markdown lié à la conversation (mission terminée ou fusion discussion). */
-export interface ActivityLinkedArtifact {
-  markdown: string;
-  filename: string;
-}
+export type { ActivityLinkedArtifact } from "@/types/activity";
 
 const STEP_KIND_LABELS: Record<MissionStepVisualKind, string | null> = {
   done: "Terminé",
@@ -164,61 +160,14 @@ export function ActivitySidebar({
   }
 
   if (state.kind === "discussion") {
-    const { isRouting, streaming, panelError, streamingSpeaker } = state;
-    const busy = isRouting || streaming;
+    if (isInline) return null;
     return (
-      <div
-        className={
-          isInline ? "activity-inline activity-inline-discussion" : "activity-sidebar"
-        }
-        role="status"
-        aria-live="polite"
-        aria-busy={busy}
-      >
-        <h2 className="activity-sidebar-title">Échanges en cours</h2>
-        {panelError && (
-          <p className="activity-sidebar-error" role="alert">
-            {panelError}
-          </p>
-        )}
-        {!panelError && isRouting && (
-          <p className="activity-sidebar-status">
-            L’orchestrateur choisit le membre le plus qualifié pour répondre…
-          </p>
-        )}
-        {!panelError && !isRouting && streaming && (
-          <p className="activity-sidebar-status">
-            {streamingSpeaker ? (
-              <>
-                Réponse en cours de <strong>{streamingSpeaker}</strong>…
-              </>
-            ) : (
-              "Réponse en cours de génération…"
-            )}
-          </p>
-        )}
-        {!panelError && !busy && linkedArtifact && (
-          <div className="activity-artifact-download">
-            <button
-              type="button"
-              className="btn-primary btn-compact"
-              aria-label="Télécharger le livrable Markdown (.md)"
-              onClick={() =>
-                triggerMarkdownDownload(
-                  linkedArtifact.markdown,
-                  linkedArtifact.filename,
-                )
-              }
-            >
-              Télécharger le .md
-            </button>
-          </div>
-        )}
-        {!panelError && !busy && !linkedArtifact && (
-          <p className="activity-sidebar-muted">
-            Aucun envoi en cours. Écris un message et envoie pour lancer l’équipe.
-          </p>
-        )}
+      <div className="activity-sidebar" role="complementary" aria-label="Activité">
+        <h2 className="activity-sidebar-title">Activité</h2>
+        <p className="activity-sidebar-muted">
+          En phase <strong>Mission équipe</strong>, étapes et durée s’affichent ici. En
+          discussion, le détail des envois est dans la colonne « Échanges en cours ».
+        </p>
       </div>
     );
   }

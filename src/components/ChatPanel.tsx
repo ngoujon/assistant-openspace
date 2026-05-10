@@ -6,7 +6,6 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { ActivitySidebar } from "@/components/ActivitySidebar";
 import { MissionWorkspace } from "@/components/MissionWorkspace";
 import {
   applyDiscussionToArtifact,
@@ -80,7 +79,6 @@ interface ChatPanelProps {
       missionUserBrief?: string;
     },
   ) => void;
-  activityState: RightActivityState;
   setRightActivity: Dispatch<SetStateAction<RightActivityState>>;
 }
 
@@ -96,7 +94,6 @@ export function ChatPanel({
   setMessages,
   onConversationTitle,
   onConversationArtifact,
-  activityState,
   setRightActivity,
 }: ChatPanelProps) {
   const [mode, setMode] = useState<ChatMode>(() =>
@@ -209,15 +206,6 @@ export function ChatPanel({
       markdownFilenameFromConversationTitle(conversation.title),
     );
   }, [conversation.artifactMarkdown, conversation.title]);
-
-  const trimmedArtifact = conversation.artifactMarkdown?.trim();
-  const linkedArtifactForActivity =
-    trimmedArtifact && trimmedArtifact.length > 0
-      ? {
-          markdown: trimmedArtifact,
-          filename: markdownFilenameFromConversationTitle(conversation.title),
-        }
-      : null;
 
   const patchArtifactFromDiscussion = useCallback(
     async (instructionText: string) => {
@@ -602,15 +590,6 @@ export function ChatPanel({
           )}
         </div>
       </header>
-
-      <div className="activity-inline-wrap" aria-hidden={false}>
-        <ActivitySidebar
-          state={activityState}
-          variant="inline"
-          linkedArtifact={linkedArtifactForActivity}
-          llmProvider={llmProvider}
-        />
-      </div>
 
       {mode === "mission" ? (
         <MissionWorkspace

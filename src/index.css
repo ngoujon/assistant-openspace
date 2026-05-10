@@ -27,8 +27,9 @@
   --font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, sans-serif;
   --sidebar-w: 272px;
-  --org-aside-w: minmax(260px, 22rem);
-  --right-w: minmax(288px, 34rem);
+  --org-aside-w: minmax(240px, 20rem);
+  --exchanges-w: minmax(220px, 22rem);
+  --activity-w: minmax(260px, 34rem);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 12px 40px rgba(0, 0, 0, 0.38);
   --shadow-modal: 0 28px 90px rgba(0, 0, 0, 0.55),
@@ -79,16 +80,23 @@ body {
   font-size: 0.9rem;
 }
 
-/* ——— Shell 3 ou 4 colonnes (Équipe : Organisation avant Activité) ——— */
+/* ——— Shell : sidebar | contenu | HUD (Organisation · Échanges · Activité) ——— */
 .shell {
   display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr var(--right-w);
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) auto;
   height: 100%;
   min-height: 100vh;
 }
 
-.shell.shell--with-org-aside {
-  grid-template-columns: var(--sidebar-w) 1fr var(--org-aside-w) var(--right-w);
+.shell.shell--with-hud > .shell-hud {
+  display: grid;
+  grid-template-columns: var(--org-aside-w) var(--exchanges-w) var(--activity-w);
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .shell-sidebar {
@@ -109,43 +117,38 @@ body {
   background: transparent;
 }
 
-.shell-org {
+.shell-org,
+.shell-exchanges,
+.shell-activity {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border-left: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   overflow: hidden;
 }
 
-.shell-org > * {
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+.shell-org {
+  border-right: 1px solid var(--border);
 }
 
-.shell-right {
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+.shell-exchanges {
+  border-right: 1px solid var(--border);
+}
+
+.shell-activity {
   overflow: auto;
-  min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
 
-.shell-right > * {
+.shell-org > *,
+.shell-exchanges > *,
+.shell-activity > * {
   flex: 1 1 auto;
   min-height: 0;
-  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .activity-sidebar {
@@ -2316,9 +2319,9 @@ body {
 }
 
 @media (max-width: 900px) {
-  .shell {
+  .shell.shell--with-hud {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto 1fr auto;
   }
 
   .shell-sidebar {
@@ -2327,12 +2330,33 @@ body {
     max-height: 38vh;
   }
 
-  .shell-right {
-    display: none;
+  .shell.shell--with-hud > .shell-hud {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: unset;
+    max-height: 42vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .shell-org,
+  .shell-exchanges {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .shell-activity {
+    overflow: visible;
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .activity-inline-wrap {
-    display: block;
+    display: none;
   }
 
   .chat-panel {

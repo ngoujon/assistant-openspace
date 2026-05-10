@@ -188,7 +188,7 @@ function TeamBranch({
   );
 }
 
-/** Colonne pleine hauteur à gauche de l’activité : arbre Organisation. */
+/** Colonne Organisation (arbre hiérarchique), à gauche des échanges et de l’activité. */
 export function TeamOrganisationAside() {
   const [archiveModalOpen, setArchiveModalOpen] = useState(false);
   const {

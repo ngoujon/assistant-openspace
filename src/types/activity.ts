@@ -1,3 +1,9 @@
+/** Livrable Markdown lié à la conversation (mission terminée ou fusion discussion). */
+export interface ActivityLinkedArtifact {
+  markdown: string;
+  filename: string;
+}
+
 /** Contenu de la colonne droite (activité / échanges en cours). */
 export type RightActivityState =
   | { kind: "idle" }

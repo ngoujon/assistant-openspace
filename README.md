@@ -71,13 +71,13 @@ Puis **http://localhost:3004**. Ollama doit être **lancé sur l’hôte** (le c
 
 ### Équipe
 
-- Arbre **modifiable** : nouveaux membres sous l’orchestrateur, **glisser-déposer** sous l’orchestrateur ou sous un agent, suppression.
-- Modale **âme / rôle** par membre, avec bouton **Générer un seed** (LLM configuré, selon le nom et la place dans l’équipe — choisir le modèle Ollama dans la barre du chat si besoin).
+- L’**arbre** est visible en permanence dans la colonne **Organisation** (à droite du contenu) : nouveaux membres sous l’orchestrateur, **glisser-déposer** sous l’orchestrateur ou sous un agent, suppression.
+- L’onglet **Équipe** ouvre la zone centrale (titre « Équipe virtuelle ») pour la modale **âme / rôle** ; bouton **Générer un seed** (LLM configuré — modèle Ollama dans la barre du chat si besoin).
 
 ### Autres
 
 - **Colonne gauche** : conversations, persistance `localStorage` ; icône **Paramètres** à droite du titre OpenSpace (fournisseur LLM, clé Mistral, prompts pour **Générer un seed**).
-- **Colonne droite** : réservée pour extensions.
+- **À droite du chat** : trois colonnes — **Organisation** (arbre de l’équipe), **Échanges en cours** (statuts discussion), **Activité** (mission : étapes, durée).
 
 ## Proxy LLM
 
