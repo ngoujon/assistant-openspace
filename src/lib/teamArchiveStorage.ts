@@ -129,3 +129,17 @@ export function deleteTeamArchive(id: string): void {
   const list = loadTeamArchives().filter((e) => e.id !== id);
   saveTeamArchives(list);
 }
+
+/** Remplace une entrée d’archive (ex. après régénération des âmes). */
+export function replaceTeamArchiveEntry(updated: TeamArchiveEntry): void {
+  const list = loadTeamArchives().map((e) =>
+    e.id === updated.id
+      ? {
+          ...updated,
+          members: structuredClone(updated.members),
+          souls: { ...updated.souls },
+        }
+      : e,
+  );
+  saveTeamArchives(list.sort((a, b) => b.createdAt - a.createdAt));
+}

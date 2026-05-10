@@ -1,13 +1,26 @@
-import { useCallback, useId, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
+import { useTeamWorkspace } from "@/components/TeamWorkspaceContext";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { generateMemberSoulSeed } from "@/lib/generateMemberSeed";
+import {
+  MISTRAL_MISSION_INTER_STEP_MS,
+  sleepMs,
+} from "@/lib/llmRateLimit";
 import {
   appendTeamArchive,
   deleteTeamArchive,
   loadTeamArchives,
+  replaceTeamArchiveEntry,
   soulsAfterRestore,
   type TeamArchiveEntry,
 } from "@/lib/teamArchiveStorage";
-import type { TreeMember } from "@/lib/teamTreeStorage";
+import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
 
 interface TeamArchiveSectionProps {
   members: TreeMember[];
@@ -22,20 +35,41 @@ const dateFmt = new Intl.DateTimeFormat("fr-FR", {
   timeStyle: "short",
 });
 
+function sortedMembersForSeedPass(members: TreeMember[]): TreeMember[] {
+  const copy = [...members];
+  copy.sort((a, b) => {
+    if (a.id === ORCHESTRATOR_ID) return -1;
+    if (b.id === ORCHESTRATOR_ID) return 1;
+    return a.order - b.order || a.id.localeCompare(b.id);
+  });
+  return copy;
+}
+
 export function TeamArchiveSection({
   members,
   souls,
   onRestore,
   variant = "default",
 }: TeamArchiveSectionProps) {
+  const { model, llmProvider, mistralApiKey } = useTeamWorkspace();
   const nameFieldId = useId();
+  const seedAbortRef = useRef<AbortController | null>(null);
   const [archives, setArchives] = useState<TeamArchiveEntry[]>(loadTeamArchives);
   const [draftName, setDraftName] = useState("");
+  const [seedingArchiveId, setSeedingArchiveId] = useState<string | null>(null);
+  const [seedBulkError, setSeedBulkError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<
     | { kind: "restore"; entry: TeamArchiveEntry }
     | { kind: "delete"; entry: TeamArchiveEntry }
+    | { kind: "regenerateSouls"; entry: TeamArchiveEntry }
     | null
   >(null);
+
+  useEffect(() => {
+    return () => {
+      seedAbortRef.current?.abort();
+    };
+  }, []);
 
   const refresh = useCallback(() => {
     setArchives(loadTeamArchives());
@@ -66,10 +100,65 @@ export function TeamArchiveSection({
     [refresh],
   );
 
+  const runRegenerateArchiveSouls = useCallback(
+    async (entry: TeamArchiveEntry) => {
+      const m = model.trim();
+      if (!m) {
+        setSeedBulkError(
+          "Aucun modèle de chat configuré. Choisis-en un dans Paramètres.",
+        );
+        return;
+      }
+      setSeedBulkError(null);
+      setSeedingArchiveId(entry.id);
+      const ac = new AbortController();
+      seedAbortRef.current = ac;
+      try {
+        const ordered = sortedMembersForSeedPass(entry.members);
+        const byId = new Map(ordered.map((x) => [x.id, x]));
+        const nextSouls: Record<string, string> = { ...entry.souls };
+        for (let i = 0; i < ordered.length; i++) {
+          const mem = ordered[i]!;
+          const parent = mem.parentId ? byId.get(mem.parentId) : undefined;
+          const text = await generateMemberSoulSeed({
+            llmProvider,
+            mistralApiKey,
+            model: m,
+            memberLabel: mem.label.trim(),
+            parentId: mem.parentId,
+            parentLabel: parent?.label ?? null,
+            signal: ac.signal,
+          });
+          nextSouls[mem.id] = text;
+          if (llmProvider === "mistral" && i < ordered.length - 1) {
+            await sleepMs(MISTRAL_MISSION_INTER_STEP_MS, ac.signal);
+          }
+        }
+        replaceTeamArchiveEntry({
+          ...entry,
+          souls: nextSouls,
+        });
+        refresh();
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        setSeedBulkError(
+          (e as Error).message || "Échec de la régénération des âmes.",
+        );
+      } finally {
+        setSeedingArchiveId(null);
+        seedAbortRef.current = null;
+      }
+    },
+    [llmProvider, mistralApiKey, model, refresh],
+  );
+
   const wrapClass =
     variant === "modal"
       ? "team-archive-wrap team-archive-wrap--modal"
       : "team-archive-wrap";
+
+  const seedingBusy = seedingArchiveId !== null;
+  const canBulkSeed = Boolean(model.trim());
 
   return (
     <div className={wrapClass}>
@@ -106,6 +195,11 @@ export function TeamArchiveSection({
           </button>
         </div>
       </div>
+      {seedBulkError ? (
+        <p className="team-archive-seed-error" role="alert">
+          {seedBulkError}
+        </p>
+      ) : null}
       {archives.length === 0 ? (
         <p className="team-archive-empty">Aucune archive pour l’instant.</p>
       ) : (
@@ -121,7 +215,26 @@ export function TeamArchiveSection({
               <div className="team-archive-actions">
                 <button
                   type="button"
+                  className="btn-secondary btn-compact"
+                  disabled={
+                    !canBulkSeed || seedingBusy || a.members.length === 0
+                  }
+                  title={
+                    canBulkSeed
+                      ? "Régénérer les textes « âme et rôle » (LLM) pour chaque membre de cette composition, puis enregistrer dans l’archive."
+                      : "Configure un modèle dans Paramètres pour régénérer les âmes."
+                  }
+                  aria-busy={seedingArchiveId === a.id}
+                  onClick={() => setConfirm({ kind: "regenerateSouls", entry: a })}
+                >
+                  {seedingArchiveId === a.id
+                    ? "Régénération…"
+                    : "Régénérer les âmes"}
+                </button>
+                <button
+                  type="button"
                   className="btn-primary btn-compact"
+                  disabled={seedingBusy}
                   onClick={() => setConfirm({ kind: "restore", entry: a })}
                 >
                   Restaurer
@@ -129,6 +242,7 @@ export function TeamArchiveSection({
                 <button
                   type="button"
                   className="btn-link team-archive-delete"
+                  disabled={seedingBusy}
                   onClick={() => setConfirm({ kind: "delete", entry: a })}
                 >
                   Supprimer
@@ -145,7 +259,9 @@ export function TeamArchiveSection({
           title={
             confirm.kind === "restore"
               ? "Restaurer cette composition ?"
-              : "Supprimer cette archive ?"
+              : confirm.kind === "delete"
+                ? "Supprimer cette archive ?"
+                : "Régénérer toutes les âmes ?"
           }
           description={
             confirm.kind === "restore" ? (
@@ -155,22 +271,38 @@ export function TeamArchiveSection({
                 cours seront écrasés. Une copie reste dans les archives tant que tu
                 ne la supprimes pas.
               </p>
-            ) : (
+            ) : confirm.kind === "delete" ? (
               <p className="modal-confirm-text">
                 Supprimer définitivement «{" "}
                 <strong>{confirm.entry.name}</strong> » ? Cette action ne peut pas
                 être annulée.
               </p>
+            ) : (
+              <p className="modal-confirm-text">
+                La composition « <strong>{confirm.entry.name}</strong> » compte{" "}
+                <strong>{confirm.entry.members.length}</strong> membre
+                {confirm.entry.members.length > 1 ? "s" : ""}. Un appel au modèle
+                sera fait <strong>par membre</strong> pour réécrire les textes « âme
+                et rôle », puis l’archive sera mise à jour (l’équipe active ne change
+                pas tant que tu ne restaures pas).
+              </p>
             )
           }
           confirmLabel={
-            confirm.kind === "restore" ? "Restaurer" : "Supprimer"
+            confirm.kind === "restore"
+              ? "Restaurer"
+              : confirm.kind === "delete"
+                ? "Supprimer"
+                : "Régénérer"
           }
-          confirmTone={confirm.kind === "restore" ? "primary" : "danger"}
+          confirmTone={
+            confirm.kind === "delete" ? "danger" : "primary"
+          }
           onClose={() => setConfirm(null)}
           onConfirm={() => {
             if (confirm.kind === "restore") applyRestore(confirm.entry);
-            else applyDelete(confirm.entry);
+            else if (confirm.kind === "delete") applyDelete(confirm.entry);
+            else void runRegenerateArchiveSouls(confirm.entry);
           }}
         />
       ) : null}

@@ -2015,6 +2015,13 @@ body {
   gap: 0.35rem 0.5rem;
 }
 
+.team-archive-seed-error {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--danger);
+}
+
 .team-archive-delete {
   font-size: 0.8125rem;
 }

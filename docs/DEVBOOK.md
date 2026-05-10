@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Archives : régénérer toutes les âmes d’une composition
+
+### Objectif
+
+Dans la modale **Archives des compositions**, un bouton **Régénérer les âmes** (à gauche de **Restaurer**) relance la génération de seed **pour chaque membre** de l’archive via le LLM configuré, met à jour l’entrée `localStorage` (`replaceTeamArchiveEntry`), avec confirmation et pause Mistral entre appels.
+
+### Fichiers
+
+- `src/lib/teamArchiveStorage.ts`, `src/components/TeamArchiveSection.tsx`, `src/index.css`
+
+---
+
 ## 2026-05-10 — Discussion : réponses fil plus concises (3–7 lignes)
 
 ### Objectif
@@ -152,6 +164,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Activité : étape **analyse directe** (sans sous-agent) — pastille **membre** uniquement (plus de libellé « Pôle ») ; parse tolérant `—` / `–` / ` - ` |
 | 2026-05-10 | Compositeur @ : miroir **sans crochets** — pastille sur **copie invisible du littéral** `@[…]` (plus d’approximation `ch`) + curseur repoussé hors mention + flèches ← → en bloc |
 | 2026-05-10 | Discussion : rendu **Markdown** (GFM) dans les bulles — titres, listes, code, tableaux ; mentions `@[…]` conservées ; liens http(s) / relatifs sûrs |
+| 2026-05-10 | Archives compositions : bouton **Régénérer les âmes** (LLM pour tous les membres de l’archive, à gauche de Restaurer) |
 | 2026-05-10 | Discussion : réponses fil **3–7 lignes max**, style télégraphique, **1–3 questions** en fin ; routage / stream / mentions multiples alignés |
 | 2026-05-10 | Activité : étapes « neutres » (gris) → pastille **SYSTEME** à la place du point ou d’une pastille vide |
 | 2026-05-10 | Compositeur @ : miroir aligné sur le littéral `@[…]` + sync scroll ; Activité discussion : une seule timeline (mission + session) |
