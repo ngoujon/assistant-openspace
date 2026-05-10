@@ -346,16 +346,6 @@ export function TeamPanel({
     <div className="team-panel">
       <h2 className="team-heading">Équipe virtuelle</h2>
 
-      <div className="team-actions-bar">
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={addUnderOrchestrator}
-        >
-          Nouveau membre (sous orchestrateur)
-        </button>
-      </div>
-
       <TeamArchiveSection
         members={members}
         souls={souls}
@@ -363,7 +353,16 @@ export function TeamPanel({
       />
 
       <div className="team-tree-wrap">
-        <h3 className="team-tree-title">Organisation</h3>
+        <div className="team-tree-head">
+          <h3 className="team-tree-title">Organisation</h3>
+          <button
+            type="button"
+            className="btn-primary team-tree-add-member"
+            onClick={addUnderOrchestrator}
+          >
+            Nouveau membre (sous orchestrateur)
+          </button>
+        </div>
         <ul
           className="team-tree-root team-tree-lineage-root"
           role="tree"
