@@ -17,6 +17,7 @@ import {
 import { resolveForcedResponderFromMessage } from "@/lib/discussionMention";
 import { sleepMs } from "@/lib/llmRateLimit";
 import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
+import { MentionRichText } from "@/components/MentionRichText";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
@@ -655,7 +656,13 @@ export function ChatPanel({
                     <p className="bubble-routing-note">{m.routingNote}</p>
                   )}
                   <div className="bubble-content">
-                    {m.content || (isPendingAssistant ? "…" : "")}
+                    {m.content ? (
+                      <MentionRichText text={m.content} />
+                    ) : isPendingAssistant ? (
+                      "…"
+                    ) : (
+                      ""
+                    )}
                   </div>
                 </article>
               );

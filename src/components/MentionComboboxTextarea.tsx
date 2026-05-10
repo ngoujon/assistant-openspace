@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import type { TreeMember } from "@/lib/teamTreeStorage";
+import { MentionRichText } from "@/components/MentionRichText";
 import {
   filterMentionCandidates,
   findBracketMentionSpans,
@@ -137,6 +138,7 @@ export function MentionComboboxTextarea({
   const escBlockAtRef = useRef<number | null>(null);
   const [cursor, setCursor] = useState(0);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [mirrorScrollTop, setMirrorScrollTop] = useState(0);
 
   useEffect(() => {
     if (value === "") setCursor(0);
@@ -265,45 +267,60 @@ export function MentionComboboxTextarea({
           ))}
         </div>
       )}
-      <textarea
-        ref={textareaRef}
-        id={id}
-        className={className}
-        rows={rows}
-        placeholder={placeholder}
-        value={value}
-        disabled={disabled}
-        aria-expanded={menuOpen}
-        aria-controls={menuOpen ? listboxId : undefined}
-        aria-activedescendant={
-          menuOpen
-            ? `mention-opt-${id ?? "ta"}-${candidates[mentionIndex]?.id}`
-            : undefined
-        }
-        onChange={(e) => {
-          onChange(e.target.value);
-          setCursor(e.target.selectionStart);
-          const c = getActiveMentionRange(
-            e.target.value,
-            e.target.selectionStart,
-          );
-          if (!c || escBlockAtRef.current !== c.start) {
-            escBlockAtRef.current = null;
+      <div className="mention-input-shell">
+        <div className="mention-mirror-clip" aria-hidden>
+          <div
+            className="mention-mirror-content"
+            style={{ transform: `translateY(-${mirrorScrollTop}px)` }}
+          >
+            {value ? <MentionRichText text={value} /> : null}
+          </div>
+        </div>
+        <textarea
+          ref={textareaRef}
+          id={id}
+          className={
+            className
+              ? `${className} mention-textarea-layer`
+              : "mention-textarea-layer"
           }
-        }}
-        onSelect={(e) => {
-          setCursor(e.currentTarget.selectionStart);
-          const c = getActiveMentionRange(
-            e.currentTarget.value,
-            e.currentTarget.selectionStart,
-          );
-          if (!c || escBlockAtRef.current !== c.start) {
-            escBlockAtRef.current = null;
+          rows={rows}
+          placeholder={placeholder}
+          value={value}
+          disabled={disabled}
+          aria-expanded={menuOpen}
+          aria-controls={menuOpen ? listboxId : undefined}
+          aria-activedescendant={
+            menuOpen
+              ? `mention-opt-${id ?? "ta"}-${candidates[mentionIndex]?.id}`
+              : undefined
           }
-        }}
-        onClick={(e) => setCursor(e.currentTarget.selectionStart)}
-        onKeyDown={onKeyDown}
-      />
+          onChange={(e) => {
+            onChange(e.target.value);
+            setCursor(e.target.selectionStart);
+            const c = getActiveMentionRange(
+              e.target.value,
+              e.target.selectionStart,
+            );
+            if (!c || escBlockAtRef.current !== c.start) {
+              escBlockAtRef.current = null;
+            }
+          }}
+          onSelect={(e) => {
+            setCursor(e.currentTarget.selectionStart);
+            const c = getActiveMentionRange(
+              e.currentTarget.value,
+              e.currentTarget.selectionStart,
+            );
+            if (!c || escBlockAtRef.current !== c.start) {
+              escBlockAtRef.current = null;
+            }
+          }}
+          onClick={(e) => setCursor(e.currentTarget.selectionStart)}
+          onScroll={(e) => setMirrorScrollTop(e.currentTarget.scrollTop)}
+          onKeyDown={onKeyDown}
+        />
+      </div>
     </div>
   );
 }

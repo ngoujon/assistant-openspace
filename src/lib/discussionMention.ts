@@ -73,6 +73,40 @@ export function findBracketMentionSpans(text: string): Array<{ start: number; en
   return spans;
 }
 
+/** Segment de texte brut ou mention `@[…]` pour affichage (badges, miroir compositeur). */
+export type BracketMentionVisualPart =
+  | { kind: "text"; text: string }
+  | { kind: "mention"; raw: string; displayLabel: string };
+
+/** Découpe le texte en alternance texte / mentions verrouillées `@[Libellé]`. */
+export function splitBracketMentionsForVisual(text: string): BracketMentionVisualPart[] {
+  const spans = findBracketMentionSpans(text);
+  const parts: BracketMentionVisualPart[] = [];
+  let cursor = 0;
+  for (const sp of spans) {
+    if (sp.start > cursor) {
+      parts.push({ kind: "text", text: text.slice(cursor, sp.start) });
+    }
+    const p = parseBracketMentionAt(text, sp.start);
+    if (!p) {
+      cursor = sp.start + 1;
+      continue;
+    }
+    const raw = text.slice(sp.start, p.end);
+    const displayLabel = unescapeMentionLabelFromBracket(p.innerEscaped).trim();
+    parts.push({
+      kind: "mention",
+      raw,
+      displayLabel: displayLabel || raw,
+    });
+    cursor = p.end;
+  }
+  if (cursor < text.length) {
+    parts.push({ kind: "text", text: text.slice(cursor) });
+  }
+  return parts;
+}
+
 /** Résout le libellé affiché dans `@[…]` vers un id membre. */
 export function resolveBracketMentionInner(
   innerEscaped: string,
