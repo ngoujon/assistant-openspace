@@ -24,7 +24,7 @@ import {
   sleepMs,
 } from "@/lib/llmRateLimit";
 import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
-import { MentionRichText } from "@/components/MentionRichText";
+import { DiscussionMessageBody } from "@/components/DiscussionMessageBody";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
@@ -773,9 +773,9 @@ export function ChatPanel({
                   {m.routingNote && (
                     <p className="bubble-routing-note">{m.routingNote}</p>
                   )}
-                  <div className="bubble-content">
+                  <div className="bubble-content bubble-content--md">
                     {m.content ? (
-                      <MentionRichText text={m.content} />
+                      <DiscussionMessageBody text={m.content} />
                     ) : isPendingAssistant ? (
                       "…"
                     ) : (

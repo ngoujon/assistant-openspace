@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Discussion : bulles en Markdown (GFM)
+
+### Objectif
+
+Afficher le contenu des messages de **discussion** avec mise en forme Markdown (titres, listes, code, tableaux, citations) tout en conservant les mentions `@[Libellé]` en pastilles.
+
+### Fichiers
+
+- `src/components/DiscussionMessageBody.tsx` (nouveau), `src/components/ChatPanel.tsx`, `src/index.css`, `package.json` (`react-markdown`, `remark-gfm`)
+
+---
+
 ## 2026-05-10 — Compositeur @ : miroir aligné + Activité discussion sur un seul fil
 
 ### Objectif
@@ -62,6 +74,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 
 | Date | Changement |
 |------|------------|
+| 2026-05-10 | Discussion : rendu **Markdown** (GFM) dans les bulles — titres, listes, code, tableaux ; mentions `@[…]` conservées ; liens http(s) / relatifs sûrs |
 | 2026-05-10 | Discussion : prompts renforcés — réponse fil **5–10 lignes max**, résumé des **modifications** uniquement, questions courtes en fin ; routage JSON et fallbacks alignés |
 | 2026-05-10 | Activité : étapes « neutres » (gris) → pastille **SYSTEME** à la place du point ou d’une pastille vide |
 | 2026-05-10 | Compositeur @ : miroir aligné sur le littéral `@[…]` + sync scroll ; Activité discussion : une seule timeline (mission + session) |
