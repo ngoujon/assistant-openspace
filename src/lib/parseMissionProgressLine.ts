@@ -6,17 +6,60 @@ export type MissionStepVisualKind =
   | "specialist"
   | "synthesis"
   | "pole-solo"
+  | "handoff"
   | "default";
 
 export interface ParsedMissionStep {
   step: number | null;
   total: number | null;
+  /** Texte brut après l’éventuel préfixe « Étape n/m — » (conservé pour clés / debug). */
   description: string;
   kind: MissionStepVisualKind;
+  /** Libellé court pour la pastille (membre) ; `null` → utiliser le libellé de type (ex. Terminé). */
+  displayPill: string | null;
+  /** Texte d’action seul, sans préfixe « Nom — » (affiché dans mission-step-desc). */
+  detailText: string;
+}
+
+function extractActorPathAndDetail(description: string): {
+  actorPath: string | null;
+  detailText: string;
+} {
+  const t = description.trim();
+  const intervenant = /^Intervenant\s*:\s*(.+)$/i.exec(t);
+  if (intervenant) {
+    return {
+      actorPath: intervenant[1].trim(),
+      detailText: "",
+    };
+  }
+  const idx = t.indexOf("—");
+  if (idx === -1) {
+    return { actorPath: null, detailText: t };
+  }
+  const left = t.slice(0, idx).trim();
+  const rest = t.slice(idx + 1).trim();
+  return { actorPath: left || null, detailText: rest };
+}
+
+function pillActorFromPath(
+  actorPath: string | null,
+  kind: MissionStepVisualKind,
+): string | null {
+  if (!actorPath) return null;
+  const bits = actorPath
+    .split(/\s*→\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (bits.length >= 2) {
+    if (kind === "delegation") return bits[0];
+    return bits[1];
+  }
+  return actorPath;
 }
 
 /**
- * Interprète les lignes émises par `runMissionPipeline` (`onProgress`).
+ * Interprète les lignes émises par `runMissionPipeline` (`onProgress`) et le journal Discussion.
  */
 export function parseMissionProgressLine(raw: string): ParsedMissionStep {
   const trimmed = raw.trim();
@@ -34,7 +77,9 @@ export function parseMissionProgressLine(raw: string): ParsedMissionStep {
   const full = trimmed.toLowerCase();
 
   let kind: MissionStepVisualKind = "default";
-  if (/terminé/.test(full)) {
+  if (/^intervenant\s*:/i.test(description)) {
+    kind = "handoff";
+  } else if (/terminé/.test(full)) {
     kind = "done";
   } else if (
     d.includes("document final") ||
@@ -47,15 +92,29 @@ export function parseMissionProgressLine(raw: string): ParsedMissionStep {
     kind = "orchestrator";
   } else if (d.includes("consignes au sous-agent")) {
     kind = "delegation";
-  } else if (d.includes("travail spécialisé") || d.startsWith("intervenant :")) {
+  } else if (d.includes("travail spécialisé")) {
     kind = "specialist";
-  } else if (d.includes("synthèse et ajustements")) {
+  } else if (
+    d.includes("synthèse et ajustements") ||
+    d.includes("intégration des apports du pôle")
+  ) {
     kind = "synthesis";
   } else if (d.includes("analyse directe")) {
     kind = "pole-solo";
   }
 
-  return { step, total, description, kind };
+  const { actorPath, detailText } = extractActorPathAndDetail(description);
+
+  let displayPill: string | null = null;
+  if (kind === "done") {
+    displayPill = null;
+  } else if (kind === "handoff") {
+    displayPill = actorPath;
+  } else {
+    displayPill = pillActorFromPath(actorPath, kind);
+  }
+
+  return { step, total, description, kind, displayPill, detailText };
 }
 
 /** Pourcentage 0–100 pour la barre, ou `null` si indéterminé. */

@@ -1,5 +1,10 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
+import { useTeamWorkspace } from "@/components/TeamWorkspaceContext";
 import { triggerMarkdownDownload } from "@/lib/downloadMarkdown";
+import {
+  findMemberByProgressLabel,
+  memberStepAccentStyle,
+} from "@/lib/memberStepColors";
 import {
   missionProgressPercent,
   parseMissionProgressLine,
@@ -19,6 +24,7 @@ const STEP_KIND_LABELS: Record<MissionStepVisualKind, string | null> = {
   specialist: "Spécialiste",
   synthesis: "Synthèse",
   "pole-solo": "Pôle",
+  handoff: null,
   default: "SYSTEME",
 };
 
@@ -31,6 +37,7 @@ function MissionStepTimeline({
   running: boolean;
   compact?: boolean;
 }) {
+  const { members } = useTeamWorkspace();
   const listRef = useRef<HTMLOListElement>(null);
   const pct = missionProgressPercent(progress);
   const showBar = progress.length > 0;
@@ -78,14 +85,29 @@ function MissionStepTimeline({
           const p = parseMissionProgressLine(line);
           const isLast = i === progress.length - 1;
           const isActive = running && isLast && p.kind !== "done";
-          const kindLabel = STEP_KIND_LABELS[p.kind];
+          const kindFallback = STEP_KIND_LABELS[p.kind];
+          const pillTextRaw =
+            p.displayPill?.trim() ||
+            (typeof kindFallback === "string" ? kindFallback : "");
+          const pillText = pillTextRaw || null;
+          const member = pillText
+            ? findMemberByProgressLabel(pillText, members)
+            : null;
+          const pillDisplay = (member?.label ?? pillText)?.trim() || null;
+          const accentStyle = memberStepAccentStyle(member, members);
           const defaultUnnumbered =
             p.kind === "default" &&
             (p.step == null || p.total == null);
+          const desc =
+            p.detailText.trim() ||
+            (p.kind === "handoff"
+              ? "Attribution de la réponse à ce membre."
+              : "");
           return (
             <li
               key={`${i}-${line.slice(0, 48)}`}
               className={`mission-step mission-step--${p.kind}${isActive ? " mission-step--active" : ""}`}
+              style={accentStyle}
             >
               <div className="mission-step-track" aria-hidden>
                 <span className="mission-step-dot-wrap">
@@ -109,25 +131,16 @@ function MissionStepTimeline({
                     </span>
                   ) : p.kind === "default" ? (
                     <span className="mission-step-pill mission-step-pill--systeme">
-                      {kindLabel}
+                      {kindFallback}
                     </span>
                   ) : (
                     <span className="mission-step-num mission-step-num--dot">·</span>
                   )}
-                  {kindLabel && !defaultUnnumbered ? (
-                    <span
-                      className={
-                        "mission-step-pill" +
-                        (p.kind === "default"
-                          ? " mission-step-pill--systeme"
-                          : "")
-                      }
-                    >
-                      {kindLabel}
-                    </span>
+                  {pillDisplay && !defaultUnnumbered ? (
+                    <span className="mission-step-pill">{pillDisplay}</span>
                   ) : null}
                 </div>
-                <p className="mission-step-desc">{p.description}</p>
+                {desc ? <p className="mission-step-desc">{desc}</p> : null}
               </div>
             </li>
           );

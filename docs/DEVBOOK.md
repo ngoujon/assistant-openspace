@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Activité : pastille membre, texte d’action seul, couleurs par pôle
+
+### Objectif
+
+Frise mission / discussion : **pastille** = libellé d’**agent ou sous-agent** (résolu via l’arbre équipe) avec **teinte stable** par pôle et variantes pour les sous-agents ; **description** = uniquement le **texte d’action** (sans préfixe « Nom — »). Lignes `Intervenant : …` classées à part avec libellé court.
+
+### Fichiers
+
+- `src/lib/memberStepColors.ts`, `src/lib/parseMissionProgressLine.ts`, `src/components/ActivitySidebar.tsx`, `src/index.css`
+
+---
+
 ## 2026-05-10 — Conversations : plus de renommage auto (mission / discussion)
 
 ### Objectif
