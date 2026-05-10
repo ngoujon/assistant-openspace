@@ -663,15 +663,6 @@ export function ChatPanel({
             </div>
           )}
           <div className="chat-messages" role="log" aria-live="polite">
-            {conversation.messages.length === 0 && (
-              <p className="chat-empty">
-                Tu t’adresses à <strong>toute l’équipe</strong>. L’
-                <strong>orchestrateur</strong> route chaque message vers le membre le
-                plus pertinent (ou répond lui-même pour une synthèse ou un arbitrage).
-                Utilise <strong>@</strong> pour parler à quelqu’un en direct. Configure
-                les rôles dans l’onglet <strong>Équipe</strong>.
-              </p>
-            )}
             {conversation.messages.map((m, i) => {
               const isPendingAssistant =
                 streaming &&

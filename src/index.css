@@ -877,15 +877,6 @@ body {
   scrollbar-color: var(--border-strong) transparent;
 }
 
-.chat-empty {
-  color: var(--text-tertiary);
-  font-size: 0.875rem;
-  margin: auto;
-  text-align: center;
-  max-width: 20rem;
-  line-height: 1.6;
-}
-
 .bubble {
   max-width: min(100%, 42rem);
   padding: 0.85rem 1.05rem;
