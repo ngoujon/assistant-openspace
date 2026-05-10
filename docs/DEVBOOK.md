@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Compositeur @ : miroir mesuré sur le littéral + curseur hors mention
+
+### Objectif
+
+Corriger la **sensation de zone cassée** après insertion d’une mention : le miroir utilisait une largeur en `ch` (mauvaise avec une police proportionnelle), ce qui **décalait** le curseur par rapport au texte transparent. Le badge repose sur une **copie invisible** du `@[…]` ; le curseur est **repoussé** s’il tombe à l’intérieur d’une mention verrouillée ; **← / →** traversent une mention comme un bloc.
+
+### Fichiers
+
+- `src/components/MentionRichText.tsx`, `src/components/MentionComboboxTextarea.tsx`, `src/index.css`
+
+---
+
 ## 2026-05-10 — Activité : pastille membre, texte d’action seul, couleurs par pôle
 
 ### Objectif
@@ -112,7 +124,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 |------|------------|
 | 2026-05-10 | Conversations : **plus de renommage automatique** après mission ni après discussion (titre sidebar stable) |
 | 2026-05-10 | Seeds équipe (défaut) : **spécialisation** métier stricte, hors-sujet explicite, positions techniques ; aide Paramètres mise à jour |
-| 2026-05-10 | Compositeur @ : miroir **sans crochets** (`@Libellé`) + sync scroll / `ResizeObserver` + pastille métrique (`ch`, pas de bordure) pour réduire le décalage du curseur |
+| 2026-05-10 | Compositeur @ : miroir **sans crochets** — pastille sur **copie invisible du littéral** `@[…]` (plus d’approximation `ch`) + curseur repoussé hors mention + flèches ← → en bloc |
 | 2026-05-10 | Discussion : rendu **Markdown** (GFM) dans les bulles — titres, listes, code, tableaux ; mentions `@[…]` conservées ; liens http(s) / relatifs sûrs |
 | 2026-05-10 | Discussion : prompts renforcés — réponse fil **5–10 lignes max**, résumé des **modifications** uniquement, questions courtes en fin ; routage JSON et fallbacks alignés |
 | 2026-05-10 | Activité : étapes « neutres » (gris) → pastille **SYSTEME** à la place du point ou d’une pastille vide |

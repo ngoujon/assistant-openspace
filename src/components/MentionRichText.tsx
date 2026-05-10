@@ -6,8 +6,8 @@ interface MentionRichTextProps {
   /** Classe sur le conteneur (ex. bulle de chat). */
   className?: string;
   /**
-   * Superposition compositeur : `@Libellé` sans crochets visibles ; largeur min. en `ch`
-   * pour se rapprocher de la chaîne `@[…]` sous-jacente (curseur).
+   * Superposition compositeur : badge `@Libellé` calé sur une copie invisible du
+   * littéral `@[…]` (même largeur que le textarea pour aligner le curseur).
    */
   metricMirror?: boolean;
 }
@@ -32,17 +32,16 @@ export function MentionRichText({
             ) : (
               <span
                 key={`m-${i}`}
-                className="agent-mention-badge agent-mention-badge--metric-mirror"
-                style={{
-                  minWidth: `${Math.max(
-                    part.raw.length,
-                    part.displayLabel.length + 2,
-                  )}ch`,
-                }}
+                className="mention-metric-slot"
                 title={part.raw}
                 translate="no"
               >
-                @{part.displayLabel}
+                <span className="mention-metric-measure" aria-hidden>
+                  {part.raw}
+                </span>
+                <span className="mention-metric-overlay agent-mention-badge agent-mention-badge--metric-mirror">
+                  @{part.displayLabel}
+                </span>
               </span>
             ),
           )

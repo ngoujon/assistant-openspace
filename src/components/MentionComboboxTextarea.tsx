@@ -14,6 +14,23 @@ import {
   formatBracketMention,
 } from "@/lib/discussionMention";
 
+/** Si le curseur est à l’intérieur d’un `@[…]` verrouillé, le place après `]` (saisie naturelle). */
+function snapCaretOutOfLockedMention(
+  value: string,
+  ta: HTMLTextAreaElement,
+  setCursor: (n: number) => void,
+): void {
+  if (ta.selectionStart !== ta.selectionEnd) return;
+  const c = ta.selectionStart;
+  for (const sp of findBracketMentionSpans(value)) {
+    if (c > sp.start && c < sp.end) {
+      ta.setSelectionRange(sp.end, sp.end);
+      setCursor(sp.end);
+      return;
+    }
+  }
+}
+
 function getActiveMentionRange(
   value: string,
   cursor: number,
@@ -170,6 +187,9 @@ export function MentionComboboxTextarea({
     const ta = textareaRef.current;
     if (!ta) return;
     setMirrorScrollTop(ta.scrollTop);
+    if (document.activeElement === ta) {
+      snapCaretOutOfLockedMention(value, ta, setCursor);
+    }
   }, [value, cursor]);
 
   useLayoutEffect(() => {
@@ -212,6 +232,35 @@ export function MentionComboboxTextarea({
     const ta = textareaRef.current;
     if (ta && tryHandleLockedBracketMentionKey(e, value, ta, onChange, setCursor)) {
       return;
+    }
+
+    if (
+      !menuOpen &&
+      ta &&
+      ta.selectionStart === ta.selectionEnd &&
+      (e.key === "ArrowLeft" || e.key === "ArrowRight")
+    ) {
+      const c = ta.selectionStart;
+      const spans = findBracketMentionSpans(value);
+      if (e.key === "ArrowLeft") {
+        for (const sp of spans) {
+          if (c > sp.start && c <= sp.end) {
+            e.preventDefault();
+            ta.setSelectionRange(sp.start, sp.start);
+            setCursor(sp.start);
+            return;
+          }
+        }
+      } else {
+        for (const sp of spans) {
+          if (c >= sp.start && c < sp.end) {
+            e.preventDefault();
+            ta.setSelectionRange(sp.end, sp.end);
+            setCursor(sp.end);
+            return;
+          }
+        }
+      }
     }
 
     if (menuOpen) {
@@ -317,27 +366,34 @@ export function MentionComboboxTextarea({
               : undefined
           }
           onChange={(e) => {
-            onChange(e.target.value);
-            setCursor(e.target.selectionStart);
-            const c = getActiveMentionRange(
-              e.target.value,
-              e.target.selectionStart,
-            );
+            const t = e.target;
+            onChange(t.value);
+            snapCaretOutOfLockedMention(t.value, t, setCursor);
+            setCursor(t.selectionStart);
+            const c = getActiveMentionRange(t.value, t.selectionStart);
             if (!c || escBlockAtRef.current !== c.start) {
               escBlockAtRef.current = null;
             }
           }}
           onSelect={(e) => {
-            setCursor(e.currentTarget.selectionStart);
-            const c = getActiveMentionRange(
-              e.currentTarget.value,
-              e.currentTarget.selectionStart,
-            );
+            const t = e.currentTarget;
+            snapCaretOutOfLockedMention(t.value, t, setCursor);
+            setCursor(t.selectionStart);
+            const c = getActiveMentionRange(t.value, t.selectionStart);
             if (!c || escBlockAtRef.current !== c.start) {
               escBlockAtRef.current = null;
             }
           }}
-          onClick={(e) => setCursor(e.currentTarget.selectionStart)}
+          onClick={(e) => {
+            const t = e.currentTarget;
+            snapCaretOutOfLockedMention(t.value, t, setCursor);
+            setCursor(t.selectionStart);
+          }}
+          onCompositionEnd={(e) => {
+            const t = e.currentTarget;
+            snapCaretOutOfLockedMention(t.value, t, setCursor);
+            setCursor(t.selectionStart);
+          }}
           onScroll={(e) => setMirrorScrollTop(e.currentTarget.scrollTop)}
           onKeyDown={onKeyDown}
         />

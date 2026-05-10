@@ -1335,6 +1335,31 @@ body {
   will-change: transform;
 }
 
+/* Largeur réelle du littéral @[…] (invisible) pour caler le badge @Libellé sur le textarea */
+.mention-metric-slot {
+  position: relative;
+  display: inline-block;
+  vertical-align: baseline;
+  max-width: 100%;
+}
+
+.mention-metric-measure {
+  visibility: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mention-metric-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
 .mention-combobox-wrap .mention-textarea-layer.chat-input:placeholder-shown {
   background: var(--bg-surface);
 }
