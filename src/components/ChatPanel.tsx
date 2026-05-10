@@ -119,6 +119,9 @@ export function ChatPanel({
     DiscussionQueuedMessage[]
   >([]);
   const [discussionQueueOpen, setDiscussionQueueOpen] = useState(false);
+  const [showMissionDraftHint, setShowMissionDraftHint] = useState(false);
+  const discussionRootRef = useRef<HTMLDivElement | null>(null);
+  const prevModeRef = useRef<ChatMode>(initialChatMode(conversation));
 
   useEffect(() => {
     const refresh = () => setTeamMembers(loadTeamMembers());
@@ -132,7 +135,6 @@ export function ChatPanel({
   }, []);
 
   useEffect(() => {
-    setInput("");
     setError(null);
     abortRef.current?.abort();
     abortRef.current = null;
@@ -143,8 +145,42 @@ export function ChatPanel({
     setDiscussionQueueOpen(false);
     const hasArtifact = !!conversation.artifactMarkdown?.trim();
     const hasMessages = conversation.messages.length > 0;
-    setMode(hasArtifact || hasMessages ? "free" : "mission");
+    const nextMode = hasArtifact || hasMessages ? "free" : "mission";
+    setMode(nextMode);
+    prevModeRef.current = nextMode;
+    if (
+      nextMode === "free" &&
+      !hasMessages &&
+      conversation.missionUserBrief?.trim()
+    ) {
+      setInput(conversation.missionUserBrief.trim());
+      setShowMissionDraftHint(true);
+    } else {
+      setInput("");
+      setShowMissionDraftHint(false);
+    }
   }, [conversation.id]);
+
+  /** Après passage Mission → Discussion : faire défiler vers le compositeur. */
+  useEffect(() => {
+    if (prevModeRef.current === "mission" && mode === "free") {
+      const id = window.requestAnimationFrame(() => {
+        discussionRootRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+      });
+      prevModeRef.current = mode;
+      return () => cancelAnimationFrame(id);
+    }
+    prevModeRef.current = mode;
+  }, [mode]);
+
+  useEffect(() => {
+    if (!showMissionDraftHint) return;
+    const t = window.setTimeout(() => setShowMissionDraftHint(false), 6500);
+    return () => window.clearTimeout(t);
+  }, [showMissionDraftHint]);
 
   /**
    * Colonne Activité : en mode Mission, réhydrater depuis le snapshot du projet
@@ -502,6 +538,7 @@ export function ChatPanel({
       return;
     }
     setInput("");
+    setShowMissionDraftHint(false);
     setError(null);
     if (!busy && discussionQueueRef.current.length === 0) {
       void runDiscussionSendOrPatchRef.current(text);
@@ -545,27 +582,52 @@ export function ChatPanel({
       </header>
 
       {mode === "mission" ? (
-        <MissionWorkspace
-          key={conversation.id}
-          llmProvider={llmProvider}
-          mistralApiKey={mistralApiKey}
-          model={model}
-          onActivityReport={reportMissionActivity}
-          onArtifactProduced={(md, missionUserBrief) => {
-            onConversationArtifact(conversation.id, md, {
-              clearDiscussionCutoff: true,
-              missionUserBrief,
-            });
-            if (md.trim()) {
-              setMode("free");
+        <div
+          className="chat-phase-surface chat-phase-surface--mission"
+          key={`mission-${conversation.id}`}
+        >
+          <MissionWorkspace
+            llmProvider={llmProvider}
+            mistralApiKey={mistralApiKey}
+            model={model}
+            onActivityReport={reportMissionActivity}
+            onArtifactProduced={(md, missionUserBrief) => {
+              onConversationArtifact(conversation.id, md, {
+                clearDiscussionCutoff: true,
+                missionUserBrief,
+              });
+              if (md.trim()) {
+                setInput(missionUserBrief.trim());
+                setShowMissionDraftHint(true);
+                setMode("free");
+              }
+            }}
+            onConversationTitleSuggested={(title) =>
+              onConversationTitle(conversation.id, title)
             }
-          }}
-          onConversationTitleSuggested={(title) =>
-            onConversationTitle(conversation.id, title)
-          }
-        />
+          />
+        </div>
       ) : (
-        <>
+        <div
+          ref={discussionRootRef}
+          className="chat-phase-surface chat-phase-surface--discussion"
+          key={`discussion-${conversation.id}`}
+        >
+          {showMissionDraftHint && (
+            <div className="mission-draft-hint" role="status">
+              {input.trim() ? (
+                <>
+                  Ton <strong>contexte mission</strong> est repris dans le champ ci-dessous.
+                  Tu peux le modifier avant d’envoyer à l’équipe.
+                </>
+              ) : (
+                <>
+                  <strong>Discussion</strong> ouverte — écris à l’équipe pour ajuster le
+                  livrable.
+                </>
+              )}
+            </div>
+          )}
           <div className="chat-messages" role="log" aria-live="polite">
             {conversation.messages.map((m, i) => {
               const isPendingAssistant =
@@ -653,7 +715,7 @@ export function ChatPanel({
             <MentionComboboxTextarea
               className="chat-input"
               rows={3}
-              placeholder="Message ou @membre… (ex. appliquer la mise à jour)"
+              placeholder="Message ou @membre… (le livrable se met à jour après chaque échange)"
               value={input}
               onChange={setInput}
               members={teamMembers}
@@ -688,7 +750,7 @@ export function ChatPanel({
               )}
             </div>
           </footer>
-        </>
+        </div>
       )}
     </div>
   );

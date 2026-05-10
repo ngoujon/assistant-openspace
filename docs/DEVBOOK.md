@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-10 — Mission → Discussion : conserver le contexte + transition
+
+### Objectif
+
+À la fin de mission, **reprendre le texte « Contexte »** dans le compositeur Discussion ; bandeau d’aide + animation d’entrée ; défilement doux vers le champ ; reprise du `missionUserBrief` à l’ouverture d’un projet sans messages encore.
+
+### Fichiers
+
+- `src/components/ChatPanel.tsx`, `src/index.css`
+
+---
+
 ## 2026-05-10 — Modèle Ollama : sélection dans Paramètres
 
 ### Objectif

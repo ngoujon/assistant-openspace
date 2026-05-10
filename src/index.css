@@ -795,6 +795,53 @@ body {
   margin: 0;
 }
 
+/* Transition Mission équipe → Discussion */
+.chat-phase-surface {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  animation: chat-phase-surface-in 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes chat-phase-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mission-draft-hint {
+  flex-shrink: 0;
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--accent-muted) 75%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
+  animation: mission-draft-hint-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+@keyframes mission-draft-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .chat-toolbar {
   flex-shrink: 0;
   padding: 0.875rem 0 0.5rem;
