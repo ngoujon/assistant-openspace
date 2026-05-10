@@ -164,6 +164,30 @@ export function ChatPanel({
     }
   }, [conversation.id]);
 
+  /**
+   * Livrable mission + brief persistés mais fil discussion vide : afficher le brief
+   * comme premier message (données anciennes ou tout juste après la mission).
+   */
+  useEffect(() => {
+    const brief = conversation.missionUserBrief?.trim();
+    if (!brief || !conversation.artifactMarkdown?.trim()) return;
+    if (conversation.messages.length > 0) return;
+    setMessages(conversation.id, () => [
+      {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: brief,
+        routingNote: "Demande envoyée en phase Mission équipe.",
+      },
+    ]);
+  }, [
+    conversation.id,
+    conversation.missionUserBrief,
+    conversation.artifactMarkdown,
+    conversation.messages.length,
+    setMessages,
+  ]);
+
   /** Après passage Mission → Discussion : faire défiler vers le compositeur. */
   useEffect(() => {
     if (prevModeRef.current === "mission" && mode === "free") {

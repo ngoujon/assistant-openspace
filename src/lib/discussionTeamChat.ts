@@ -25,6 +25,23 @@ function sliceText(s: string, max: number): string {
 /**
  * Brief mission + extrait du livrable pour le routage ou le stream discussion.
  */
+/**
+ * Si le 1er message utilisateur du fil reprend déjà le brief mission (ex. écho après mission),
+ * ne pas réinjecter le brief dans les blocs « contexte documentaire » (routage / stream / fusion).
+ */
+export function missionBriefUnlessEchoedInHistory(
+  missionUserBrief: string | null | undefined,
+  history: ChatMessage[],
+): string | undefined {
+  const b = missionUserBrief?.trim();
+  if (!b) return undefined;
+  const firstUser = history.find((m) => m.role === "user");
+  if (firstUser && firstUser.content.trim() === b) {
+    return undefined;
+  }
+  return missionUserBrief ?? undefined;
+}
+
 export function formatMissionAndArtifactForDiscussion(
   missionUserBrief: string | undefined | null,
   artifactMarkdown: string | undefined | null,
@@ -190,7 +207,10 @@ export async function routeDiscussionMessage(opts: {
   const hist = formatHistoryForRouting(historyWithLatestUser);
   const orchSoul = soul(souls, ORCHESTRATOR_ID);
   const docCtx = formatMissionAndArtifactForDiscussion(
-    missionUserBrief,
+    missionBriefUnlessEchoedInHistory(
+      missionUserBrief,
+      historyWithLatestUser,
+    ),
     artifactMarkdown,
     MAX_ARTIFACT_EXCERPT_ROUTING,
   );
@@ -243,7 +263,10 @@ export function buildDiscussionStreamMessages(opts: {
   } = opts;
   const responderSoul = soul(souls, responderId);
   const docBlock = formatMissionAndArtifactForDiscussion(
-    missionUserBrief,
+    missionBriefUnlessEchoedInHistory(
+      missionUserBrief,
+      historyWithLatestUser,
+    ),
     artifactMarkdown,
     MAX_ARTIFACT_EXCERPT_STREAM,
   );
@@ -430,8 +453,12 @@ export async function applyDiscussionToArtifact(opts: {
     doc = doc.slice(0, MAX_ARTIFACT) + "\n\n[… document tronqué pour le contexte …]";
   }
 
-  const missionSection = missionUserBrief?.trim()
-    ? `## Brief initial de la mission (première demande utilisateur)\n\n${sliceText(missionUserBrief, MAX_MISSION_BRIEF_IN_CTX)}\n\n---\n\n`
+  const mbForPatch = missionBriefUnlessEchoedInHistory(
+    missionUserBrief,
+    discussionMessages,
+  );
+  const missionSection = mbForPatch?.trim()
+    ? `## Brief initial de la mission (première demande utilisateur)\n\n${sliceText(mbForPatch, MAX_MISSION_BRIEF_IN_CTX)}\n\n---\n\n`
     : "";
 
   const userBlock = `${missionSection}Tu es l’**orchestrateur**. L’utilisateur a discuté avec l’équipe pour **ajuster** un livrable Markdown déjà produit (mission / rapport).

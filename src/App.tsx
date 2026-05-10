@@ -153,12 +153,17 @@ export default function App() {
           const messages = updater(c.messages);
           const hasAssistant = messages.some((m) => m.role === "assistant");
           const firstUser = messages.find((m) => m.role === "user");
-          /** Avant la 1ʳᵉ réponse : extrait du message utilisateur ; ensuite l’orchestrateur renomme via setActiveConversationTitle. */
+          const suggestedFromFirstUser =
+            firstUser?.content.slice(0, 48).trim() ?? "";
+          /**
+           * Avant la 1ʳᵉ réponse : titre depuis le 1er message utilisateur,
+           * sauf si un titre réel existe déjà (ex. proposé pendant la mission).
+           */
           const title =
             !hasAssistant && firstUser
-              ? firstUser.content.slice(0, 48).trim() ||
-                c.title ||
-                "Nouveau projet"
+              ? c.title.trim() && c.title !== "Nouveau projet"
+                ? c.title
+                : suggestedFromFirstUser || c.title || "Nouveau projet"
               : c.title;
           return {
             ...c,
