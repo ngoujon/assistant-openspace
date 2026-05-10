@@ -124,6 +124,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 |------|------------|
 | 2026-05-10 | Conversations : **plus de renommage automatique** après mission ni après discussion (titre sidebar stable) |
 | 2026-05-10 | Seeds équipe (défaut) : **spécialisation** métier stricte, hors-sujet explicite, positions techniques ; aide Paramètres mise à jour |
+| 2026-05-10 | Activité : étape **analyse directe** (sans sous-agent) — pastille **membre** uniquement (plus de libellé « Pôle ») ; parse tolérant `—` / `–` / ` - ` |
 | 2026-05-10 | Compositeur @ : miroir **sans crochets** — pastille sur **copie invisible du littéral** `@[…]` (plus d’approximation `ch`) + curseur repoussé hors mention + flèches ← → en bloc |
 | 2026-05-10 | Discussion : rendu **Markdown** (GFM) dans les bulles — titres, listes, code, tableaux ; mentions `@[…]` conservées ; liens http(s) / relatifs sûrs |
 | 2026-05-10 | Discussion : prompts renforcés — réponse fil **5–10 lignes max**, résumé des **modifications** uniquement, questions courtes en fin ; routage JSON et fallbacks alignés |

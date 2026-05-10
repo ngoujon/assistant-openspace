@@ -21,6 +21,9 @@ export interface ParsedMissionStep {
   detailText: string;
 }
 
+/** Séparateur « acteur — détail » tel qu’émis par la mission (`—`) ou variantes (copie / historique). */
+const ACTOR_DETAIL_SEP = /\s[—–]\s|\s-\s/;
+
 function extractActorPathAndDetail(description: string): {
   actorPath: string | null;
   detailText: string;
@@ -33,12 +36,12 @@ function extractActorPathAndDetail(description: string): {
       detailText: "",
     };
   }
-  const idx = t.indexOf("—");
-  if (idx === -1) {
+  const m = ACTOR_DETAIL_SEP.exec(t);
+  if (!m) {
     return { actorPath: null, detailText: t };
   }
-  const left = t.slice(0, idx).trim();
-  const rest = t.slice(idx + 1).trim();
+  const left = t.slice(0, m.index).trim();
+  const rest = t.slice(m.index + m[0].length).trim();
   return { actorPath: left || null, detailText: rest };
 }
 

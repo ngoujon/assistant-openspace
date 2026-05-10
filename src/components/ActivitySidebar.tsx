@@ -23,7 +23,8 @@ const STEP_KIND_LABELS: Record<MissionStepVisualKind, string | null> = {
   delegation: "Brief",
   specialist: "Spécialiste",
   synthesis: "Synthèse",
-  "pole-solo": "Pôle",
+  /** Pastille = libellé membre (`displayPill`) ; pas de libellé générique « Pôle ». */
+  "pole-solo": null,
   handoff: null,
   default: "SYSTEME",
 };
