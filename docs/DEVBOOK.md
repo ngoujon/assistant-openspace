@@ -40,6 +40,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Discussion : persistance `missionUserBrief` + contexte routage/stream/fusion ; consignes anti-recopie du livrable dans le chat |
 | 2026-05-10 | Mistral : retries 429/502/503 + `Retry-After` ; pause mission entre étapes ; pause courte routage → stream |
 | 2026-05-10 | UI : `.chat-input` pleine largeur (`width: 100%`, `box-sizing`) + file discussion `align-items: stretch` |
+| 2026-05-10 | Discussion : suppression du paragraphe d’aide sous le livrable (`discussion-routing-hint`) |
 
 ## 2026-03-28 — Bootstrap UI + Chat Ollama
 

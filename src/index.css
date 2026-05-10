@@ -907,16 +907,6 @@ body {
   box-shadow: inset 3px 0 0 0 var(--assistant-accent), var(--shadow-sm);
 }
 
-.discussion-routing-hint {
-  margin: 0 0 0.65rem;
-  padding: 0.45rem 0.65rem;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  background: var(--accent-muted);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-}
-
 .discussion-artifact-bar {
   margin: 0 0 0.65rem;
   padding: 0.65rem 0.75rem;

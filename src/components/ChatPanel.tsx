@@ -662,20 +662,6 @@ export function ChatPanel({
               </pre>
             </div>
           )}
-          <p className="discussion-routing-hint" role="note">
-            <strong>@mention</strong> : tape <kbd>@</kbd> pour la liste ({" "}
-            <kbd>↑</kbd> <kbd>↓</kbd> puis <kbd>Entrée</kbd>), ou saisis{" "}
-            <code>@orchestrateur</code> / id comme dans <strong>Équipe</strong>.
-            Sans @, l’orchestrateur choisit qui répond. L’équipe voit ton **brief
-            mission** et un **extrait du livrable** ; les réponses du chat restent
-            **courtes** (questions, clarté) — le texte révisé du fichier passe par{" "}
-            <strong>Télécharger</strong> après fusion. Pendant une réponse,{" "}
-            <strong>Entrée</strong> ou <strong>Mettre en file</strong> enchaîne des
-            messages au-dessus du champ.
-            {conversation.artifactMarkdown?.trim()
-              ? " Pour mettre à jour le document : « appliquer la mise à jour » ou le bouton ci-dessus."
-              : " Après une mission, le livrable est lié ici pour affinage."}
-          </p>
           <div className="chat-messages" role="log" aria-live="polite">
             {conversation.messages.length === 0 && (
               <p className="chat-empty">
