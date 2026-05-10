@@ -197,13 +197,9 @@ export async function routeDiscussionMessage(opts: {
 
   if (forcedResponderId) {
     const id = validateResponderId(forcedResponderId, members);
-    const label =
-      members.find((m) => m.id === id)?.label ??
-      (id === ORCHESTRATOR_ID ? "Orchestrateur" : id);
     return {
       responderId: id,
       brief: `${buildDirectMentionBrief(id, members)}\n\n${DISCUSSION_REPLY_STYLE_RULES}`,
-      userNote: `Message adressé à **${label}** (@mention). Réponse **5–10 lignes max** : résumé des modifications + questions courtes ; le détail va dans le .md après fusion.`,
     };
   }
 
