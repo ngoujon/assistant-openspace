@@ -1,6 +1,11 @@
 import { generateMissionConversationTitle } from "@/lib/discussionTeamChat";
 import { completeLlmChat } from "@/lib/llmChat";
 import {
+  LLM_AGENT_OUTPUT_BUDGET_FR,
+  LLM_MAX_TOKENS_AGENT_STEP,
+  LLM_MAX_TOKENS_DOCUMENT,
+} from "@/lib/llmOutputLimits";
+import {
   MISTRAL_MISSION_AFTER_TITLE_MS,
   MISTRAL_MISSION_INTER_STEP_MS,
   MISTRAL_MISSION_LEAD_TO_SUB_MS,
@@ -102,7 +107,7 @@ const TEMP_FINAL = 0.22;
 const ORCHESTRATOR_FINAL_SYSTEM_APPEND = `
 
 — **Livrable final (obligatoire)** —
-Tu rédiges un **rapport complet** à partir des blocs fournis par l’utilisateur dans le message suivant.
+Tu rédiges un **rapport synthétique mais exploitable** à partir des blocs fournis dans le message suivant : **priorité à la densité** (faits, listes, arbitrages) plutôt qu’au volume — le budget de sortie est **plafonné** côté technique.
 **Interdit** : squelette avec crochets du type \`[nom du projet]\`, \`[liste des …]\`, \`[à compléter]\`, \`[contexte]\`, ou toute ligne où le contenu utile serait **entre crochets** comme placeholder.
 **Interdit** : préambule du type « Voici le document » puis un bloc de code ; commence directement par \`# Titre\`.
 Chaque section doit contenir du **texte réel** (paragraphes, listes à puces avec éléments rédigés) issu des analyses fournies, pas un plan à trous.`;
@@ -132,9 +137,11 @@ async function missionComplete(
   messages: OllamaChatMessage[],
   signal: AbortSignal | undefined,
   temperature: number,
+  maxTokens: number,
 ): Promise<string> {
   const out = await completeLlmChat(llmProvider, mistralApiKey, model, messages, signal, {
     temperature,
+    maxTokens,
     ...(llmProvider === "ollama"
       ? { keepAlive: MISSION_KEEP_ALIVE }
       : {}),
@@ -198,9 +205,9 @@ ${orchestratorBrief}
 
 ---
 
-## 1) Matière brute — retours détaillés des membres (TU DOIS T’EN SERVIR POUR RÉDIGER)
+## 1) Matière brute — retours des membres (source à intégrer)
 
-**C’est la source principale du rapport.** Recopie ou reformule **sans la vider** : paragraphes denses, listes avec éléments rédigés, chiffres, exemples.
+**Synthétise** sans vider le sens : paragraphes courts, listes à puces **avec éléments rédigés**, chiffres et exemples quand ils figurent dans la source.
 
 Contributeurs concernés :
 ${contributorLines}
@@ -211,7 +218,7 @@ ${specialistBlock}
 
 ---
 
-## 2) Intégrations « directeur de pôle » (arbitrages — en complément du bloc 1)
+## 2) Intégrations « directeur de pôle » (arbitrages)
 
 ${poleSyntheses}
 
@@ -219,25 +226,25 @@ ${poleSyntheses}
 
 ## Consignes de rédaction du rapport final
 
-Tu produis un **rapport long** (souvent **plusieurs milliers de mots** si la matière ci-dessus est fournie), destiné à être lu comme un **dossier complet**, pas comme un README de structure.
+Tu produis un **rapport condensé** (équivalent **quelques pages** au plus une fois rendu), **dense** et **actionnable** : priorité aux décisions, risques, recommandations et liens transverses — **pas** une recopie exhaustive de tout le détail (celui-ci reste dans les étapes intermédiaires déjà produites).
 
 ### Interdictions absolues
 
-- **Aucun** placeholder entre crochets : pas de \`[nom du projet]\`, \`[liste des …]\`, \`[contexte]\`, \`[à compléter]\`, \`[description …]\`, etc. Les crochets \`[ ]\` pour marquer un trou sont **interdits**.
-- Pas de **squelette** : si une sous-partie n’a pas assez de matière, **tu la supprimes** ou tu la remplis avec du texte tiré du bloc 1, mais tu n’écris pas de titre suivi uniquement de puces génériques.
-- Pas de préambule « Voici le document », pas d’enveloppe \`\`\`markdown\`\`\` autour du tout : commence par \`# Titre du rapport\` (titre réel, pas « [titre] »).
+- **Aucun** placeholder entre crochets : pas de \`[nom du projet]\`, \`[liste des …]\`, \`[contexte]\`, \`[à compléter]\`, \`[description …]\`, etc.
+- Pas de **squelette** vide : pas de titre suivi uniquement de puces génériques.
+- Pas de préambule « Voici le document », pas d’enveloppe \`\`\`markdown\`\`\` autour du tout : commence par \`# Titre du rapport\` (titre réel).
 
 ### Obligations
 
-- Sous chaque grand titre, du **texte rédigé** : paragraphes complets, listes dont **chaque puce** est une phrase ou un segment informatif (pas « - [point à traiter] »).
-- **Analyses par domaine** : pour chaque pôle, section **longue** ; pour chaque spécialiste listé ci-dessus, un sous-titre \`####\` avec **le nom réel** du membre (comme dans le bloc 1), suivi de **plusieurs paragraphes** repris ou étroitement dérivés de son texte.
-- **Interdit** : section \`## Annexes\`, « fiches contributeurs », ou tout équivalent en fin de document — intègre la matière dans le corps du rapport (notamment sous **Analyses par domaine**), sans dupliquer en annexe.
+- Sous chaque grand titre : **texte rédigé** ; listes avec puces **informatives** (pas de tirets placeholders).
+- **Analyses par domaine** : pour chaque pôle, un \`###\` avec l’essentiel ; pour chaque spécialiste listé, un \`####\` avec **le nom réel** + **paragraphes courts** captant les points forts de son texte (pas une reprise intégrale).
+- **Interdit** : section \`## Annexes\` ou « fiches contributeurs » en doublon — tout tient dans le corps.
 
-Structure type (adapte les titres au sujet, mais **remplis** chaque partie) :
+Structure type (adapte, **remplis** chaque partie utilement) :
 
 - \`#\` Titre du rapport (concret)
 - \`## Contexte et problématique\`
-- \`## Analyses par domaine\` puis \`###\` par pôle puis \`####\` par spécialiste avec contenu dense
+- \`## Analyses par domaine\` puis \`###\` par pôle puis \`####\` par spécialiste si pertinent
 - \`## Synthèse transversale et arbitrages\`
 - \`## Recommandations et plan d’action\`
 
@@ -292,11 +299,12 @@ export async function runMissionPipeline(
       { role: "system", content: soul(souls, ORCHESTRATOR_ID) },
       {
         role: "user",
-        content: `${payloadSlice}\n\n---\nTâche : en tant qu’orchestrateur, pose un **cadre** pour l’équipe — **sans** réaliser toi tout l’analyse à leur place (sinon les pôles copient une synthèse courte et perdent en profondeur).\n\n1) **## Synthèse globale** : **10–18 lignes maximum** — enjeux, périmètre, risques transverses, hypothèses. Ajoute **2–4 angles que l’utilisateur n’a probablement pas explicités** (questions ouvertes, risques oubliés, dépendances) à explorer par les pôles. Pas de liste exhaustive : les détails seront produits par chaque pôle.\n\n2) Pour **chaque pôle** ci-dessous, un brief **## Pôle …** de **6–12 lignes** : questions à trancher, livrables attendus, contraintes, liens avec d’autres pôles — style **briefing**, pas rapport final. Inclut au moins **une piste « hors prompt initial »** par pôle (ce que l’utilisateur n’a peut-être pas envisagé dans son premier message).\n\nEn-têtes obligatoires :\n\n## Synthèse globale\n${poleHeaders}\n\nSois précis mais **bref** : chaque membre doit encore **développer** largement.`,
+        content: `${payloadSlice}\n\n---\nTâche : en tant qu’**orchestrateur**, pose un **cadre** pour l’équipe — **sans** réaliser toi toute l’analyse à leur place.\n\n1) **## Synthèse globale** : **6–10 lignes maximum** — enjeux, périmètre, risques transverses, hypothèses. Indique **2–3 angles** que l’utilisateur n’a probablement **pas** explicités (risques oubliés, dépendances).\n\n2) Pour **chaque pôle** ci-dessous, un brief **## Pôle …** de **4–8 lignes** : questions à trancher, livrables attendus, liens entre pôles — style **briefing**. **Une** piste « hors prompt initial » par pôle.\n\nEn-têtes obligatoires :\n\n## Synthèse globale\n${poleHeaders}\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
       },
     ],
     signal,
     TEMP,
+    LLM_MAX_TOKENS_AGENT_STEP,
   );
 
   if (onConversationTitleSuggested) {
@@ -335,11 +343,12 @@ export async function runMissionPipeline(
           { role: "system", content: soul(souls, lead.id) },
           {
             role: "user",
-            content: `Vision de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nContexte et fichiers (rappel) :\n\n${slicePayloadForModel(payload)}\n\n---\nTu es **${lead.label}**, seul sur ce pôle. Tu es responsable d’une **analyse approfondie** (pas un résumé de l’orchestrateur).\n\nExige-toi :\n- **Au moins 5 sous-sections \`###\`** sur des angles différents de ton domaine.\n- **Listes, risques, recommandations, critères, exemples** : chaque \`###\` contient plusieurs paragraphes **ou** 5–12 puces utiles.\n- Inclure une sous-section **### Angles hors premier jet utilisateur** : questions ou risques que le porteur de projet n’a probablement pas formulés dans son message initial.\n- Vise **l’équivalent d’environ 55–95 lignes** de contenu dense (si le sujet est riche, va au-delà).\n- Cite ou paraphrase le **contexte et fichiers** quand c’est pertinent.\n\n**Interdit** : placeholders \`[…]\` pour remplacer du contenu — tout doit être rédigé.\n\nPas de méta-discussion sur le processus.`,
+            content: `Vision de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nContexte et fichiers (rappel) :\n\n${slicePayloadForModel(payload)}\n\n---\nTu es **${lead.label}**, seul sur ce pôle. **Analyse utile** (pas un simple résumé de l’orchestrateur).\n\n- **3 à 5 sous-sections \`###\`** sur des angles distincts.\n- Chaque \`###\` : paragraphes courts **et/ou** listes à puces **rédigées** (risques, options, recommandations).\n- Une sous-section **### Angles hors premier jet utilisateur** : 3–6 questions ou risques peu couverts par le message initial.\n- T’appuie sur le **contexte et fichiers** quand c’est pertinent.\n\n**Interdit** : placeholders \`[…]\` — tout est rédigé.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
           },
         ],
         signal,
         TEMP,
+        LLM_MAX_TOKENS_AGENT_STEP,
       );
       branchOutputs.push({
         leadLabel: lead.label,
@@ -361,11 +370,12 @@ export async function runMissionPipeline(
           { role: "system", content: soul(souls, lead.id) },
           {
             role: "user",
-            content: `Vision globale de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nEn tant que **${lead.label}**, rédige des **consignes exigeantes** pour **${sub.label}** : objectifs, périmètre, angles d’analyse **obligatoires**, livrables (sous-parties attendues), contraintes, critères de qualité, questions ouvertes à traiter. **22–36 lignes** utiles — tu veux un rapport **long et argumenté** de sa part.`,
+            content: `Vision globale de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nEn tant que **${lead.label}**, rédige des **consignes claires** pour **${sub.label}** : objectifs, périmètre, angles **obligatoires**, livrables attendus (sous-parties), contraintes, critères de qualité, questions ouvertes. **12–18 lignes** utiles maximum, style briefing.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
           },
         ],
         signal,
         TEMP,
+        LLM_MAX_TOKENS_AGENT_STEP,
       );
 
       if (llmProvider === "mistral") {
@@ -381,11 +391,12 @@ export async function runMissionPipeline(
           { role: "system", content: soul(souls, sub.id) },
           {
             role: "user",
-            content: `Consignes de **${lead.label}** :\n\n${delegation}\n\n---\nContexte et fichiers initiaux (rappel) :\n\n${slicePayloadForModel(payload)}\n\n---\nTu es **${sub.label}**. Tu dois produire une **analyse de référence** sur ton périmètre : ce texte alimentera directement le rapport final — **ne te limite pas** à une synthèse courte.\n\n- **Minimum 6 sous-sections \`###\`** (thèmes distincts).\n- Chaque \`###\` : plusieurs paragraphes **et/ou** listes détaillées (risques, options, recommandations, exemples, critères mesurables).\n- Inclure une sous-section **### Angles et questions non couverts par le premier jet utilisateur** : au moins **6–10 questions** ou hypothèses à creuser pour un cahier des charges complet (ce que le porteur de projet pourrait avoir oublié).\n- Vise **l’équivalent d’environ 60–100 lignes** de contenu utile ; si le sujet l’exige, **dépasse** ce volume.\n- T’appuyer explicitement sur le **contexte et les fichiers** (citations courtes, renvois).\n\n**Interdit** : lignes du type \`[liste des …]\`, \`[à compléter]\`, \`[nom]\` ou tout contenu utile uniquement entre crochets — chaque puce et paragraphe doit être **rédigé**.\n\nPas de méta sur les « agents ».`,
+            content: `Consignes de **${lead.label}** :\n\n${delegation}\n\n---\nContexte et fichiers initiaux (rappel) :\n\n${slicePayloadForModel(payload)}\n\n---\nTu es **${sub.label}**. Produis une **analyse structurée** sur ton périmètre (matière pour le rapport final).\n\n- **4 à 6 sous-sections \`###\`** (thèmes distincts).\n- Chaque \`###\` : paragraphes courts et/ou listes **réelles** (risques, options, recommandations, critères).\n- **### Angles et questions hors premier jet utilisateur** : 4–8 questions ou hypothèses à creuser.\n- T’appuie sur le **contexte et les fichiers** (citations courtes).\n\n**Interdit** : placeholders entre crochets.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
           },
         ],
         signal,
         TEMP,
+        LLM_MAX_TOKENS_AGENT_STEP,
       );
 
       subBlocks.push(`### ${sub.label}\n\n${subWork}`);
@@ -403,11 +414,12 @@ export async function runMissionPipeline(
         { role: "system", content: soul(souls, lead.id) },
         {
           role: "user",
-          content: `Tu es **${lead.label}**, responsable du pôle. Voici le travail **complet** de tes sous-agents (c’est la matière première du dossier final) :\n\n${combined}\n\n---\n\n## Ta mission (critique)\n\n**Ordre et portée** : tu interviens **après** tous les sous-agents ci-dessus — tu disposes de **l’ensemble** de leurs livrables. Tu dois **synchroniser** leurs apports (cohérence, doublons, trous, formulations) et **ajuster** où c’est nécessaire **sans réduire** le contenu utile : c’est une **deuxième lecture** au niveau pôle, avec **vision globale** de ce que chacun a produit, pour que l’orchestrateur puisse rédiger le document final sans perdre la matière des spécialistes.\n\n**Interdit** : produire une « synthèse » courte qui réécrit tout en plus petit. Le rédacteur final doit pouvoir **s’appuyer sur ton texte** sans perdre le détail des spécialistes.\n\n**Interdit** : titres avec crochets du type \`#### [nom]\` — utilise les **vrais noms** : ${subNameList}.\n\n**Obligation** : ton livrable doit être **long et dense** — vise **au minimum** une longueur proche du **texte cumulé** des sous-agents (tu peux dépasser avec ton arbitrage), et **jamais** en dessous d’**environ 60 %** de ce volume en supprimant des arguments.\n\nStructure **obligatoire** en Markdown :\n\n### Arbitrage du responsable (court)\n**10–18 lignes maximum** : tensions entre sous-agents, priorités, décisions tranchées, ce que tu retiens ou écarts — **sans** résumer leur contenu ici.\n\n### Reprise quasi intégrale par spécialiste (corps principal)\n\nPour **chaque** sous-agent (${subNameList}), une section \`####\` dont le titre est **exactement** le nom du spécialiste (sans crochets), suivie **dans l’ord** de :\n\n1. **Reprise fidèle** : paragraphes et listes issus de son texte — **reformulation légère autorisée**, mais **conserve** les listes à puces, chiffres, exemples et nuances (**interdit** de les remplacer par une ou deux phrases).\n2. **Complément** : seulement après, 2–5 paragraphes de ton commentaire, arbitrage ou lien avec les autres si utile.\n\nSi un spécialiste a écrit long, **le bloc \`####\` correspondant doit être long** ; ne « compresse » pas en résumé.\n\nPas de méta-discussion sur le processus ou les « agents ».`,
+          content: `Tu es **${lead.label}**, responsable du pôle. Voici le travail de tes sous-agents :\n\n${combined}\n\n---\n\n## Ta mission\n\n**Synchronise** leurs apports (cohérence, doublons, trous) et **arbitre** en **restant dense** : le détail brut reste dans les sections ci-dessus ; ici tu produis une **vue pôle** exploitable pour le rapport final.\n\n**Interdit** : titres \`#### [nom]\` — utilise les **vrais noms** : ${subNameList}.\n\nStructure **obligatoire** en Markdown :\n\n### Arbitrage du responsable\n**6–10 lignes maximum** : tensions, priorités, décisions — pas de répétition exhaustive des textes des sous-agents.\n\n### Synthèse par spécialiste\n\nPour **chaque** sous-agent (${subNameList}), un \`####\` titre = nom exact, puis **paragraphes courts** qui captent l’**essentiel** (faits, listes clés) + **2–4 phrases** d’arbitrage ou de lien avec les autres.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
         },
       ],
       signal,
       TEMP,
+      LLM_MAX_TOKENS_AGENT_STEP,
     );
 
     branchOutputs.push({
@@ -440,6 +452,7 @@ export async function runMissionPipeline(
     ],
     signal,
     TEMP_FINAL,
+    LLM_MAX_TOKENS_DOCUMENT,
   );
 
   onProgress("Terminé — document prêt ci-dessous.");

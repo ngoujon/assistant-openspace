@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-11 — LLM : plafonds `max_tokens` / `num_predict` (timeouts)
+
+### Objectif
+
+Réduire les **504 / timeouts** et la lenteur : chaque appel **Mistral** ou **Ollama** fixe désormais un **plafond de tokens générés** — ~**½ page** par étape « agent » (mission, stream discussion), **384** pour routage / titres, **8192** par défaut pour rapport final mission et **fusion livrable** discussion ; seeds **1536**. Variables `VITE_OPENSPACE_MAX_AGENT_TOKENS` et `VITE_OPENSPACE_MAX_DOCUMENT_TOKENS` (bornées dans `llmOutputLimits.ts`). Prompts mission réalignés (plus d’exigence de dizaines de pages par étape).
+
+### Fichiers
+
+- `src/lib/llmOutputLimits.ts`, `src/lib/ollama.ts`, `src/lib/mistral.ts`, `src/lib/llmChat.ts`, `src/orchestration/pipeline.ts`, `src/lib/discussionTeamChat.ts`, `src/lib/generateMemberSeed.ts`, `src/vite-env.d.ts`, `README.md`, `docs/DEVBOOK.md`
+
+---
+
 ## 2026-05-11 — Activité : temps de traitement affiché à la fin
 
 ### Objectif
@@ -170,6 +182,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 
 | Date | Changement |
 |------|------------|
+| 2026-05-11 | LLM : plafonds **max_tokens** / **num_predict** (agent ~512, document 8192, routage 384) + prompts mission **denses** |
 | 2026-05-11 | Activité : **temps de traitement** affiché à la fin (mission : durée persistée corrigée ; discussion : dernier envoi) |
 | 2026-05-10 | Conversations : **plus de renommage automatique** après mission ni après discussion (titre sidebar stable) |
 | 2026-05-10 | Seeds équipe (défaut) : **spécialisation** métier stricte, hors-sujet explicite, positions techniques ; aide Paramètres mise à jour |

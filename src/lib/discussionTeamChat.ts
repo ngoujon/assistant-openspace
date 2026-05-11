@@ -1,4 +1,9 @@
 import { completeLlmChat, streamLlmChat } from "@/lib/llmChat";
+import {
+  LLM_MAX_TOKENS_AGENT_STEP,
+  LLM_MAX_TOKENS_DOCUMENT,
+  LLM_MAX_TOKENS_ROUTING,
+} from "@/lib/llmOutputLimits";
 import type { OllamaChatMessage } from "@/lib/ollama";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
@@ -235,7 +240,7 @@ export async function routeDiscussionMessage(opts: {
       { role: "user", content: userBlock },
     ],
     signal,
-    { temperature: 0.25 },
+    { temperature: 0.25, maxTokens: LLM_MAX_TOKENS_ROUTING },
   );
 
   let routing: DiscussionRouting;
@@ -317,6 +322,7 @@ export async function streamDiscussionReply(opts: {
     messages,
     opts.onToken,
     opts.signal,
+    { maxTokens: LLM_MAX_TOKENS_AGENT_STEP },
   );
 }
 
@@ -368,7 +374,7 @@ Réponds par **le titre uniquement**, rien d’autre.`,
       },
     ],
     opts.signal,
-    { temperature: 0.25 },
+    { temperature: 0.25, maxTokens: LLM_MAX_TOKENS_ROUTING },
   );
   return sanitizeConversationTitle(raw);
 }
@@ -420,7 +426,7 @@ Réponds par **le titre uniquement**, rien d’autre.`,
       },
     ],
     opts.signal,
-    { temperature: 0.25 },
+    { temperature: 0.25, maxTokens: LLM_MAX_TOKENS_ROUTING },
   );
   const t = sanitizeConversationTitle(raw);
   return t.length >= 3 ? t : null;
@@ -510,6 +516,6 @@ Réponds par **le document Markdown complet révisé**, sans préambule ni post-
       { role: "user", content: userBlock },
     ],
     signal,
-    { temperature: 0.35 },
+    { temperature: 0.35, maxTokens: LLM_MAX_TOKENS_DOCUMENT },
   );
 }

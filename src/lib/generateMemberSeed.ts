@@ -3,6 +3,7 @@ import {
   loadAppSettings,
 } from "@/lib/appSettingsStorage";
 import { completeLlmChat } from "@/lib/llmChat";
+import { LLM_MAX_TOKENS_SEED } from "@/lib/llmOutputLimits";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID } from "@/lib/teamTreeStorage";
 
@@ -53,6 +54,6 @@ export async function generateMemberSoulSeed(
       { role: "user", content: user },
     ],
     signal,
-    { temperature: 0.5 },
+    { temperature: 0.5, maxTokens: LLM_MAX_TOKENS_SEED },
   );
 }

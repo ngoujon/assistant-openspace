@@ -110,6 +110,8 @@ export async function completeOllamaChat(
     keepAlive?: string;
     /** Délai max côté navigateur (ms) ; au-delà, annulation avec TimeoutError. */
     timeoutMs?: number;
+    /** Plafond tokens générés (`num_predict` côté Ollama). */
+    maxTokens?: number;
   },
 ): Promise<string> {
   assertChatModel(model);
@@ -122,8 +124,13 @@ export async function completeOllamaChat(
   if (options?.keepAlive != null && options.keepAlive !== "") {
     body.keep_alive = options.keepAlive;
   }
-  if (options?.temperature != null) {
-    body.options = { temperature: options.temperature };
+  const runOpts: Record<string, number> = {};
+  if (options?.temperature != null) runOpts.temperature = options.temperature;
+  if (options?.maxTokens != null && options.maxTokens > 0) {
+    runOpts.num_predict = options.maxTokens;
+  }
+  if (Object.keys(runOpts).length > 0) {
+    body.options = runOpts;
   }
   let res: Response;
   try {
@@ -161,12 +168,17 @@ export async function streamOllamaChat(
   messages: OllamaChatMessage[],
   onToken: (chunk: string) => void,
   signal?: AbortSignal,
+  options?: { maxTokens?: number },
 ): Promise<void> {
   assertChatModel(model);
+  const body: Record<string, unknown> = { model, messages, stream: true };
+  if (options?.maxTokens != null && options.maxTokens > 0) {
+    body.options = { num_predict: options.maxTokens };
+  }
   const res = await fetch(`${BASE}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: true }),
+    body: JSON.stringify(body),
     signal,
   });
   if (!res.ok) {
