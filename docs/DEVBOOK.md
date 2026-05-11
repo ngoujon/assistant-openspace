@@ -206,6 +206,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 
 | Date | Changement |
 |------|------------|
+| 2026-05-11 | Discussion : **compositeur vide** à l’entrée (plus de reprise du brief mission dans le champ) |
 | 2026-05-11 | Paramètres : **température Mistral** (0–1) pour chat, mission, fusion, seeds ; stream Mistral avec `temperature` |
 | 2026-05-11 | Activité mission : suppression des **textes d’attente** (1ʳᵉ réponse longue, délai 15–20 min / clé API) |
 | 2026-05-11 | LLM : plafonds **max_tokens** / **num_predict** (agent ~512, document 8192, routage 384) + prompts mission **denses** |

@@ -166,7 +166,7 @@ export function ChatPanel({
       !hasMessages &&
       conversation.missionUserBrief?.trim()
     ) {
-      setInput(conversation.missionUserBrief.trim());
+      setInput("");
       setShowMissionDraftHint(true);
     } else {
       setInput("");
@@ -732,7 +732,7 @@ export function ChatPanel({
                 missionUserBrief,
               });
               if (md.trim()) {
-                setInput(missionUserBrief.trim());
+                setInput("");
                 setShowMissionDraftHint(true);
                 setMode("free");
               }
