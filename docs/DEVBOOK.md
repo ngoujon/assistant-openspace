@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-11 — Activité mission : retrait des messages d’attente
+
+### Objectif
+
+Supprimer les paragraphes **« 1ʳᵉ réponse longe »** et **« au-delà de 15–20 min… »** (Mistral / Ollama) sous la durée en mission ; le prop `llmProvider` sur `ActivitySidebar` n’est plus nécessaire.
+
+### Fichiers
+
+- `src/components/ActivitySidebar.tsx`, `src/App.tsx`, `docs/DEVBOOK.md`
+
+---
+
 ## 2026-05-11 — LLM : plafonds `max_tokens` / `num_predict` (timeouts)
 
 ### Objectif
@@ -182,6 +194,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 
 | Date | Changement |
 |------|------------|
+| 2026-05-11 | Activité mission : suppression des **textes d’attente** (1ʳᵉ réponse longue, délai 15–20 min / clé API) |
 | 2026-05-11 | LLM : plafonds **max_tokens** / **num_predict** (agent ~512, document 8192, routage 384) + prompts mission **denses** |
 | 2026-05-11 | Activité : **temps de traitement** affiché à la fin (mission : durée persistée corrigée ; discussion : dernier envoi) |
 | 2026-05-10 | Conversations : **plus de renommage automatique** après mission ni après discussion (titre sidebar stable) |

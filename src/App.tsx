@@ -279,7 +279,6 @@ export default function App() {
       state={activityForShell}
       linkedArtifact={activityLinkedArtifact}
       missionHistory={active.missionActivitySnapshot}
-      llmProvider={llmProvider}
     />
   );
 

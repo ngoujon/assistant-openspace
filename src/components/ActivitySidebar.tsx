@@ -10,7 +10,6 @@ import {
   parseMissionProgressLine,
   type MissionStepVisualKind,
 } from "@/lib/parseMissionProgressLine";
-import type { LlmProvider } from "@/lib/llmProvider";
 import type { ActivityLinkedArtifact, RightActivityState } from "@/types/activity";
 import type { MissionActivitySnapshot } from "@/types";
 
@@ -167,8 +166,6 @@ interface ActivitySidebarProps {
   linkedArtifact?: ActivityLinkedArtifact | null;
   /** Dernière mission (étapes) persistée pour ce projet — affichée en Discussion. */
   missionHistory?: MissionActivitySnapshot | null;
-  /** Messages d’attente mission (Ollama vs Mistral). */
-  llmProvider?: LlmProvider;
 }
 
 export function ActivitySidebar({
@@ -176,7 +173,6 @@ export function ActivitySidebar({
   variant = "sidebar",
   linkedArtifact = null,
   missionHistory = null,
-  llmProvider = "ollama",
 }: ActivitySidebarProps) {
   const isInline = variant === "inline";
 
@@ -299,41 +295,6 @@ export function ActivitySidebar({
         {!running && progress.length > 0 && (
           <p className="activity-sidebar-timer" aria-label="Temps de traitement">
             Temps de traitement : {formatElapsedSec(elapsedSec)}
-          </p>
-        )}
-        {running && elapsedSec >= 8 && (
-          <p className="activity-sidebar-wait-hint">
-            {llmProvider === "mistral" ? (
-              <>
-                La <strong>1<sup>re</sup> réponse</strong> peut être longue (API Mistral,
-                taille du contexte). La liste d’étapes ne change qu’à la fin de chaque appel
-                — ce n’est pas un blocage de l’app.
-              </>
-            ) : (
-              <>
-                La <strong>1<sup>re</sup> réponse</strong> charge souvent le modèle dans
-                Ollama (plusieurs minutes en CPU). La liste d’étapes ne change qu’à la fin
-                de chaque appel — ce n’est pas un blocage de l’app.
-              </>
-            )}
-          </p>
-        )}
-        {running && elapsedSec >= 120 && (
-          <p className="activity-sidebar-wait-hint activity-sidebar-wait-hint--strong">
-            {llmProvider === "mistral" ? (
-              <>
-                Si tu n’as <strong>aucune</strong> réponse au-delà de ~15–20&nbsp;min,
-                vérifie ta <strong>clé API</strong> dans Paramètres et le statut du service
-                Mistral ; réduis aussi le volume de fichiers joints si besoin.
-              </>
-            ) : (
-              <>
-                Si tu n’as <strong>aucune</strong> réponse au-delà de ~15–20&nbsp;min, teste
-                dans un terminal : <code>ollama run</code> + ton modèle, ou redémarre
-                Ollama. Un modèle volumineux sur disque externe peut aussi expliquer des
-                délais très longs.
-              </>
-            )}
           </p>
         )}
         {!running && progress.length === 0 && (
