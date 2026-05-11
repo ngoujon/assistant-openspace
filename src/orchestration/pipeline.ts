@@ -1,3 +1,4 @@
+import { clampMistralTemperature } from "@/lib/appSettingsStorage";
 import { generateMissionConversationTitle } from "@/lib/discussionTeamChat";
 import { completeLlmChat } from "@/lib/llmChat";
 import {
@@ -37,6 +38,8 @@ export interface RunMissionOptions {
    * Si absent, aucun appel supplémentaire.
    */
   onConversationTitleSuggested?: (title: string) => void;
+  /** Température Mistral (0–1) pour toute la mission ; ignoré si Ollama. */
+  mistralTemperature?: number;
 }
 
 function soul(souls: Record<string, string>, id: string): string {
@@ -268,7 +271,11 @@ export async function runMissionPipeline(
     signal,
     onProgress,
     onConversationTitleSuggested,
+    mistralTemperature: mistralTempOpt,
   } = opts;
+  const mistralTemp = clampMistralTemperature(mistralTempOpt);
+  const agentStepTemp = llmProvider === "mistral" ? mistralTemp : TEMP;
+  const finalStepTemp = llmProvider === "mistral" ? mistralTemp : TEMP_FINAL;
   const payload = bundleUserPayload(context, files);
   const leads = leadsOf(teamMembers);
 
@@ -303,7 +310,7 @@ export async function runMissionPipeline(
       },
     ],
     signal,
-    TEMP,
+    agentStepTemp,
     LLM_MAX_TOKENS_AGENT_STEP,
   );
 
@@ -318,6 +325,7 @@ export async function runMissionPipeline(
         orchestratorBrief,
         userPayloadPreview: slicePayloadForModel(payload),
         signal,
+        mistralTemperature: mistralTemp,
       });
       if (title) onConversationTitleSuggested(title);
     } catch {
@@ -347,7 +355,7 @@ export async function runMissionPipeline(
           },
         ],
         signal,
-        TEMP,
+        agentStepTemp,
         LLM_MAX_TOKENS_AGENT_STEP,
       );
       branchOutputs.push({
@@ -374,7 +382,7 @@ export async function runMissionPipeline(
           },
         ],
         signal,
-        TEMP,
+        agentStepTemp,
         LLM_MAX_TOKENS_AGENT_STEP,
       );
 
@@ -395,7 +403,7 @@ export async function runMissionPipeline(
           },
         ],
         signal,
-        TEMP,
+        agentStepTemp,
         LLM_MAX_TOKENS_AGENT_STEP,
       );
 
@@ -418,7 +426,7 @@ export async function runMissionPipeline(
         },
       ],
       signal,
-      TEMP,
+      agentStepTemp,
       LLM_MAX_TOKENS_AGENT_STEP,
     );
 
@@ -451,7 +459,7 @@ export async function runMissionPipeline(
       },
     ],
     signal,
-    TEMP_FINAL,
+    finalStepTemp,
     LLM_MAX_TOKENS_DOCUMENT,
   );
 

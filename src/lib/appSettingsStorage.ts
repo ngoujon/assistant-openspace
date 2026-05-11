@@ -62,6 +62,21 @@ Réponds **uniquement** avec le corps du champ, en respectant **exactement** ces
 - Longueur cible : environ 12 à 22 lignes au total (les deux sections réunies) si le métier le justifie ; sinon rester concis.
 - Ton : **professionnel, technique, tranché** dans sa discipline — fiche d’expert **spécialisé**, pas généraliste ni fiche de casting.`;
 
+/** Température Mistral par défaut (0 = déterministe, 1 = plus créatif). */
+export const DEFAULT_MISTRAL_TEMPERATURE = 0.45;
+
+/** Borne la température Mistral pour l’API (0–1). */
+export function clampMistralTemperature(n: unknown): number {
+  if (typeof n === "number" && Number.isFinite(n)) {
+    return Math.min(1, Math.max(0, n));
+  }
+  if (typeof n === "string" && n.trim() !== "") {
+    const p = Number(n.replace(",", "."));
+    if (Number.isFinite(p)) return Math.min(1, Math.max(0, p));
+  }
+  return DEFAULT_MISTRAL_TEMPERATURE;
+}
+
 export interface AppSettings {
   seedSystemPrompt: string;
   seedUserTemplate: string;
@@ -71,6 +86,8 @@ export interface AppSettings {
   mistralApiKey: string;
   /** Modèle Mistral pour le chat / mission / équipe (choisi dans Paramètres uniquement). */
   mistralChatModel: string;
+  /** Température (0–1) pour tous les appels Mistral ; ignorée si fournisseur Ollama. */
+  mistralTemperature: number;
   /** Modèle Ollama pour le chat / mission / équipe (choisi dans Paramètres uniquement). */
   ollamaChatModel: string;
 }
@@ -82,6 +99,7 @@ function defaults(): AppSettings {
     llmProvider: DEFAULT_LLM_PROVIDER,
     mistralApiKey: "",
     mistralChatModel: "",
+    mistralTemperature: DEFAULT_MISTRAL_TEMPERATURE,
     ollamaChatModel: "",
   };
 }
@@ -112,6 +130,9 @@ export function loadAppSettings(): AppSettings {
       typeof o.mistralChatModel === "string"
         ? o.mistralChatModel
         : base.mistralChatModel;
+    const mistralTemperature = clampMistralTemperature(
+      o.mistralTemperature ?? base.mistralTemperature,
+    );
     const ollamaModel =
       typeof o.ollamaChatModel === "string"
         ? o.ollamaChatModel
@@ -122,6 +143,7 @@ export function loadAppSettings(): AppSettings {
       llmProvider: prov,
       mistralApiKey: key,
       mistralChatModel: mistralModel,
+      mistralTemperature,
       ollamaChatModel: ollamaModel,
     };
   } catch {
@@ -138,6 +160,7 @@ export function saveAppSettings(s: AppSettings): void {
       llmProvider: s.llmProvider,
       mistralApiKey: s.mistralApiKey,
       mistralChatModel: s.mistralChatModel,
+      mistralTemperature: clampMistralTemperature(s.mistralTemperature),
       ollamaChatModel: s.ollamaChatModel,
     }),
   );

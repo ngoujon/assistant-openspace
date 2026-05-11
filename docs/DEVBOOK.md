@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-11 — Paramètres : température Mistral (0–1)
+
+### Objectif
+
+Réglage **Température** dans la modale Paramètres lorsque le fournisseur est **Mistral AI** : valeur persistée (`mistralTemperature` dans `openspace-app-settings-v1`), appliquée au chat, mission, fusion discussion et seeds ; Ollama inchangé (températures internes pipeline / discussion).
+
+### Fichiers
+
+- `src/lib/appSettingsStorage.ts`, `src/components/SettingsModal.tsx`, `src/App.tsx`, `src/components/ChatPanel.tsx`, `src/components/MissionWorkspace.tsx`, `src/orchestration/pipeline.ts`, `src/lib/discussionTeamChat.ts`, `src/lib/generateMemberSeed.ts`, `src/lib/mistral.ts`, `src/lib/ollama.ts`, `src/lib/llmChat.ts`, `src/index.css`, `docs/DEVBOOK.md`
+
+---
+
 ## 2026-05-11 — Activité mission : retrait des messages d’attente
 
 ### Objectif
@@ -194,6 +206,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 
 | Date | Changement |
 |------|------------|
+| 2026-05-11 | Paramètres : **température Mistral** (0–1) pour chat, mission, fusion, seeds ; stream Mistral avec `temperature` |
 | 2026-05-11 | Activité mission : suppression des **textes d’attente** (1ʳᵉ réponse longue, délai 15–20 min / clé API) |
 | 2026-05-11 | LLM : plafonds **max_tokens** / **num_predict** (agent ~512, document 8192, routage 384) + prompts mission **denses** |
 | 2026-05-11 | Activité : **temps de traitement** affiché à la fin (mission : durée persistée corrigée ; discussion : dernier envoi) |

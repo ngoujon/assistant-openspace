@@ -2438,6 +2438,28 @@ body {
   box-shadow: 0 0 0 2px var(--accent-muted);
 }
 
+.modal-settings-temp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.modal-settings-range {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.modal-settings-temp-value {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  min-width: 2.25rem;
+  text-align: right;
+}
+
 .modal-settings-section-title {
   margin: 0 0 0.35rem;
   font-size: 0.8125rem;

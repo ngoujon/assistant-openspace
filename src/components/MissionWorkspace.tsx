@@ -22,6 +22,8 @@ import type { LlmProvider } from "@/lib/llmProvider";
 interface MissionWorkspaceProps {
   llmProvider: LlmProvider;
   mistralApiKey: string;
+  /** Température Mistral (0–1), Paramètres ; ignorée si Ollama. */
+  mistralTemperature: number;
   model: string;
   /** Alimente la colonne droite (et la bande mobile) avec la progression. */
   onActivityReport?: (payload: {
@@ -36,6 +38,7 @@ interface MissionWorkspaceProps {
 export function MissionWorkspace({
   llmProvider,
   mistralApiKey,
+  mistralTemperature,
   model,
   onActivityReport,
   onArtifactProduced,
@@ -224,6 +227,8 @@ export function MissionWorkspace({
       const md = await runMissionPipeline({
         llmProvider,
         mistralApiKey,
+        mistralTemperature:
+          llmProvider === "mistral" ? mistralTemperature : undefined,
         model,
         context: contextForPipeline,
         files: missionFiles,
@@ -258,6 +263,7 @@ export function MissionWorkspace({
     files,
     llmProvider,
     mistralApiKey,
+    mistralTemperature,
     model,
     onArtifactProduced,
   ]);

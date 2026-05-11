@@ -1,5 +1,7 @@
 import { useEffect, useId, useState, type MouseEvent } from "react";
 import {
+  clampMistralTemperature,
+  DEFAULT_MISTRAL_TEMPERATURE,
   DEFAULT_SEED_SYSTEM_PROMPT,
   DEFAULT_SEED_USER_TEMPLATE,
   loadAppSettings,
@@ -21,6 +23,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
   const titleId = useId();
   const mistralKeyId = useId();
   const mistralModelSelectId = useId();
+  const mistralTemperatureId = useId();
   const ollamaModelSelectId = useId();
   const [seedSystem, setSeedSystem] = useState(DEFAULT_SEED_SYSTEM_PROMPT);
   const [seedUser, setSeedUser] = useState(DEFAULT_SEED_USER_TEMPLATE);
@@ -31,6 +34,9 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
   const [mistralModelsLoading, setMistralModelsLoading] = useState(false);
   const [mistralModelsError, setMistralModelsError] = useState<string | null>(
     null,
+  );
+  const [mistralTemperature, setMistralTemperature] = useState(
+    DEFAULT_MISTRAL_TEMPERATURE,
   );
   const [ollamaModelsList, setOllamaModelsList] = useState<string[]>([]);
   const [ollamaModelChoice, setOllamaModelChoice] = useState("");
@@ -48,6 +54,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
     setLlmProvider(s.llmProvider);
     setMistralApiKey(s.mistralApiKey);
     setMistralModelChoice(s.mistralChatModel?.trim() ?? "");
+    setMistralTemperature(clampMistralTemperature(s.mistralTemperature));
     setMistralModelsList([]);
     setMistralModelsError(null);
     setOllamaModelChoice(s.ollamaChatModel?.trim() ?? "");
@@ -198,6 +205,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
         llmProvider === "mistral"
           ? mistralModelChoice.trim()
           : prev.mistralChatModel,
+      mistralTemperature: clampMistralTemperature(mistralTemperature),
       ollamaChatModel:
         llmProvider === "ollama"
           ? ollamaModelChoice.trim()
@@ -347,6 +355,38 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
                     )}
                   </select>
                 )}
+                <label
+                  className="modal-field-label modal-settings-label-block"
+                  htmlFor={mistralTemperatureId}
+                >
+                  Température (Mistral)
+                </label>
+                <p className="modal-settings-hint">
+                  S’applique au <strong>chat</strong>, aux <strong>missions</strong>, à la{" "}
+                  <strong>fusion du livrable</strong> et à la <strong>génération de seeds</strong>.
+                  Plus bas = plus déterministe ; plus haut = plus de variété (0 à 1).
+                </p>
+                <div className="modal-settings-temp-row">
+                  <input
+                    id={mistralTemperatureId}
+                    type="range"
+                    className="modal-settings-range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={mistralTemperature}
+                    onChange={(e) =>
+                      setMistralTemperature(Number(e.target.value))
+                    }
+                    aria-valuemin={0}
+                    aria-valuemax={1}
+                    aria-valuenow={mistralTemperature}
+                    aria-valuetext={`${mistralTemperature.toFixed(2)}`}
+                  />
+                  <span className="modal-settings-temp-value" aria-live="polite">
+                    {mistralTemperature.toFixed(2)}
+                  </span>
+                </div>
               </>
             )}
             {llmProvider === "ollama" && (

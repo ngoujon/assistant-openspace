@@ -1,4 +1,5 @@
 import {
+  clampMistralTemperature,
   interpolateSeedUserTemplate,
   loadAppSettings,
 } from "@/lib/appSettingsStorage";
@@ -37,13 +38,18 @@ export async function generateMemberSoulSeed(
       ? "Ce membre est **directement sous l’orchestrateur** (niveau directeur / pilier métier)."
       : `Ce membre est **sous le responsable** « ${parentLabel ?? "—"} » (sous-agent / spécialiste).`;
 
-  const { seedSystemPrompt, seedUserTemplate } = loadAppSettings();
+  const settings = loadAppSettings();
+  const { seedSystemPrompt, seedUserTemplate } = settings;
   const system = seedSystemPrompt;
   const user = interpolateSeedUserTemplate(
     seedUserTemplate,
     memberLabel,
     place,
   );
+  const temperature =
+    llmProvider === "mistral"
+      ? clampMistralTemperature(settings.mistralTemperature)
+      : 0.5;
 
   return completeLlmChat(
     llmProvider,
@@ -54,6 +60,6 @@ export async function generateMemberSoulSeed(
       { role: "user", content: user },
     ],
     signal,
-    { temperature: 0.5, maxTokens: LLM_MAX_TOKENS_SEED },
+    { temperature, maxTokens: LLM_MAX_TOKENS_SEED },
   );
 }

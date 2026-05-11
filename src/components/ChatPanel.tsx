@@ -66,6 +66,8 @@ interface ChatPanelProps {
   model: string;
   llmProvider: LlmProvider;
   mistralApiKey: string;
+  /** Température Mistral (0–1) depuis Paramètres. */
+  mistralTemperature: number;
   llmError: string | null;
   onRetryLlm: () => void;
   /** Premier argument = conversation ciblée (obligatoire pour les tours async). */
@@ -96,6 +98,7 @@ export function ChatPanel({
   model,
   llmProvider,
   mistralApiKey,
+  mistralTemperature,
   llmError,
   onRetryLlm,
   setMessages,
@@ -366,13 +369,15 @@ export function ChatPanel({
         artifactMarkdown: opts.artifactMarkdown,
         missionUserBrief: opts.missionUserBrief ?? undefined,
         signal: opts.signal,
+        mistralTemperature:
+          llmProvider === "mistral" ? mistralTemperature : undefined,
       });
       const finalMd = unwrapMarkdownFence(raw);
       onConversationArtifact(opts.conversationId, finalMd, {
         discussionCutoffAfterId: opts.cutoffAfterAssistantId,
       });
     },
-    [llmProvider, mistralApiKey, model, onConversationArtifact],
+    [llmProvider, mistralApiKey, mistralTemperature, model, onConversationArtifact],
   );
 
   const runDiscussionSendOrPatch = useCallback(
@@ -445,6 +450,8 @@ export function ChatPanel({
             multiMentionRoutingHint,
             missionUserBrief: turnMissionBrief,
             artifactMarkdown: turnArtifactMd,
+            mistralTemperature:
+              llmProvider === "mistral" ? mistralTemperature : undefined,
           });
 
           if (llmProvider === "mistral") {
@@ -481,6 +488,8 @@ export function ChatPanel({
             historyWithLatestUser: historyWithUser,
             missionUserBrief: turnMissionBrief,
             artifactMarkdown: turnArtifactMd,
+            mistralTemperature:
+              llmProvider === "mistral" ? mistralTemperature : undefined,
             onToken: (chunk) => {
               assistantAccum += chunk;
               setMessages(convId, (prev) =>
@@ -580,6 +589,7 @@ export function ChatPanel({
     [
       llmProvider,
       mistralApiKey,
+      mistralTemperature,
       model,
       conversation.id,
       conversation.messages,
@@ -713,6 +723,7 @@ export function ChatPanel({
           <MissionWorkspace
             llmProvider={llmProvider}
             mistralApiKey={mistralApiKey}
+            mistralTemperature={mistralTemperature}
             model={model}
             onActivityReport={reportMissionActivity}
             onArtifactProduced={(md, missionUserBrief) => {

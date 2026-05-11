@@ -173,7 +173,7 @@ export async function streamMistralChat(
   messages: OllamaChatMessage[],
   onToken: (chunk: string) => void,
   signal?: AbortSignal,
-  options?: { maxTokens?: number },
+  options?: { maxTokens?: number; temperature?: number },
 ): Promise<void> {
   assertChatModel(model);
   const res = await fetchWithRateLimitRetries(
@@ -185,6 +185,7 @@ export async function streamMistralChat(
           model,
           messages,
           stream: true,
+          ...(options?.temperature != null ? { temperature: options.temperature } : {}),
           ...(options?.maxTokens != null && options.maxTokens > 0
             ? { max_tokens: options.maxTokens }
             : {}),

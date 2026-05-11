@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { loadAppSettings } from "@/lib/appSettingsStorage";
+import { clampMistralTemperature, loadAppSettings } from "@/lib/appSettingsStorage";
 import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { fetchMistralModels } from "@/lib/mistral";
@@ -64,6 +64,9 @@ export default function App() {
   const [mistralApiKey, setMistralApiKey] = useState(
     () => loadAppSettings().mistralApiKey,
   );
+  const [mistralTemperature, setMistralTemperature] = useState(() =>
+    clampMistralTemperature(loadAppSettings().mistralTemperature),
+  );
   const [llmError, setLlmError] = useState<string | null>(null);
   const [rightActivity, setRightActivity] = useState<RightActivityState>(() =>
     deriveInitialRightActivity(conversations[0]!),
@@ -80,6 +83,7 @@ export default function App() {
     const s = loadAppSettings();
     setLlmProvider(s.llmProvider);
     setMistralApiKey(s.mistralApiKey);
+    setMistralTemperature(clampMistralTemperature(s.mistralTemperature));
 
     if (s.llmProvider === "mistral" && !s.mistralApiKey.trim()) {
       setModel("");
@@ -289,6 +293,7 @@ export default function App() {
         model={model}
         llmProvider={llmProvider}
         mistralApiKey={mistralApiKey}
+        mistralTemperature={mistralTemperature}
         llmError={llmError}
         onRetryLlm={refreshLlmModels}
         setMessages={setConversationMessages}

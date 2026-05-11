@@ -1,3 +1,7 @@
+import {
+  clampMistralTemperature,
+  loadAppSettings,
+} from "@/lib/appSettingsStorage";
 import { completeLlmChat, streamLlmChat } from "@/lib/llmChat";
 import {
   LLM_MAX_TOKENS_AGENT_STEP,
@@ -8,6 +12,12 @@ import type { OllamaChatMessage } from "@/lib/ollama";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
 import type { ChatMessage } from "@/types";
+
+function mistralTemperatureForCall(explicit: number | undefined): number {
+  return clampMistralTemperature(
+    explicit ?? loadAppSettings().mistralTemperature,
+  );
+}
 
 const MAX_MISSION_BRIEF_IN_CTX = 8000;
 const MAX_ARTIFACT_EXCERPT_ROUTING = 5000;
@@ -188,6 +198,8 @@ export async function routeDiscussionMessage(opts: {
   artifactMarkdown?: string | null;
   /** Plusieurs @[…] résolus : consigne pour l’orchestrateur (un seul orateur chat, angles combinés). */
   multiMentionRoutingHint?: string | null;
+  /** Température Mistral (0–1) ; défaut = Paramètres. */
+  mistralTemperature?: number;
 }): Promise<DiscussionRouting> {
   const {
     llmProvider,
@@ -201,6 +213,7 @@ export async function routeDiscussionMessage(opts: {
     missionUserBrief,
     artifactMarkdown,
     multiMentionRoutingHint: multiMentionRaw,
+    mistralTemperature: mistralTempOpt,
   } = opts;
 
   const multiMentionRoutingHint = multiMentionRaw?.trim();
@@ -240,7 +253,13 @@ export async function routeDiscussionMessage(opts: {
       { role: "user", content: userBlock },
     ],
     signal,
-    { temperature: 0.25, maxTokens: LLM_MAX_TOKENS_ROUTING },
+    {
+      temperature:
+        llmProvider === "mistral"
+          ? mistralTemperatureForCall(mistralTempOpt)
+          : 0.25,
+      maxTokens: LLM_MAX_TOKENS_ROUTING,
+    },
   );
 
   let routing: DiscussionRouting;
@@ -313,8 +332,11 @@ export async function streamDiscussionReply(opts: {
   artifactMarkdown?: string | null;
   onToken: (chunk: string) => void;
   signal?: AbortSignal;
+  /** Température Mistral (0–1) ; défaut = Paramètres. */
+  mistralTemperature?: number;
 }): Promise<void> {
-  const messages = buildDiscussionStreamMessages(opts);
+  const { mistralTemperature: mistralTempOpt, ...streamPayload } = opts;
+  const messages = buildDiscussionStreamMessages(streamPayload);
   await streamLlmChat(
     opts.llmProvider,
     opts.mistralApiKey,
@@ -322,7 +344,12 @@ export async function streamDiscussionReply(opts: {
     messages,
     opts.onToken,
     opts.signal,
-    { maxTokens: LLM_MAX_TOKENS_AGENT_STEP },
+    {
+      maxTokens: LLM_MAX_TOKENS_AGENT_STEP,
+      ...(opts.llmProvider === "mistral"
+        ? { temperature: mistralTemperatureForCall(mistralTempOpt) }
+        : {}),
+    },
   );
 }
 
@@ -346,6 +373,7 @@ export async function generateDiscussionConversationTitle(opts: {
   /** Fil récent (markdown libre), déjà formaté. */
   recentTranscript: string;
   signal?: AbortSignal;
+  mistralTemperature?: number;
 }): Promise<string> {
   const orchSoul = soul(opts.souls, ORCHESTRATOR_ID);
   const raw = await completeLlmChat(
@@ -374,7 +402,13 @@ Réponds par **le titre uniquement**, rien d’autre.`,
       },
     ],
     opts.signal,
-    { temperature: 0.25, maxTokens: LLM_MAX_TOKENS_ROUTING },
+    {
+      temperature:
+        opts.llmProvider === "mistral"
+          ? mistralTemperatureForCall(opts.mistralTemperature)
+          : 0.25,
+      maxTokens: LLM_MAX_TOKENS_ROUTING,
+    },
   );
   return sanitizeConversationTitle(raw);
 }
@@ -392,6 +426,7 @@ export async function generateMissionConversationTitle(opts: {
   /** Contexte + fichiers (tronqué comme dans le pipeline mission). */
   userPayloadPreview: string;
   signal?: AbortSignal;
+  mistralTemperature?: number;
 }): Promise<string | null> {
   const orchSoul = soul(opts.souls, ORCHESTRATOR_ID);
   const briefSlice = opts.orchestratorBrief.slice(0, 6000);
@@ -426,7 +461,13 @@ Réponds par **le titre uniquement**, rien d’autre.`,
       },
     ],
     opts.signal,
-    { temperature: 0.25, maxTokens: LLM_MAX_TOKENS_ROUTING },
+    {
+      temperature:
+        opts.llmProvider === "mistral"
+          ? mistralTemperatureForCall(opts.mistralTemperature)
+          : 0.25,
+      maxTokens: LLM_MAX_TOKENS_ROUTING,
+    },
   );
   const t = sanitizeConversationTitle(raw);
   return t.length >= 3 ? t : null;
@@ -448,6 +489,7 @@ export async function applyDiscussionToArtifact(opts: {
   /** Brief « Contexte » de la mission (première demande), pour ancrer les retouches. */
   missionUserBrief?: string | null;
   signal?: AbortSignal;
+  mistralTemperature?: number;
 }): Promise<string> {
   const {
     llmProvider,
@@ -458,6 +500,7 @@ export async function applyDiscussionToArtifact(opts: {
     artifactMarkdown,
     missionUserBrief,
     signal,
+    mistralTemperature: mistralTempOpt,
   } = opts;
   const orchSoul = soul(souls, ORCHESTRATOR_ID);
   const discussion = formatHistoryForRouting(
@@ -516,6 +559,12 @@ Réponds par **le document Markdown complet révisé**, sans préambule ni post-
       { role: "user", content: userBlock },
     ],
     signal,
-    { temperature: 0.35, maxTokens: LLM_MAX_TOKENS_DOCUMENT },
+    {
+      temperature:
+        llmProvider === "mistral"
+          ? mistralTemperatureForCall(mistralTempOpt)
+          : 0.35,
+      maxTokens: LLM_MAX_TOKENS_DOCUMENT,
+    },
   );
 }

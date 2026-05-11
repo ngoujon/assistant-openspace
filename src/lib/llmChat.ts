@@ -43,6 +43,7 @@ export async function completeLlmChat(
 
 export type StreamLlmOptions = {
   maxTokens?: number;
+  temperature?: number;
 };
 
 export async function streamLlmChat(
@@ -57,10 +58,12 @@ export async function streamLlmChat(
   if (provider === "mistral") {
     await streamMistralChat(mistralApiKey ?? "", model, messages, onToken, signal, {
       maxTokens: options?.maxTokens,
+      temperature: options?.temperature,
     });
     return;
   }
   await streamOllamaChat(model, messages, onToken, signal, {
     maxTokens: options?.maxTokens,
+    temperature: options?.temperature,
   });
 }

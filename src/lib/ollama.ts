@@ -168,12 +168,17 @@ export async function streamOllamaChat(
   messages: OllamaChatMessage[],
   onToken: (chunk: string) => void,
   signal?: AbortSignal,
-  options?: { maxTokens?: number },
+  options?: { maxTokens?: number; temperature?: number },
 ): Promise<void> {
   assertChatModel(model);
   const body: Record<string, unknown> = { model, messages, stream: true };
+  const runOpts: Record<string, number> = {};
+  if (options?.temperature != null) runOpts.temperature = options.temperature;
   if (options?.maxTokens != null && options.maxTokens > 0) {
-    body.options = { num_predict: options.maxTokens };
+    runOpts.num_predict = options.maxTokens;
+  }
+  if (Object.keys(runOpts).length > 0) {
+    body.options = runOpts;
   }
   const res = await fetch(`${BASE}/api/chat`, {
     method: "POST",
