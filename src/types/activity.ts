@@ -16,6 +16,8 @@ export type RightActivityState =
       streamingSpeaker: string | null;
       /** Étapes cumulées (routage, réponse, fusion livrable) — défilent comme la mission. */
       discussionProgress: string[];
+      /** Dernier envoi terminé (routage + réponse + fusions), en secondes ; `null` si aucun encore. */
+      lastCompletedTurnSec: number | null;
     }
   | {
       kind: "mission";

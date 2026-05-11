@@ -131,6 +131,7 @@ export function ChatPanel({
   const discussionRootRef = useRef<HTMLDivElement | null>(null);
   const prevModeRef = useRef<ChatMode>(initialChatMode(conversation));
   const discussionActivityConvIdRef = useRef(conversation.id);
+  const discussionBusySinceRef = useRef<number | null>(null);
 
   useEffect(() => {
     const refresh = () => setTeamMembers(loadTeamMembers());
@@ -274,6 +275,7 @@ export function ChatPanel({
             panelError: null,
             streamingSpeaker: null,
             discussionProgress: cap([trimmed]),
+            lastCompletedTurnSec: null,
           };
         }
         return {
@@ -301,11 +303,29 @@ export function ChatPanel({
         discussionActivityConvIdRef.current !== conversation.id;
       if (idChanged) {
         discussionActivityConvIdRef.current = conversation.id;
+        discussionBusySinceRef.current = null;
       }
       const discussionProgress =
         !idChanged && prev.kind === "discussion"
           ? prev.discussionProgress
           : [];
+      const busy = isRouting || streaming;
+      const wasBusy =
+        prev.kind === "discussion" && (prev.isRouting || prev.streaming);
+      let lastCompletedTurnSec: number | null =
+        prev.kind === "discussion" && !idChanged
+          ? prev.lastCompletedTurnSec
+          : null;
+      if (busy && !wasBusy) {
+        discussionBusySinceRef.current = Date.now();
+        lastCompletedTurnSec = null;
+      }
+      if (!busy && wasBusy && discussionBusySinceRef.current != null) {
+        lastCompletedTurnSec = Math.floor(
+          (Date.now() - discussionBusySinceRef.current) / 1000,
+        );
+        discussionBusySinceRef.current = null;
+      }
       return {
         kind: "discussion",
         isRouting,
@@ -313,6 +333,7 @@ export function ChatPanel({
         panelError: error,
         streamingSpeaker,
         discussionProgress,
+        lastCompletedTurnSec,
       };
     });
   }, [

@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-05-11 — Activité : temps de traitement affiché à la fin
+
+### Objectif
+
+En **Mission équipe**, la durée n’était plus fiable à l’arrêt (remise à 0 s puis écrasement du snapshot). La colonne **Activité** affiche désormais **Temps de traitement** une fois la mission terminée (valeur persistée correcte). En **Discussion**, le même libellé résume la durée du **dernier envoi** (routage + réponse + fusions).
+
+### Fichiers
+
+- `src/components/MissionWorkspace.tsx`, `src/components/ActivitySidebar.tsx`, `src/components/ChatPanel.tsx`, `src/types/activity.ts`, `src/App.tsx`, `docs/DEVBOOK.md`
+
+---
+
 ## 2026-05-10 — Archives : régénérer toutes les âmes d’une composition
 
 ### Objectif
@@ -158,6 +170,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 
 | Date | Changement |
 |------|------------|
+| 2026-05-11 | Activité : **temps de traitement** affiché à la fin (mission : durée persistée corrigée ; discussion : dernier envoi) |
 | 2026-05-10 | Conversations : **plus de renommage automatique** après mission ni après discussion (titre sidebar stable) |
 | 2026-05-10 | Seeds équipe (défaut) : **spécialisation** métier stricte, hors-sujet explicite, positions techniques ; aide Paramètres mise à jour |
 | 2026-05-10 | Mission : doc + prompt **pilier après sous-agents** — synchro sans compression, double lecture, vision globale du pôle |

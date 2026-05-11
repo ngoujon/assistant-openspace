@@ -16,6 +16,12 @@ import type { MissionActivitySnapshot } from "@/types";
 
 export type { ActivityLinkedArtifact } from "@/types/activity";
 
+function formatElapsedSec(elapsedSec: number): string {
+  return elapsedSec >= 60
+    ? `${Math.floor(elapsedSec / 60)} min ${(elapsedSec % 60).toString().padStart(2, "0")} s`
+    : `${elapsedSec} s`;
+}
+
 const STEP_KIND_LABELS: Record<MissionStepVisualKind, string | null> = {
   done: "Terminé",
   "final-doc": "Document final",
@@ -207,7 +213,7 @@ export function ActivitySidebar({
 
   if (state.kind === "discussion") {
     if (isInline) return null;
-    const { isRouting, streaming, panelError } = state;
+    const { isRouting, streaming, panelError, lastCompletedTurnSec } = state;
     const busy = isRouting || streaming;
 
     return (
@@ -232,6 +238,11 @@ export function ActivitySidebar({
             />
           ) : !panelError && busy ? (
             <p className="activity-sidebar-status">En cours…</p>
+          ) : null}
+          {!panelError && !busy && lastCompletedTurnSec != null ? (
+            <p className="activity-sidebar-timer" aria-label="Temps de traitement">
+              Temps de traitement : {formatElapsedSec(lastCompletedTurnSec)}
+            </p>
           ) : null}
           {!panelError && !busy && !linkedArtifact && (
             <p className="activity-sidebar-muted">
@@ -263,10 +274,6 @@ export function ActivitySidebar({
   }
 
   const { running, progress, elapsedSec } = state;
-  const fmt =
-    elapsedSec >= 60
-      ? `${Math.floor(elapsedSec / 60)} min ${(elapsedSec % 60).toString().padStart(2, "0")} s`
-      : `${elapsedSec} s`;
 
   const showMissionDownload =
     !running && linkedArtifact && progress.length > 0;
@@ -286,7 +293,12 @@ export function ActivitySidebar({
         <h2 className="activity-sidebar-title">Activité</h2>
         {running && (
           <p className="activity-sidebar-timer" aria-label="Durée écoulée">
-            Durée : {fmt}
+            Durée : {formatElapsedSec(elapsedSec)}
+          </p>
+        )}
+        {!running && progress.length > 0 && (
+          <p className="activity-sidebar-timer" aria-label="Temps de traitement">
+            Temps de traitement : {formatElapsedSec(elapsedSec)}
           </p>
         )}
         {running && elapsedSec >= 8 && (

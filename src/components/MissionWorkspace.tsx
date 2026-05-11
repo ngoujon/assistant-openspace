@@ -52,6 +52,7 @@ export function MissionWorkspace({
   const [resultMd, setResultMd] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsedSec, setElapsedSec] = useState(0);
+  const missionElapsedT0Ref = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
@@ -73,16 +74,19 @@ export function MissionWorkspace({
     };
   }, []);
 
+  /** Pendant l’exécution : compteur. À l’arrêt : conserve la durée finale (Activité + snapshot). */
   useEffect(() => {
-    if (!running) {
-      setElapsedSec(0);
-      return;
-    }
+    if (!running) return;
+    setElapsedSec(0);
     const t0 = Date.now();
+    missionElapsedT0Ref.current = t0;
     const id = window.setInterval(() => {
       setElapsedSec(Math.floor((Date.now() - t0) / 1000));
     }, 1000);
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearInterval(id);
+      missionElapsedT0Ref.current = null;
+    };
   }, [running]);
 
   useEffect(() => {
@@ -207,6 +211,7 @@ export function MissionWorkspace({
       setError(
         "Aucun membre sous l’orchestrateur. Ajoute au moins un pilier dans la colonne Organisation.",
       );
+      setElapsedSec(0);
       setRunning(false);
       abortRef.current = null;
       return;
@@ -239,6 +244,10 @@ export function MissionWorkspace({
         setError((e as Error).message || "Erreur pendant la mission.");
       }
     } finally {
+      const t0 = missionElapsedT0Ref.current;
+      if (t0 != null) {
+        setElapsedSec(Math.floor((Date.now() - t0) / 1000));
+      }
       setRunning(false);
       abortRef.current = null;
     }
