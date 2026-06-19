@@ -13,9 +13,19 @@ import { TeamCentrePanel } from "@/components/TeamCentrePanel";
 import { TeamOrganisationAside } from "@/components/TeamOrganisationAside";
 import { TeamWorkspaceProvider } from "@/components/TeamWorkspaceContext";
 import { fetchOllamaModels } from "@/lib/ollama";
-import { loadConversations, saveConversations } from "@/lib/storage";
+import {
+  appendArtifactVersion,
+  loadConversations,
+  saveConversations,
+} from "@/lib/storage";
 import type { RightActivityState } from "@/types/activity";
-import type { Conversation, MissionActivitySnapshot } from "@/types";
+import type {
+  Conversation,
+  MissionActivitySnapshot,
+  MissionAgentJournalEntry,
+} from "@/types";
+
+const SAVE_DEBOUNCE_MS = 300;
 
 /** Colonne Activité au chargement (évite un flash « vide » avant les effets du ChatPanel). */
 function deriveInitialRightActivity(c: Conversation): RightActivityState {
@@ -122,7 +132,10 @@ export default function App() {
   }, [refreshLlmModels]);
 
   useEffect(() => {
-    saveConversations(conversations);
+    const t = window.setTimeout(() => {
+      saveConversations(conversations);
+    }, SAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(t);
   }, [conversations]);
 
   useEffect(() => {
@@ -211,6 +224,12 @@ export default function App() {
         clearDiscussionCutoff?: boolean;
         /** Contexte mission au moment du livrable (première demande utilisateur). */
         missionUserBrief?: string;
+        /** Libellé de version (mission, fusion, etc.). */
+        versionLabel?: string;
+        /** Fusion en attente (message sans intention de retouche). */
+        pendingArtifactMerge?: boolean;
+        /** Remplace le journal mission (nouvelle mission). */
+        replaceAgentJournal?: MissionAgentJournalEntry[];
       },
     ) => {
       setConversations((prev) =>
@@ -227,12 +246,82 @@ export default function App() {
             opts?.missionUserBrief !== undefined
               ? opts.missionUserBrief
               : c.missionUserBrief;
+          const artifactVersions = appendArtifactVersion(
+            c,
+            markdown,
+            opts?.versionLabel,
+          );
           return {
             ...c,
             artifactMarkdown: markdown,
+            artifactVersions,
             updatedAt: Date.now(),
             artifactDiscussionCutoffAfterId,
             missionUserBrief,
+            pendingArtifactMerge:
+              opts?.pendingArtifactMerge !== undefined
+                ? opts.pendingArtifactMerge
+                : c.pendingArtifactMerge,
+            missionAgentJournal:
+              opts?.replaceAgentJournal !== undefined
+                ? opts.replaceAgentJournal
+                : c.missionAgentJournal,
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  const clearMissionAgentJournal = useCallback((conversationId: string) => {
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conversationId ? { ...c, missionAgentJournal: [] } : c,
+      ),
+    );
+  }, []);
+
+  const appendMissionAgentJournal = useCallback(
+    (conversationId: string, entry: MissionAgentJournalEntry) => {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId
+            ? {
+                ...c,
+                missionAgentJournal: [...(c.missionAgentJournal ?? []), entry],
+                updatedAt: Date.now(),
+              }
+            : c,
+        ),
+      );
+    },
+    [],
+  );
+
+  const setPendingArtifactMerge = useCallback(
+    (conversationId: string, pending: boolean) => {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId
+            ? { ...c, pendingArtifactMerge: pending, updatedAt: Date.now() }
+            : c,
+        ),
+      );
+    },
+    [],
+  );
+
+  const restoreArtifactVersion = useCallback(
+    (conversationId: string, versionId: string) => {
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id !== conversationId) return c;
+          const v = c.artifactVersions?.find((x) => x.id === versionId);
+          if (!v) return c;
+          return {
+            ...c,
+            artifactMarkdown: v.markdown,
+            updatedAt: Date.now(),
           };
         }),
       );
@@ -283,6 +372,19 @@ export default function App() {
       state={activityForShell}
       linkedArtifact={activityLinkedArtifact}
       missionHistory={active.missionActivitySnapshot}
+      agentJournal={active.missionAgentJournal}
+      artifactVersions={active.artifactVersions}
+      pendingArtifactMerge={active.pendingArtifactMerge}
+      onRestoreVersion={(versionId) =>
+        restoreArtifactVersion(active.id, versionId)
+      }
+      onRequestArtifactMerge={() => {
+        window.dispatchEvent(
+          new CustomEvent("openspace-request-artifact-merge", {
+            detail: { conversationId: active.id },
+          }),
+        );
+      }}
     />
   );
 
@@ -299,7 +401,31 @@ export default function App() {
         setMessages={setConversationMessages}
         onConversationArtifact={setConversationArtifactMarkdown}
         onMissionActivitySnapshot={persistMissionActivitySnapshot}
+        onMissionAgentJournal={appendMissionAgentJournal}
+        onMissionJournalClear={clearMissionAgentJournal}
+        onPendingArtifactMerge={setPendingArtifactMerge}
         setRightActivity={setRightActivity}
+        activityAside={
+          <ActivitySidebar
+            state={activityForShell}
+            variant="inline"
+            linkedArtifact={activityLinkedArtifact}
+            missionHistory={active.missionActivitySnapshot}
+            agentJournal={active.missionAgentJournal}
+            artifactVersions={active.artifactVersions}
+            pendingArtifactMerge={active.pendingArtifactMerge}
+            onRestoreVersion={(versionId) =>
+              restoreArtifactVersion(active.id, versionId)
+            }
+            onRequestArtifactMerge={() => {
+              window.dispatchEvent(
+                new CustomEvent("openspace-request-artifact-merge", {
+                  detail: { conversationId: active.id },
+                }),
+              );
+            }}
+          />
+        }
       />
       <TeamCentrePanel />
     </div>

@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
 } from "react";
 import { MissionWorkspace } from "@/components/MissionWorkspace";
@@ -17,11 +18,14 @@ import {
   collectMentionedMemberIds,
   resolveForcedResponderFromMessage,
 } from "@/lib/discussionMention";
+import { useDiscussionQueue } from "@/hooks/useDiscussionQueue";
+import { useStreamTokenBuffer } from "@/hooks/useStreamTokenBuffer";
 import {
   MISTRAL_DISCUSSION_ROUTE_TO_STREAM_MS,
   MISTRAL_DISCUSSION_STREAM_TO_MERGE_MS,
   sleepMs,
 } from "@/lib/llmRateLimit";
+import { shouldAutoMergeArtifact } from "@/lib/shouldAutoMergeArtifact";
 import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
 import { DiscussionMessageBody } from "@/components/DiscussionMessageBody";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
@@ -33,6 +37,7 @@ import type {
   ChatMessage,
   Conversation,
   MissionActivitySnapshot,
+  MissionAgentJournalEntry,
 } from "@/types";
 
 type ChatMode = "mission" | "free";
@@ -43,9 +48,8 @@ function initialChatMode(conversation: Conversation): ChatMode {
   return hasArtifact || hasMessages ? "free" : "mission";
 }
 
-interface DiscussionQueuedMessage {
-  id: string;
-  text: string;
+function llmProviderLabel(provider: LlmProvider): string {
+  return provider === "mistral" ? "Mistral" : "Ollama";
 }
 
 const DISCUSSION_ACTIVITY_MAX_LINES = 100;
@@ -83,6 +87,9 @@ interface ChatPanelProps {
       discussionCutoffAfterId?: string;
       clearDiscussionCutoff?: boolean;
       missionUserBrief?: string;
+      versionLabel?: string;
+      pendingArtifactMerge?: boolean;
+      replaceAgentJournal?: MissionAgentJournalEntry[];
     },
   ) => void;
   /** Persiste la progression mission sur la conversation (localStorage). */
@@ -90,7 +97,15 @@ interface ChatPanelProps {
     conversationId: string,
     snapshot: MissionActivitySnapshot,
   ) => void;
+  onMissionAgentJournal?: (
+    conversationId: string,
+    entry: MissionAgentJournalEntry,
+  ) => void;
+  onMissionJournalClear?: (conversationId: string) => void;
+  onPendingArtifactMerge?: (conversationId: string, pending: boolean) => void;
   setRightActivity: Dispatch<SetStateAction<RightActivityState>>;
+  /** Activité compacte (mobile) au-dessus du fil discussion. */
+  activityAside?: ReactNode;
 }
 
 export function ChatPanel({
@@ -104,7 +119,11 @@ export function ChatPanel({
   setMessages,
   onConversationArtifact,
   onMissionActivitySnapshot,
+  onMissionAgentJournal,
+  onMissionJournalClear,
+  onPendingArtifactMerge,
   setRightActivity,
+  activityAside,
 }: ChatPanelProps) {
   const [mode, setMode] = useState<ChatMode>(() =>
     initialChatMode(conversation),
@@ -117,19 +136,11 @@ export function ChatPanel({
     loadTeamMembers(),
   );
   const abortRef = useRef<AbortController | null>(null);
-  const discussionQueueRef = useRef<DiscussionQueuedMessage[]>([]);
-  const pumpingRef = useRef(false);
-  const busyRef = useRef(false);
-  const runDiscussionSendOrPatchRef = useRef<(text: string) => Promise<void>>(
-    async () => {},
-  );
-  const pumpDiscussionQueueRef = useRef<() => Promise<void>>(async () => {});
+  const streamBuffer = useStreamTokenBuffer();
   const lastMissionPersistSigRef = useRef<string>("");
-
-  const [discussionQueue, setDiscussionQueue] = useState<
-    DiscussionQueuedMessage[]
-  >([]);
-  const [discussionQueueOpen, setDiscussionQueueOpen] = useState(false);
+  const [streamingSpeakerLabel, setStreamingSpeakerLabel] = useState<
+    string | null
+  >(null);
   const [showMissionDraftHint, setShowMissionDraftHint] = useState(false);
   const discussionRootRef = useRef<HTMLDivElement | null>(null);
   const prevModeRef = useRef<ChatMode>(initialChatMode(conversation));
@@ -146,33 +157,6 @@ export function ChatPanel({
       window.removeEventListener("openspace-team-updated", onTeamSaved);
     };
   }, []);
-
-  useEffect(() => {
-    setError(null);
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setStreaming(false);
-    setIsRouting(false);
-    discussionQueueRef.current = [];
-    setDiscussionQueue([]);
-    setDiscussionQueueOpen(false);
-    const hasArtifact = !!conversation.artifactMarkdown?.trim();
-    const hasMessages = conversation.messages.length > 0;
-    const nextMode = hasArtifact || hasMessages ? "free" : "mission";
-    setMode(nextMode);
-    prevModeRef.current = nextMode;
-    if (
-      nextMode === "free" &&
-      !hasMessages &&
-      conversation.missionUserBrief?.trim()
-    ) {
-      setInput("");
-      setShowMissionDraftHint(true);
-    } else {
-      setInput("");
-      setShowMissionDraftHint(false);
-    }
-  }, [conversation.id]);
 
   /**
    * Livrable mission + brief persistés mais fil discussion vide : afficher le brief
@@ -375,6 +359,8 @@ export function ChatPanel({
       const finalMd = unwrapMarkdownFence(raw);
       onConversationArtifact(opts.conversationId, finalMd, {
         discussionCutoffAfterId: opts.cutoffAfterAssistantId,
+        versionLabel: "Fusion discussion",
+        pendingArtifactMerge: false,
       });
     },
     [llmProvider, mistralApiKey, mistralTemperature, model, onConversationArtifact],
@@ -382,7 +368,6 @@ export function ChatPanel({
 
   const runDiscussionSendOrPatch = useCallback(
     async (text: string) => {
-      let skipPump = false;
       try {
         if (!model) {
           setError(
@@ -390,7 +375,6 @@ export function ChatPanel({
               ? "Aucun modèle Mistral disponible. Vérifie ta clé API dans Paramètres."
               : "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
           );
-          skipPump = true;
           return;
         }
 
@@ -472,12 +456,14 @@ export function ChatPanel({
             routingNote: routing.userNote,
           };
 
+          setStreamingSpeakerLabel(speakerLabel);
           setMessages(convId, () => [...historyWithUser, assistantShell]);
           setIsRouting(false);
           setStreaming(true);
           appendDiscussionProgressLine("Rédaction de la réponse (flux du modèle)…");
 
           let assistantAccum = "";
+          streamBuffer.reset();
           await streamDiscussionReply({
             llmProvider,
             mistralApiKey,
@@ -492,16 +478,29 @@ export function ChatPanel({
               llmProvider === "mistral" ? mistralTemperature : undefined,
             onToken: (chunk) => {
               assistantAccum += chunk;
-              setMessages(convId, (prev) =>
-                prev.map((m) =>
-                  m.id === assistantId
-                    ? { ...m, content: m.content + chunk }
-                    : m,
-                ),
-              );
+              streamBuffer.push(chunk, (flushed) => {
+                setMessages(convId, (prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? { ...m, content: m.content + flushed }
+                      : m,
+                  ),
+                );
+              });
             },
             signal: ac.signal,
           });
+          streamBuffer.flushNow((flushed) => {
+            if (!flushed) return;
+            setMessages(convId, (prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? { ...m, content: m.content + flushed }
+                  : m,
+              ),
+            );
+          });
+          setStreamingSpeakerLabel(null);
           appendDiscussionProgressLine("Réponse de l’équipe reçue.");
 
           const transcriptMessages: ChatMessage[] = [
@@ -516,44 +515,50 @@ export function ChatPanel({
           ];
           const art = turnArtifactMd?.trim();
           if (art && assistantId) {
-            const discussionForPatch = messagesAfterArtifactCutoff(
-              transcriptMessages,
-              turnCutoffAfterId,
-            );
-            if (llmProvider === "mistral") {
-              await sleepMs(MISTRAL_DISCUSSION_STREAM_TO_MERGE_MS, ac.signal);
-            }
-            setIsRouting(true);
-            appendDiscussionProgressLine(
-              "Application des retouches au livrable Markdown…",
-            );
-            try {
-              await artifactMergeFromDiscussion({
-                conversationId: convId,
-                missionUserBrief: turnMissionBrief,
-                discussionMessages: discussionForPatch,
-                artifactMarkdown: art,
-                cutoffAfterAssistantId: assistantId,
-                signal: ac.signal,
-              });
-              appendDiscussionProgressLine("Livrable Markdown mis à jour.");
-            } catch (mergeErr) {
-              if ((mergeErr as Error).name === "AbortError") {
-                appendDiscussionProgressLine(
-                  "Mise à jour du livrable interrompue.",
-                );
-                skipPump = true;
-                return;
+            if (shouldAutoMergeArtifact(text)) {
+              const discussionForPatch = messagesAfterArtifactCutoff(
+                transcriptMessages,
+                turnCutoffAfterId,
+              );
+              if (llmProvider === "mistral") {
+                await sleepMs(MISTRAL_DISCUSSION_STREAM_TO_MERGE_MS, ac.signal);
               }
+              setIsRouting(true);
               appendDiscussionProgressLine(
-                `Échec fusion livrable : ${((mergeErr as Error).message || "?").slice(0, 100)}`,
+                "Application des retouches au livrable Markdown…",
               );
-              setError(
-                (mergeErr as Error).message ||
-                  "La mise à jour automatique du livrable a échoué ; télécharge le .md existant depuis Activité si besoin.",
+              try {
+                await artifactMergeFromDiscussion({
+                  conversationId: convId,
+                  missionUserBrief: turnMissionBrief,
+                  discussionMessages: discussionForPatch,
+                  artifactMarkdown: art,
+                  cutoffAfterAssistantId: assistantId,
+                  signal: ac.signal,
+                });
+                appendDiscussionProgressLine("Livrable Markdown mis à jour.");
+              } catch (mergeErr) {
+                if ((mergeErr as Error).name === "AbortError") {
+                  appendDiscussionProgressLine(
+                    "Mise à jour du livrable interrompue.",
+                  );
+                  return;
+                }
+                appendDiscussionProgressLine(
+                  `Échec fusion livrable : ${((mergeErr as Error).message || "?").slice(0, 100)}`,
+                );
+                setError(
+                  (mergeErr as Error).message ||
+                    "La mise à jour automatique du livrable a échoué ; télécharge le .md existant depuis Activité si besoin.",
+                );
+              } finally {
+                setIsRouting(false);
+              }
+            } else {
+              onPendingArtifactMerge?.(convId, true);
+              appendDiscussionProgressLine(
+                "Fusion non déclenchée (message sans intention de retouche). Utilise « Mettre à jour le livrable » dans Activité.",
               );
-            } finally {
-              setIsRouting(false);
             }
           } else {
             appendDiscussionProgressLine(
@@ -563,7 +568,6 @@ export function ChatPanel({
         } catch (e) {
           if ((e as Error).name === "AbortError") {
             appendDiscussionProgressLine("Échange interrompu.");
-            skipPump = true;
             return;
           }
           appendDiscussionProgressLine(
@@ -578,12 +582,11 @@ export function ChatPanel({
         } finally {
           setIsRouting(false);
           setStreaming(false);
+          setStreamingSpeakerLabel(null);
           abortRef.current = null;
         }
-      } finally {
-        if (!skipPump) {
-          queueMicrotask(() => void pumpDiscussionQueueRef.current());
-        }
+      } catch {
+        /* erreurs gérées dans le bloc interne */
       }
     },
     [
@@ -600,65 +603,97 @@ export function ChatPanel({
       artifactMergeFromDiscussion,
       teamMembers,
       appendDiscussionProgressLine,
+      onPendingArtifactMerge,
+      streamBuffer,
     ],
   );
 
-  useEffect(() => {
-    runDiscussionSendOrPatchRef.current = runDiscussionSendOrPatch;
-  }, [runDiscussionSendOrPatch]);
-
-  const pumpDiscussionQueue = useCallback(async () => {
-    if (pumpingRef.current) return;
-    if (busyRef.current) return;
-    const head = discussionQueueRef.current[0];
-    if (!head) return;
-    pumpingRef.current = true;
-    const claimed = discussionQueueRef.current.shift()!;
-    setDiscussionQueue([...discussionQueueRef.current]);
-    let scheduleAgain = true;
-    try {
-      await runDiscussionSendOrPatchRef.current(claimed.text);
-    } catch {
-      discussionQueueRef.current = [claimed, ...discussionQueueRef.current];
-      setDiscussionQueue([...discussionQueueRef.current]);
-      scheduleAgain = false;
-    } finally {
-      pumpingRef.current = false;
-      if (scheduleAgain) {
-        queueMicrotask(() => void pumpDiscussionQueueRef.current());
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    pumpDiscussionQueueRef.current = pumpDiscussionQueue;
-  }, [pumpDiscussionQueue]);
-
-  const removeQueuedMessage = useCallback((id: string) => {
-    discussionQueueRef.current = discussionQueueRef.current.filter(
-      (x) => x.id !== id,
-    );
-    setDiscussionQueue([...discussionQueueRef.current]);
-  }, []);
-
-  const updateQueuedMessageText = useCallback((id: string, next: string) => {
-    discussionQueueRef.current = discussionQueueRef.current.map((x) =>
-      x.id === id ? { ...x, text: next } : x,
-    );
-    setDiscussionQueue([...discussionQueueRef.current]);
-  }, []);
-
   const busy = streaming || isRouting;
 
-  useEffect(() => {
-    busyRef.current = busy;
-  }, [busy]);
+  const discussionQueue = useDiscussionQueue(runDiscussionSendOrPatch, busy);
 
-  /** Reprend la file après routage / stream (ex. après « Arrêter » sans pompe). */
   useEffect(() => {
-    if (busy) return;
-    void pumpDiscussionQueueRef.current();
-  }, [busy]);
+    setError(null);
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStreaming(false);
+    setIsRouting(false);
+    setStreamingSpeakerLabel(null);
+    discussionQueue.resetQueue();
+    const hasArtifact = !!conversation.artifactMarkdown?.trim();
+    const hasMessages = conversation.messages.length > 0;
+    const nextMode = hasArtifact || hasMessages ? "free" : "mission";
+    setMode(nextMode);
+    prevModeRef.current = nextMode;
+    if (
+      nextMode === "free" &&
+      !hasMessages &&
+      conversation.missionUserBrief?.trim()
+    ) {
+      setInput("");
+      setShowMissionDraftHint(true);
+    } else {
+      setInput("");
+      setShowMissionDraftHint(false);
+    }
+  }, [conversation.id]);
+
+  const runManualArtifactMerge = useCallback(async () => {
+    const art = conversation.artifactMarkdown?.trim();
+    if (!art || busy) return;
+    const lastAssistant = [...conversation.messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    if (!lastAssistant) return;
+
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setIsRouting(true);
+    appendDiscussionProgressLine(
+      "Fusion manuelle — application des retouches au livrable…",
+    );
+    try {
+      const discussionForPatch = messagesAfterArtifactCutoff(
+        conversation.messages,
+        conversation.artifactDiscussionCutoffAfterId,
+      );
+      await artifactMergeFromDiscussion({
+        conversationId: conversation.id,
+        missionUserBrief: conversation.missionUserBrief,
+        discussionMessages: discussionForPatch,
+        artifactMarkdown: art,
+        cutoffAfterAssistantId: lastAssistant.id,
+        signal: ac.signal,
+      });
+      appendDiscussionProgressLine("Livrable Markdown mis à jour.");
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") {
+        setError((e as Error).message || "Échec de la fusion manuelle.");
+      }
+    } finally {
+      setIsRouting(false);
+      abortRef.current = null;
+    }
+  }, [
+    busy,
+    conversation,
+    artifactMergeFromDiscussion,
+    appendDiscussionProgressLine,
+  ]);
+
+  useEffect(() => {
+    const onMergeRequest = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ conversationId: string }>).detail;
+      if (detail?.conversationId !== conversation.id) return;
+      void runManualArtifactMerge();
+    };
+    window.addEventListener("openspace-request-artifact-merge", onMergeRequest);
+    return () =>
+      window.removeEventListener(
+        "openspace-request-artifact-merge",
+        onMergeRequest,
+      );
+  }, [conversation.id, runManualArtifactMerge]);
 
   const submitDiscussionComposer = useCallback(() => {
     const text = input.trim();
@@ -674,20 +709,8 @@ export function ChatPanel({
     setInput("");
     setShowMissionDraftHint(false);
     setError(null);
-    if (!busy && discussionQueueRef.current.length === 0) {
-      void runDiscussionSendOrPatchRef.current(text);
-      return;
-    }
-    discussionQueueRef.current = [
-      ...discussionQueueRef.current,
-      { id: crypto.randomUUID(), text },
-    ];
-    setDiscussionQueue([...discussionQueueRef.current]);
-    if (busy) {
-      setDiscussionQueueOpen(true);
-    }
-    void pumpDiscussionQueueRef.current();
-  }, [input, model, llmProvider, busy]);
+    discussionQueue.trySendNow(text);
+  }, [input, model, llmProvider, discussionQueue]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -704,6 +727,12 @@ export function ChatPanel({
               ? "Mission équipe"
               : "Discussion"}
           </p>
+          {model ? (
+            <p className="chat-llm-indicator" aria-label="Fournisseur et modèle actifs">
+              {llmProviderLabel(llmProvider)}
+              {model ? ` · ${model}` : ""}
+            </p>
+          ) : null}
           {llmError && (
             <div className="banner banner-warn">
               {llmError}
@@ -730,6 +759,8 @@ export function ChatPanel({
               onConversationArtifact(conversation.id, md, {
                 clearDiscussionCutoff: true,
                 missionUserBrief,
+                versionLabel: "Mission équipe",
+                pendingArtifactMerge: false,
               });
               if (md.trim()) {
                 setInput("");
@@ -737,6 +768,12 @@ export function ChatPanel({
                 setMode("free");
               }
             }}
+            onAgentJournal={(entry) =>
+              onMissionAgentJournal?.(conversation.id, entry)
+            }
+            onMissionJournalClear={() =>
+              onMissionJournalClear?.(conversation.id)
+            }
           />
         </div>
       ) : (
@@ -760,6 +797,9 @@ export function ChatPanel({
               )}
             </div>
           )}
+          {activityAside ? (
+            <div className="activity-inline-wrap">{activityAside}</div>
+          ) : null}
           <div className="chat-messages" role="log" aria-live="polite">
             {conversation.messages.map((m, i) => {
               const isPendingAssistant =
@@ -779,6 +819,11 @@ export function ChatPanel({
                   className={`bubble bubble-${m.role}${m.artifactPatchNote ? " bubble-artifact-patch" : ""}`}
                 >
                   <span className="bubble-role">{roleLine}</span>
+                  {isPendingAssistant && streamingSpeakerLabel ? (
+                    <p className="bubble-streaming-speaker" aria-live="polite">
+                      En train de répondre : {streamingSpeakerLabel}
+                    </p>
+                  ) : null}
                   {m.routingNote && (
                     <p className="bubble-routing-note">{m.routingNote}</p>
                   )}
@@ -799,31 +844,33 @@ export function ChatPanel({
           {error && <div className="banner banner-error">{error}</div>}
 
           <footer className="chat-input-row">
-            {discussionQueue.length > 0 && (
+            {discussionQueue.queue.length > 0 && (
               <div className="discussion-queue-block">
                 <div className="discussion-queue-toolbar">
                   <span className="discussion-queue-badge" aria-live="polite">
-                    {discussionQueue.length === 1
+                    {discussionQueue.queue.length === 1
                       ? "1 message en file"
-                      : `${discussionQueue.length} messages en file`}
+                      : `${discussionQueue.queue.length} messages en file`}
                   </span>
                   <button
                     type="button"
                     className="btn-secondary discussion-queue-toggle"
-                    aria-expanded={discussionQueueOpen}
+                    aria-expanded={discussionQueue.queueOpen}
                     aria-label={
-                      discussionQueueOpen
+                      discussionQueue.queueOpen
                         ? "Replier la file d’attente"
                         : "Voir ou modifier la file d’attente"
                     }
                     title={
-                      discussionQueueOpen
+                      discussionQueue.queueOpen
                         ? "Replier la file"
                         : "Voir / modifier la file"
                     }
-                    onClick={() => setDiscussionQueueOpen((o) => !o)}
+                    onClick={() =>
+                      discussionQueue.setQueueOpen((o) => !o)
+                    }
                   >
-                    {discussionQueueOpen ? (
+                    {discussionQueue.queueOpen ? (
                       <svg
                         width="20"
                         height="20"
@@ -854,12 +901,12 @@ export function ChatPanel({
                     )}
                   </button>
                 </div>
-                {discussionQueueOpen && (
+                {discussionQueue.queueOpen && (
                   <ol
                     className="discussion-queue-list"
                     aria-label="Messages en attente d’envoi"
                   >
-                    {discussionQueue.map((item, index) => (
+                    {discussionQueue.queue.map((item, index) => (
                       <li key={item.id} className="discussion-queue-item">
                         <span className="discussion-queue-item-index">
                           {index + 1}.
@@ -869,7 +916,10 @@ export function ChatPanel({
                           rows={2}
                           value={item.text}
                           onChange={(e) =>
-                            updateQueuedMessageText(item.id, e.target.value)
+                            discussionQueue.updateQueuedText(
+                              item.id,
+                              e.target.value,
+                            )
                           }
                           aria-label={`Message ${index + 1} en file`}
                         />
@@ -878,7 +928,9 @@ export function ChatPanel({
                           className="btn-secondary discussion-queue-remove"
                           aria-label={`Retirer le message ${index + 1} de la file`}
                           title="Retirer de la file"
-                          onClick={() => removeQueuedMessage(item.id)}
+                          onClick={() =>
+                            discussionQueue.removeQueued(item.id)
+                          }
                         >
                           <svg
                             width="18"

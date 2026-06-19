@@ -1,4 +1,6 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AgentJournalPanel } from "@/components/AgentJournalPanel";
+import { ArtifactPreviewPanel } from "@/components/ArtifactPreviewPanel";
 import { useTeamWorkspace } from "@/components/TeamWorkspaceContext";
 import { triggerMarkdownDownload } from "@/lib/downloadMarkdown";
 import {
@@ -11,7 +13,7 @@ import {
   type MissionStepVisualKind,
 } from "@/lib/parseMissionProgressLine";
 import type { ActivityLinkedArtifact, RightActivityState } from "@/types/activity";
-import type { MissionActivitySnapshot } from "@/types";
+import type { ArtifactVersion, MissionActivitySnapshot, MissionAgentJournalEntry } from "@/types";
 
 export type { ActivityLinkedArtifact } from "@/types/activity";
 
@@ -28,7 +30,6 @@ const STEP_KIND_LABELS: Record<MissionStepVisualKind, string | null> = {
   delegation: "Brief",
   specialist: "Spécialiste",
   synthesis: "Synthèse",
-  /** Pastille = libellé membre (`displayPill`) ; pas de libellé générique « Pôle ». */
   "pole-solo": null,
   handoff: null,
   default: "SYSTEME",
@@ -160,12 +161,76 @@ const EMPTY_PROGRESS: string[] = [];
 
 interface ActivitySidebarProps {
   state: RightActivityState;
-  /** Sur mobile la colonne droite est masquée : version compacte au-dessus du fil. */
   variant?: "sidebar" | "inline";
-  /** Téléchargement du cahier des charges / rapport lié à la conversation active. */
   linkedArtifact?: ActivityLinkedArtifact | null;
-  /** Dernière mission (étapes) persistée pour ce projet — affichée en Discussion. */
   missionHistory?: MissionActivitySnapshot | null;
+  agentJournal?: MissionAgentJournalEntry[];
+  artifactVersions?: ArtifactVersion[];
+  pendingArtifactMerge?: boolean;
+  onRestoreVersion?: (versionId: string) => void;
+  onRequestArtifactMerge?: () => void;
+}
+
+function ArtifactActions({
+  linkedArtifact,
+  artifactVersions,
+  pendingArtifactMerge,
+  onRestoreVersion,
+  onRequestArtifactMerge,
+}: {
+  linkedArtifact: ActivityLinkedArtifact;
+  artifactVersions?: ArtifactVersion[];
+  pendingArtifactMerge?: boolean;
+  onRestoreVersion?: (versionId: string) => void;
+  onRequestArtifactMerge?: () => void;
+}) {
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(linkedArtifact.markdown);
+      setCopyFeedback("Copié !");
+      window.setTimeout(() => setCopyFeedback(null), 2000);
+    } catch {
+      setCopyFeedback("Échec");
+    }
+  };
+
+  return (
+    <div className="activity-artifact-actions">
+      <ArtifactPreviewPanel
+        markdown={linkedArtifact.markdown}
+        versions={artifactVersions}
+        onSelectVersion={onRestoreVersion}
+        onCopy={() => void handleCopy()}
+        copyFeedback={copyFeedback}
+      />
+      <div className="activity-sidebar-footer">
+        {pendingArtifactMerge && onRequestArtifactMerge ? (
+          <button
+            type="button"
+            className="btn-primary btn-compact activity-merge-md-btn"
+            onClick={onRequestArtifactMerge}
+          >
+            Mettre à jour le livrable
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="btn-primary btn-compact activity-download-md-btn"
+          aria-label="Télécharger le livrable Markdown (.md)"
+          onClick={() =>
+            triggerMarkdownDownload(
+              linkedArtifact.markdown,
+              linkedArtifact.filename,
+            )
+          }
+        >
+          Télécharger le .md
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function ActivitySidebar({
@@ -173,6 +238,11 @@ export function ActivitySidebar({
   variant = "sidebar",
   linkedArtifact = null,
   missionHistory = null,
+  agentJournal = [],
+  artifactVersions,
+  pendingArtifactMerge,
+  onRestoreVersion,
+  onRequestArtifactMerge,
 }: ActivitySidebarProps) {
   const isInline = variant === "inline";
 
@@ -208,19 +278,31 @@ export function ActivitySidebar({
   }
 
   if (state.kind === "discussion") {
-    if (isInline) return null;
-    const { isRouting, streaming, panelError, lastCompletedTurnSec } = state;
+    if (isInline && !linkedArtifact && discussionCombinedProgress.length === 0) {
+      return null;
+    }
+    const { isRouting, streaming, panelError, lastCompletedTurnSec, streamingSpeaker } =
+      state;
     const busy = isRouting || streaming;
 
     return (
       <div
-        className="activity-sidebar activity-sidebar--discussion"
+        className={
+          isInline
+            ? "activity-inline activity-inline-discussion"
+            : "activity-sidebar activity-sidebar--discussion"
+        }
         role="status"
         aria-live="polite"
         aria-busy={busy}
       >
         <h2 className="activity-sidebar-title">Activité</h2>
         <div className="activity-discussion-main">
+          {streamingSpeaker && busy ? (
+            <p className="activity-streaming-speaker" aria-live="polite">
+              En train de répondre : <strong>{streamingSpeaker}</strong>
+            </p>
+          ) : null}
           {panelError && (
             <p className="activity-sidebar-error" role="alert">
               {panelError}
@@ -230,7 +312,7 @@ export function ActivitySidebar({
             <MissionStepTimeline
               progress={discussionCombinedProgress}
               running={busy}
-              compact
+              compact={isInline}
             />
           ) : !panelError && busy ? (
             <p className="activity-sidebar-status">En cours…</p>
@@ -249,28 +331,22 @@ export function ActivitySidebar({
           )}
         </div>
         {!panelError && !busy && linkedArtifact ? (
-          <div className="activity-sidebar-footer">
-            <button
-              type="button"
-              className="btn-primary btn-compact activity-download-md-btn"
-              aria-label="Télécharger le livrable Markdown (.md)"
-              onClick={() =>
-                triggerMarkdownDownload(
-                  linkedArtifact.markdown,
-                  linkedArtifact.filename,
-                )
-              }
-            >
-              Télécharger le .md
-            </button>
-          </div>
+          <ArtifactActions
+            linkedArtifact={linkedArtifact}
+            artifactVersions={artifactVersions}
+            pendingArtifactMerge={pendingArtifactMerge}
+            onRestoreVersion={onRestoreVersion}
+            onRequestArtifactMerge={onRequestArtifactMerge}
+          />
+        ) : null}
+        {!isInline && agentJournal.length > 0 ? (
+          <AgentJournalPanel entries={agentJournal} />
         ) : null}
       </div>
     );
   }
 
   const { running, progress, elapsedSec } = state;
-
   const showMissionDownload =
     !running && linkedArtifact && progress.length > 0;
 
@@ -318,24 +394,15 @@ export function ActivitySidebar({
       </div>
       {showMissionDownload && linkedArtifact ? (
         <div className="activity-sidebar-footer">
-          <p className="activity-sidebar-muted">
-            Le document Markdown est enregistré sur cette conversation. En{" "}
-            <strong>Discussion</strong>, le livrable est mis à jour automatiquement
-            d’après les échanges ; télécharge le fichier pour voir le détail.
-          </p>
-          <button
-            type="button"
-            className="btn-primary btn-compact activity-download-md-btn"
-            onClick={() =>
-              triggerMarkdownDownload(
-                linkedArtifact.markdown,
-                linkedArtifact.filename,
-              )
-            }
-          >
-            Télécharger le .md
-          </button>
+          <ArtifactActions
+            linkedArtifact={linkedArtifact}
+            artifactVersions={artifactVersions}
+            onRestoreVersion={onRestoreVersion}
+          />
         </div>
+      ) : null}
+      {!isInline && agentJournal.length > 0 ? (
+        <AgentJournalPanel entries={agentJournal} />
       ) : null}
     </div>
   );

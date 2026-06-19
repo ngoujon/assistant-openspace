@@ -1,4 +1,5 @@
 import { type DragEvent, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { TeamArchiveModal } from "@/components/TeamArchiveModal";
 import {
   canReparent,
@@ -191,6 +192,7 @@ function TeamBranch({
 /** Colonne Organisation (arbre hiérarchique), à gauche des échanges et de l’activité. */
 export function TeamOrganisationAside() {
   const [archiveModalOpen, setArchiveModalOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const {
     members,
     souls,
@@ -214,6 +216,10 @@ export function TeamOrganisationAside() {
       </div>
     );
   }
+
+  const pendingMember = pendingDeleteId
+    ? members.find((m) => m.id === pendingDeleteId)
+    : undefined;
 
   return (
     <div className="team-org-aside-inner">
@@ -284,10 +290,28 @@ export function TeamOrganisationAside() {
             onDragEnd={handleDragEnd}
             onSetDropTarget={setDropTargetId}
             onDropOn={handleDropOn}
-            onDelete={handleDelete}
+            onDelete={(id) => setPendingDeleteId(id)}
           />
         </ul>
       </div>
+      <ConfirmDialog
+        open={pendingDeleteId != null}
+        title="Supprimer ce membre ?"
+        description={
+          pendingMember ? (
+            <>
+              « <strong>{pendingMember.label}</strong> » et ses sous-agents seront
+              retirés de l’équipe.
+            </>
+          ) : null
+        }
+        confirmLabel="Supprimer"
+        confirmTone="danger"
+        onConfirm={() => {
+          if (pendingDeleteId) handleDelete(pendingDeleteId);
+        }}
+        onClose={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

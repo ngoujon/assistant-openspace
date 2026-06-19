@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --port 3004 --strictPort",
     "build": "tsc -b && vite build",
+    "test": "vitest run",
     "preview": "vite preview --port 3004 --strictPort",
     "docker:up": "sh scripts/docker-up.sh up --build -d",
     "docker:dev": "sh scripts/docker-up.sh -f docker-compose.dev.yml up",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "~5.7.2",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vitest": "^3.0.5"
   }
 }

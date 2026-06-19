@@ -18,6 +18,34 @@ import {
 import { triggerMarkdownDownload } from "@/lib/downloadMarkdown";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 import type { LlmProvider } from "@/lib/llmProvider";
+import { MISSION_TEMPLATES } from "@/lib/missionTemplates";
+import type { MissionAgentJournalEntry } from "@/types";
+
+const TEXT_FILE_EXTENSIONS = [
+  ".md",
+  ".txt",
+  ".markdown",
+  ".json",
+  ".csv",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".py",
+  ".yaml",
+  ".yml",
+  ".xml",
+  ".html",
+  ".css",
+  ".sql",
+  ".sh",
+];
+
+function isTextMissionFile(file: File): boolean {
+  if (file.type.startsWith("text/")) return true;
+  const lower = file.name.toLowerCase();
+  return TEXT_FILE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
 
 interface MissionWorkspaceProps {
   llmProvider: LlmProvider;
@@ -33,6 +61,8 @@ interface MissionWorkspaceProps {
   }) => void;
   /** Quand une mission produit un Markdown, pour le lier à la conversation (Discussion). */
   onArtifactProduced?: (markdown: string, missionUserBrief: string) => void;
+  onAgentJournal?: (entry: MissionAgentJournalEntry) => void;
+  onMissionJournalClear?: () => void;
 }
 
 export function MissionWorkspace({
@@ -42,6 +72,8 @@ export function MissionWorkspace({
   model,
   onActivityReport,
   onArtifactProduced,
+  onAgentJournal,
+  onMissionJournalClear,
 }: MissionWorkspaceProps) {
   const [context, setContext] = useState("");
   const [teamMembers, setTeamMembers] = useState<TreeMember[]>(() =>
@@ -109,13 +141,7 @@ export function MissionWorkspace({
     if (!list?.length) return;
     const next: { id: string; name: string; content: string }[] = [];
     for (const file of list) {
-      const lower = file.name.toLowerCase();
-      const ok =
-        file.type === "text/plain" ||
-        lower.endsWith(".md") ||
-        lower.endsWith(".txt") ||
-        lower.endsWith(".markdown");
-      if (!ok) continue;
+      if (!isTextMissionFile(file)) continue;
       const text = await file.text();
       next.push({ id: crypto.randomUUID(), name: file.name, content: text });
     }
@@ -199,6 +225,7 @@ export function MissionWorkspace({
     setResultMd(null);
     setProgress([]);
     setRunning(true);
+    onMissionJournalClear?.();
     const ac = new AbortController();
     abortRef.current = ac;
 
@@ -238,6 +265,7 @@ export function MissionWorkspace({
         onProgress: (label) => {
           setProgress((p) => [...p, label]);
         },
+        onAgentJournal: (entry) => onAgentJournal?.(entry),
       });
       const finalMd = unwrapMarkdownFence(md);
       setResultMd(finalMd);
@@ -266,6 +294,8 @@ export function MissionWorkspace({
     mistralTemperature,
     model,
     onArtifactProduced,
+    onAgentJournal,
+    onMissionJournalClear,
   ]);
 
   const canStart = (context.trim().length > 0 || files.length > 0) && !!model;
@@ -279,6 +309,27 @@ export function MissionWorkspace({
   return (
     <div className="mission-workspace">
       <div className="mission-body">
+        <label className="mission-label" htmlFor="mission-template">
+          Modèle de mission
+        </label>
+        <select
+          id="mission-template"
+          className="mission-template-select"
+          defaultValue=""
+          onChange={(e) => {
+            const tpl = MISSION_TEMPLATES.find((t) => t.id === e.target.value);
+            if (tpl) setContext(tpl.context);
+          }}
+          disabled={running}
+          aria-label="Choisir un modèle de contexte mission"
+        >
+          <option value="">— Choisir un modèle —</option>
+          {MISSION_TEMPLATES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
         <label className="mission-label" htmlFor="mission-context">
           Contexte
         </label>
@@ -301,7 +352,7 @@ export function MissionWorkspace({
             id="mission-files-input"
             ref={fileInputRef}
             type="file"
-            accept=".txt,.md,.markdown,text/plain"
+            accept=".txt,.md,.markdown,.json,.csv,.ts,.tsx,.js,.jsx,.py,.yaml,.yml,text/plain"
             multiple
             className="mission-file-input"
             disabled={running}

@@ -1,3 +1,5 @@
+import { useMemo, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Conversation } from "@/types";
 
 interface SidebarProps {
@@ -17,7 +19,19 @@ export function Sidebar({
   onDelete,
   onOpenSettings,
 }: SidebarProps) {
-  const sorted = [...conversations].sort((a, b) => b.updatedAt - a.updatedAt);
+  const [search, setSearch] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
+
+  const sorted = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = [...conversations].sort((a, b) => b.updatedAt - a.updatedAt);
+    if (!q) return list;
+    return list.filter((c) => {
+      if (c.title.toLowerCase().includes(q)) return true;
+      if (c.missionUserBrief?.toLowerCase().includes(q)) return true;
+      return c.messages.some((m) => m.content.toLowerCase().includes(q));
+    });
+  }, [conversations, search]);
 
   return (
     <div className="sidebar-inner">
@@ -55,6 +69,14 @@ export function Sidebar({
       </header>
       <nav className="sidebar-nav" aria-label="Conversations">
         <h2 className="sidebar-section">Conversations</h2>
+        <input
+          type="search"
+          className="sidebar-search"
+          placeholder="Rechercher…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Rechercher dans les conversations"
+        />
         <ul className="conv-list">
           {sorted.map((c) => (
             <li key={c.id}>
@@ -85,7 +107,7 @@ export function Sidebar({
                   aria-label={`Supprimer ${c.title}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDelete(c.id);
+                    setPendingDelete(c);
                   }}
                 >
                   ×
@@ -95,6 +117,24 @@ export function Sidebar({
           ))}
         </ul>
       </nav>
+      <ConfirmDialog
+        open={pendingDelete != null}
+        title="Supprimer la conversation ?"
+        description={
+          pendingDelete ? (
+            <>
+              La conversation « <strong>{pendingDelete.title}</strong> » et son
+              livrable seront définitivement supprimés.
+            </>
+          ) : null
+        }
+        confirmLabel="Supprimer"
+        confirmTone="danger"
+        onConfirm={() => {
+          if (pendingDelete) onDelete(pendingDelete.id);
+        }}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

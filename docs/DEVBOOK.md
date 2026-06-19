@@ -4,6 +4,30 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-06-19 — Plan global : perf, UX, robustesse
+
+### Objectif
+
+Implémentation du plan d’amélioration global : parallélisation mission, fusion discussion intelligente, aperçu/copie/versioning livrable, journal agents, templates mission, export/import, CI + Vitest, UX mobile et confirmations destructives.
+
+### Changements principaux
+
+- **Pipeline** : piliers et sous-agents en parallèle (`mapWithConcurrency`, `VITE_OPENSPACE_MISSION_CONCURRENCY`) ; journal intermédiaire `missionAgentJournal`.
+- **Discussion** : fusion auto seulement si intention de retouche (`shouldAutoMergeArtifact`) ; bouton « Mettre à jour le livrable » ; buffer streaming 80 ms.
+- **UX** : `streamingSpeaker` affiché ; indicateur modèle ; aperçu Markdown ; versions livrable ; recherche conversations ; HUD repliable mobile ; Activité inline mobile.
+- **Mission** : templates contexte ; fichiers code/JSON/CSV ; debounce `localStorage` 300 ms.
+- **Données** : validation `loadConversations` ; export/import JSON (Paramètres).
+- **Qualité** : GitHub Actions CI ; Vitest (parseMission, teamTree, unwrap, merge) ; hooks `useDiscussionQueue`, `useStreamTokenBuffer`.
+
+### Fichiers
+
+- `src/orchestration/pipeline.ts`, `src/lib/mapWithConcurrency.ts`, `src/lib/shouldAutoMergeArtifact.ts`, `src/lib/missionTemplates.ts`, `src/lib/exportImport.ts`, `src/lib/storage.ts`, `src/types.ts`
+- `src/components/ChatPanel.tsx`, `ActivitySidebar.tsx`, `ArtifactPreviewPanel.tsx`, `AgentJournalPanel.tsx`, `Layout.tsx`, `Sidebar.tsx`, `MissionWorkspace.tsx`, `SettingsModal.tsx`, `TeamOrganisationAside.tsx`
+- `src/hooks/useDiscussionQueue.ts`, `useStreamTokenBuffer.ts`
+- `.github/workflows/ci.yml`, `vitest.config.ts`, `.env.example`, `package.json`, `src/index.css`, `docs/DEVBOOK.md`
+
+---
+
 ## 2026-05-11 — Paramètres : température Mistral (0–1)
 
 ### Objectif

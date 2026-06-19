@@ -6,6 +6,7 @@ import {
   LLM_MAX_TOKENS_AGENT_STEP,
   LLM_MAX_TOKENS_DOCUMENT,
 } from "@/lib/llmOutputLimits";
+import { mapWithConcurrency } from "@/lib/mapWithConcurrency";
 import {
   MISTRAL_MISSION_AFTER_TITLE_MS,
   MISTRAL_MISSION_INTER_STEP_MS,
@@ -15,6 +16,7 @@ import {
 import type { OllamaChatMessage } from "@/lib/ollama";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
+import type { MissionAgentJournalEntry } from "@/types";
 
 export interface MissionFile {
   name: string;
@@ -40,6 +42,8 @@ export interface RunMissionOptions {
   onConversationTitleSuggested?: (title: string) => void;
   /** Température Mistral (0–1) pour toute la mission ; ignoré si Ollama. */
   mistralTemperature?: number;
+  /** Journal des sorties intermédiaires par membre. */
+  onAgentJournal?: (entry: MissionAgentJournalEntry) => void;
 }
 
 function soul(souls: Record<string, string>, id: string): string {
@@ -122,6 +126,13 @@ const MAX_PAYLOAD_SLICE = 24_000;
 const MISSION_CHAT_TIMEOUT_MS = 40 * 60 * 1000;
 
 const MISSION_KEEP_ALIVE = "45m";
+
+function missionConcurrencyLimit(): number {
+  const raw = import.meta.env.VITE_OPENSPACE_MISSION_CONCURRENCY;
+  const n = raw ? Number.parseInt(String(raw), 10) : 3;
+  if (!Number.isFinite(n) || n < 1) return 3;
+  return Math.min(6, Math.max(1, n));
+}
 
 function slicePayloadForModel(payload: string): string {
   if (payload.length <= MAX_PAYLOAD_SLICE) return payload;
@@ -272,12 +283,23 @@ export async function runMissionPipeline(
     onProgress,
     onConversationTitleSuggested,
     mistralTemperature: mistralTempOpt,
+    onAgentJournal,
   } = opts;
   const mistralTemp = clampMistralTemperature(mistralTempOpt);
   const agentStepTemp = llmProvider === "mistral" ? mistralTemp : TEMP;
   const finalStepTemp = llmProvider === "mistral" ? mistralTemp : TEMP_FINAL;
   const payload = bundleUserPayload(context, files);
   const leads = leadsOf(teamMembers);
+  const concurrency = missionConcurrencyLimit();
+
+  const journal = (memberLabel: string, stepLabel: string, content: string) => {
+    onAgentJournal?.({
+      memberLabel,
+      stepLabel,
+      content,
+      createdAt: Date.now(),
+    });
+  };
 
   if (leads.length === 0) {
     throw new Error(
@@ -314,6 +336,8 @@ export async function runMissionPipeline(
     LLM_MAX_TOKENS_AGENT_STEP,
   );
 
+  journal("Orchestrateur", "Brief global", orchestratorBrief);
+
   if (onConversationTitleSuggested) {
     prog("Orchestrateur — titre de la conversation (sidebar)…");
     try {
@@ -336,13 +360,91 @@ export async function runMissionPipeline(
     }
   }
 
-  const branchOutputs: BranchOutput[] = [];
+  const branchOutputs = await mapWithConcurrency(
+    leads,
+    concurrency,
+    async (lead) => {
+      const subs = childrenOf(lead.id, teamMembers);
 
-  for (const lead of leads) {
-    const subs = childrenOf(lead.id, teamMembers);
+      if (subs.length === 0) {
+        prog(`${lead.label} — analyse directe (sans sous-agent)…`);
+        const synthesis = await missionComplete(
+          llmProvider,
+          mistralApiKey,
+          model,
+          [
+            { role: "system", content: soul(souls, lead.id) },
+            {
+              role: "user",
+              content: `Vision de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nContexte et fichiers (rappel) :\n\n${slicePayloadForModel(payload)}\n\n---\nTu es **${lead.label}**, seul sur ce pôle. **Analyse utile** (pas un simple résumé de l’orchestrateur).\n\n- **3 à 5 sous-sections \`###\`** sur des angles distincts.\n- Chaque \`###\` : paragraphes courts **et/ou** listes à puces **rédigées** (risques, options, recommandations).\n- Une sous-section **### Angles hors premier jet utilisateur** : 3–6 questions ou risques peu couverts par le message initial.\n- T’appuie sur le **contexte et fichiers** quand c’est pertinent.\n\n**Interdit** : placeholders \`[…]\` — tout est rédigé.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
+            },
+          ],
+          signal,
+          agentStepTemp,
+          LLM_MAX_TOKENS_AGENT_STEP,
+        );
+        journal(lead.label, "Analyse directe", synthesis);
+        return {
+          leadLabel: lead.label,
+          synthesis,
+          specialistLabels: [] as string[],
+        };
+      }
 
-    if (subs.length === 0) {
-      prog(`${lead.label} — analyse directe (sans sous-agent)…`);
+      const subResults = await mapWithConcurrency(
+        subs,
+        concurrency,
+        async (sub) => {
+          prog(`${lead.label} → ${sub.label} — consignes au sous-agent…`);
+          const delegation = await missionComplete(
+            llmProvider,
+            mistralApiKey,
+            model,
+            [
+              { role: "system", content: soul(souls, lead.id) },
+              {
+                role: "user",
+                content: `Vision globale de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nEn tant que **${lead.label}**, rédige des **consignes claires** pour **${sub.label}** : objectifs, périmètre, angles **obligatoires**, livrables attendus (sous-parties), contraintes, critères de qualité, questions ouvertes. **12–18 lignes** utiles maximum, style briefing.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
+              },
+            ],
+            signal,
+            agentStepTemp,
+            LLM_MAX_TOKENS_AGENT_STEP,
+          );
+          journal(lead.label, `Consignes → ${sub.label}`, delegation);
+
+          if (llmProvider === "mistral") {
+            await sleepMs(MISTRAL_MISSION_LEAD_TO_SUB_MS, signal);
+          }
+
+          prog(`${sub.label} — travail spécialisé…`);
+          const subWork = await missionComplete(
+            llmProvider,
+            mistralApiKey,
+            model,
+            [
+              { role: "system", content: soul(souls, sub.id) },
+              {
+                role: "user",
+                content: `Consignes de **${lead.label}** :\n\n${delegation}\n\n---\nContexte et fichiers initiaux (rappel) :\n\n${slicePayloadForModel(payload)}\n\n---\nTu es **${sub.label}**. Produis une **analyse structurée** sur ton périmètre (matière pour le rapport final).\n\n- **4 à 6 sous-sections \`###\`** (thèmes distincts).\n- Chaque \`###\` : paragraphes courts et/ou listes **réelles** (risques, options, recommandations, critères).\n- **### Angles et questions hors premier jet utilisateur** : 4–8 questions ou hypothèses à creuser.\n- T’appuie sur le **contexte et les fichiers** (citations courtes).\n\n**Interdit** : placeholders entre crochets.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
+              },
+            ],
+            signal,
+            agentStepTemp,
+            LLM_MAX_TOKENS_AGENT_STEP,
+          );
+          journal(sub.label, "Travail spécialisé", subWork);
+          return { sub, subWork };
+        },
+        signal,
+      );
+
+      const subBlocks = subResults.map(
+        ({ sub, subWork }) => `### ${sub.label}\n\n${subWork}`,
+      );
+      const combined = subBlocks.join("\n\n---\n\n");
+      const subNameList = subs.map((s) => s.label).join(", ");
+      prog(`${lead.label} — intégration des apports du pôle (reprise du détail)…`);
       const synthesis = await missionComplete(
         llmProvider,
         mistralApiKey,
@@ -351,92 +453,24 @@ export async function runMissionPipeline(
           { role: "system", content: soul(souls, lead.id) },
           {
             role: "user",
-            content: `Vision de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nContexte et fichiers (rappel) :\n\n${slicePayloadForModel(payload)}\n\n---\nTu es **${lead.label}**, seul sur ce pôle. **Analyse utile** (pas un simple résumé de l’orchestrateur).\n\n- **3 à 5 sous-sections \`###\`** sur des angles distincts.\n- Chaque \`###\` : paragraphes courts **et/ou** listes à puces **rédigées** (risques, options, recommandations).\n- Une sous-section **### Angles hors premier jet utilisateur** : 3–6 questions ou risques peu couverts par le message initial.\n- T’appuie sur le **contexte et fichiers** quand c’est pertinent.\n\n**Interdit** : placeholders \`[…]\` — tout est rédigé.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
+            content: `Tu es **${lead.label}**, responsable du pôle. Voici le travail de tes sous-agents :\n\n${combined}\n\n---\n\n## Ta mission\n\n**Synchronise** leurs apports (cohérence, doublons, trous) et **arbitre** en **restant dense** : le détail brut reste dans les sections ci-dessus ; ici tu produis une **vue pôle** exploitable pour le rapport final.\n\n**Interdit** : titres \`#### [nom]\` — utilise les **vrais noms** : ${subNameList}.\n\nStructure **obligatoire** en Markdown :\n\n### Arbitrage du responsable\n**6–10 lignes maximum** : tensions, priorités, décisions — pas de répétition exhaustive des textes des sous-agents.\n\n### Synthèse par spécialiste\n\nPour **chaque** sous-agent (${subNameList}), un \`####\` titre = nom exact, puis **paragraphes courts** qui captent l’**essentiel** (faits, listes clés) + **2–4 phrases** d’arbitrage ou de lien avec les autres.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
           },
         ],
         signal,
         agentStepTemp,
         LLM_MAX_TOKENS_AGENT_STEP,
       );
-      branchOutputs.push({
+      journal(lead.label, "Synthèse du pôle", synthesis);
+
+      return {
         leadLabel: lead.label,
         synthesis,
-        specialistLabels: [],
-      });
-      continue;
-    }
-
-    const subBlocks: string[] = [];
-
-    for (const sub of subs) {
-      prog(`${lead.label} → ${sub.label} — consignes au sous-agent…`);
-      const delegation = await missionComplete(
-        llmProvider,
-        mistralApiKey,
-        model,
-        [
-          { role: "system", content: soul(souls, lead.id) },
-          {
-            role: "user",
-            content: `Vision globale de l’orchestrateur :\n\n${orchestratorBrief}\n\n---\nEn tant que **${lead.label}**, rédige des **consignes claires** pour **${sub.label}** : objectifs, périmètre, angles **obligatoires**, livrables attendus (sous-parties), contraintes, critères de qualité, questions ouvertes. **12–18 lignes** utiles maximum, style briefing.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
-          },
-        ],
-        signal,
-        agentStepTemp,
-        LLM_MAX_TOKENS_AGENT_STEP,
-      );
-
-      if (llmProvider === "mistral") {
-        await sleepMs(MISTRAL_MISSION_LEAD_TO_SUB_MS, signal);
-      }
-
-      prog(`${sub.label} — travail spécialisé…`);
-      const subWork = await missionComplete(
-        llmProvider,
-        mistralApiKey,
-        model,
-        [
-          { role: "system", content: soul(souls, sub.id) },
-          {
-            role: "user",
-            content: `Consignes de **${lead.label}** :\n\n${delegation}\n\n---\nContexte et fichiers initiaux (rappel) :\n\n${slicePayloadForModel(payload)}\n\n---\nTu es **${sub.label}**. Produis une **analyse structurée** sur ton périmètre (matière pour le rapport final).\n\n- **4 à 6 sous-sections \`###\`** (thèmes distincts).\n- Chaque \`###\` : paragraphes courts et/ou listes **réelles** (risques, options, recommandations, critères).\n- **### Angles et questions hors premier jet utilisateur** : 4–8 questions ou hypothèses à creuser.\n- T’appuie sur le **contexte et les fichiers** (citations courtes).\n\n**Interdit** : placeholders entre crochets.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
-          },
-        ],
-        signal,
-        agentStepTemp,
-        LLM_MAX_TOKENS_AGENT_STEP,
-      );
-
-      subBlocks.push(`### ${sub.label}\n\n${subWork}`);
-    }
-
-    const combined = subBlocks.join("\n\n---\n\n");
-
-    const subNameList = subs.map((s) => s.label).join(", ");
-    prog(`${lead.label} — intégration des apports du pôle (reprise du détail)…`);
-    const synthesis = await missionComplete(
-      llmProvider,
-      mistralApiKey,
-      model,
-      [
-        { role: "system", content: soul(souls, lead.id) },
-        {
-          role: "user",
-          content: `Tu es **${lead.label}**, responsable du pôle. Voici le travail de tes sous-agents :\n\n${combined}\n\n---\n\n## Ta mission\n\n**Synchronise** leurs apports (cohérence, doublons, trous) et **arbitre** en **restant dense** : le détail brut reste dans les sections ci-dessus ; ici tu produis une **vue pôle** exploitable pour le rapport final.\n\n**Interdit** : titres \`#### [nom]\` — utilise les **vrais noms** : ${subNameList}.\n\nStructure **obligatoire** en Markdown :\n\n### Arbitrage du responsable\n**6–10 lignes maximum** : tensions, priorités, décisions — pas de répétition exhaustive des textes des sous-agents.\n\n### Synthèse par spécialiste\n\nPour **chaque** sous-agent (${subNameList}), un \`####\` titre = nom exact, puis **paragraphes courts** qui captent l’**essentiel** (faits, listes clés) + **2–4 phrases** d’arbitrage ou de lien avec les autres.\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
-        },
-      ],
-      signal,
-      agentStepTemp,
-      LLM_MAX_TOKENS_AGENT_STEP,
-    );
-
-    branchOutputs.push({
-      leadLabel: lead.label,
-      synthesis,
-      subContributionsMarkdown: combined,
-      specialistLabels: subs.map((s) => s.label),
-    });
-  }
+        subContributionsMarkdown: combined,
+        specialistLabels: subs.map((s) => s.label),
+      };
+    },
+    signal,
+  );
 
   prog("Orchestrateur — rédaction du rapport final (dossier complet)…");
   const finalUserPrompt = buildFinalDocumentPrompt(
@@ -462,6 +496,8 @@ export async function runMissionPipeline(
     finalStepTemp,
     LLM_MAX_TOKENS_DOCUMENT,
   );
+
+  journal("Orchestrateur", "Rapport final", readme);
 
   onProgress("Terminé — document prêt ci-dessous.");
   return readme;

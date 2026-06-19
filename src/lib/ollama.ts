@@ -49,7 +49,17 @@ export function assertChatModel(model: string): void {
 }
 
 /** Modèles utilisables pour le chat (exclut embedding / rerank). */
+let ollamaModelsCache: { names: string[]; fetchedAt: number } | null = null;
+const OLLAMA_MODELS_CACHE_MS = 5 * 60 * 1000;
+
 export async function fetchOllamaModels(): Promise<string[]> {
+  const now = Date.now();
+  if (
+    ollamaModelsCache &&
+    now - ollamaModelsCache.fetchedAt < OLLAMA_MODELS_CACHE_MS
+  ) {
+    return ollamaModelsCache.names;
+  }
   const res = await fetch(`${BASE}/api/tags`);
   if (!res.ok) {
     throw new Error(`Ollama indisponible (${res.status}). Lance Ollama sur ce Mac.`);
@@ -57,7 +67,9 @@ export async function fetchOllamaModels(): Promise<string[]> {
   const data = (await res.json()) as { models?: { name: string }[] };
   const names = data.models?.map((m) => m.name) ?? [];
   const flags = await Promise.all(names.map((n) => modelSupportsChat(n)));
-  return names.filter((_, i) => flags[i]);
+  const filtered = names.filter((_, i) => flags[i]);
+  ollamaModelsCache = { names: filtered, fetchedAt: now };
+  return filtered;
 }
 
 export interface OllamaChatMessage {

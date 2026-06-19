@@ -19,6 +19,22 @@ export interface ChatMessage {
   artifactPatchNote?: boolean;
 }
 
+/** Version archivée d’un livrable Markdown (fusion ou mission). */
+export interface ArtifactVersion {
+  id: string;
+  markdown: string;
+  createdAt: number;
+  label?: string;
+}
+
+/** Travail intermédiaire d’un membre pendant une mission. */
+export interface MissionAgentJournalEntry {
+  memberLabel: string;
+  stepLabel: string;
+  content: string;
+  createdAt: number;
+}
+
 export interface Conversation {
   id: string;
   title: string;
@@ -29,6 +45,8 @@ export interface Conversation {
    * « appliquer la mise à jour ».
    */
   artifactMarkdown?: string;
+  /** Historique des versions du livrable (dernières entrées conservées). */
+  artifactVersions?: ArtifactVersion[];
   /**
    * Texte saisi dans « Contexte » (mission équipe) au moment où le livrable
    * a été produit — repris en Discussion et lors des fusions document.
@@ -41,4 +59,8 @@ export interface Conversation {
   artifactDiscussionCutoffAfterId?: string;
   /** Historique mission (étapes) — conservé au rafraîchissement et au changement de projet. */
   missionActivitySnapshot?: MissionActivitySnapshot;
+  /** Journal des sorties intermédiaires par membre (mission). */
+  missionAgentJournal?: MissionAgentJournalEntry[];
+  /** Fusion livrable en attente après un message sans intention de retouche. */
+  pendingArtifactMerge?: boolean;
 }

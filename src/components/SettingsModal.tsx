@@ -11,6 +11,11 @@ import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { fetchMistralModels } from "@/lib/mistral";
 import { fetchOllamaModels } from "@/lib/ollama";
+import {
+  applyWorkspaceImport,
+  downloadWorkspaceExport,
+  parseWorkspaceImport,
+} from "@/lib/exportImport";
 
 interface SettingsModalProps {
   open: boolean;
@@ -45,6 +50,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
     null,
   );
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -432,6 +438,58 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
                 )}
               </>
             )}
+          </section>
+
+          <section
+            className="modal-settings-section"
+            aria-labelledby="settings-data-heading"
+          >
+            <h3 className="modal-settings-section-title" id="settings-data-heading">
+              Sauvegarde et restauration
+            </h3>
+            <p className="modal-settings-hint">
+              Exporte ou importe conversations, équipe, archives et paramètres (JSON
+              local).
+            </p>
+            <div className="modal-settings-data-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => downloadWorkspaceExport()}
+              >
+                Exporter les données
+              </button>
+              <label className="btn-secondary modal-import-label">
+                Importer…
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  className="modal-import-input"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    void file.text().then((raw) => {
+                      try {
+                        const payload = parseWorkspaceImport(raw);
+                        const result = applyWorkspaceImport(payload);
+                        setImportStatus(
+                          `Import réussi : ${result.conversations} conversation(s), ${result.teamMembers} membre(s), ${result.archives} archive(s). Recharge la page.`,
+                        );
+                        onSaved?.();
+                      } catch (err) {
+                        setImportStatus((err as Error).message);
+                      }
+                    });
+                  }}
+                />
+              </label>
+            </div>
+            {importStatus ? (
+              <p className="modal-settings-hint" role="status">
+                {importStatus}
+              </p>
+            ) : null}
           </section>
 
           <section className="modal-settings-section" aria-labelledby="settings-seed-heading">
