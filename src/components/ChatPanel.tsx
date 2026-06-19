@@ -9,6 +9,10 @@ import {
 } from "react";
 import { MissionWorkspace } from "@/components/MissionWorkspace";
 import {
+  markdownFilenameFromConversationTitle,
+  triggerMarkdownDownload,
+} from "@/lib/downloadMarkdown";
+import {
   applyDiscussionToArtifact,
   DISCUSSION_FIL_LINES_JSON,
   routeDiscussionMessage,
@@ -31,7 +35,7 @@ import { DiscussionMessageBody } from "@/components/DiscussionMessageBody";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
-import { loadTeamMembers, type TreeMember } from "@/lib/teamTreeStorage";
+import { loadTeamMembers, ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
 import type { RightActivityState } from "@/types/activity";
 import type {
   ChatMessage,
@@ -50,6 +54,45 @@ function initialChatMode(conversation: Conversation): ChatMode {
 
 function llmProviderLabel(provider: LlmProvider): string {
   return provider === "mistral" ? "Mistral" : "Ollama";
+}
+
+const MISSION_COMPLETE_ASSISTANT_TEXT =
+  "**C’est terminé !** L’équipe a produit le rapport Markdown. Télécharge-le ci-dessous, puis poursuis en **Discussion** pour l’affiner si besoin.";
+
+function orchestratorLabel(members: TreeMember[]): string {
+  return (
+    members.find((m) => m.id === ORCHESTRATOR_ID)?.label ?? "Orchestrateur"
+  );
+}
+
+/** Messages de clôture mission (brief user + annonce orchestrateur). */
+function appendMissionCompleteMessages(
+  prev: ChatMessage[],
+  missionUserBrief: string,
+  speakerLabel: string,
+): ChatMessage[] {
+  if (prev.some((m) => m.missionDeliverableNote)) return prev;
+  const next = [...prev];
+  if (
+    missionUserBrief.trim() &&
+    !prev.some((m) => m.role === "user")
+  ) {
+    next.push({
+      id: crypto.randomUUID(),
+      role: "user",
+      content: missionUserBrief,
+      routingNote: "Demande envoyée en phase Mission équipe.",
+    });
+  }
+  next.push({
+    id: crypto.randomUUID(),
+    role: "assistant",
+    content: MISSION_COMPLETE_ASSISTANT_TEXT,
+    speakerLabel,
+    routingNote: "Mission équipe terminée.",
+    missionDeliverableNote: true,
+  });
+  return next;
 }
 
 const DISCUSSION_ACTIVITY_MAX_LINES = 100;
@@ -159,27 +202,30 @@ export function ChatPanel({
   }, []);
 
   /**
-   * Livrable mission + brief persistés mais fil discussion vide : afficher le brief
-   * comme premier message (données anciennes ou tout juste après la mission).
+   * Livrable mission sans message de clôture : rétrocompatibilité au rechargement.
    */
   useEffect(() => {
     const brief = conversation.missionUserBrief?.trim();
     if (!brief || !conversation.artifactMarkdown?.trim()) return;
-    if (conversation.messages.length > 0) return;
-    setMessages(conversation.id, () => [
-      {
-        id: crypto.randomUUID(),
-        role: "user",
-        content: brief,
-        routingNote: "Demande envoyée en phase Mission équipe.",
-      },
-    ]);
+    if (conversation.messages.some((m) => m.missionDeliverableNote)) return;
+    const hasAssistantReply = conversation.messages.some(
+      (m) => m.role === "assistant",
+    );
+    if (hasAssistantReply) return;
+    setMessages(conversation.id, (prev) =>
+      appendMissionCompleteMessages(
+        prev,
+        brief,
+        orchestratorLabel(teamMembers),
+      ),
+    );
   }, [
     conversation.id,
     conversation.missionUserBrief,
     conversation.artifactMarkdown,
-    conversation.messages.length,
+    conversation.messages,
     setMessages,
+    teamMembers,
   ]);
 
   /** Après passage Mission → Discussion : faire défiler vers le compositeur. */
@@ -763,8 +809,15 @@ export function ChatPanel({
                 pendingArtifactMerge: false,
               });
               if (md.trim()) {
+                setMessages(conversation.id, (prev) =>
+                  appendMissionCompleteMessages(
+                    prev,
+                    missionUserBrief,
+                    orchestratorLabel(teamMembers),
+                  ),
+                );
                 setInput("");
-                setShowMissionDraftHint(true);
+                setShowMissionDraftHint(false);
                 setMode("free");
               }
             }}
@@ -831,11 +884,28 @@ export function ChatPanel({
                     {m.content ? (
                       <DiscussionMessageBody text={m.content} />
                     ) : isPendingAssistant ? (
-                      "…"
+                      <span className="bubble-streaming-placeholder">…</span>
                     ) : (
                       ""
                     )}
                   </div>
+                  {m.missionDeliverableNote &&
+                  conversation.artifactMarkdown?.trim() ? (
+                    <button
+                      type="button"
+                      className="btn-primary btn-compact bubble-download-md-btn"
+                      onClick={() =>
+                        triggerMarkdownDownload(
+                          conversation.artifactMarkdown!,
+                          markdownFilenameFromConversationTitle(
+                            conversation.title,
+                          ),
+                        )
+                      }
+                    >
+                      Télécharger le rapport (.md)
+                    </button>
+                  ) : null}
                 </article>
               );
             })}

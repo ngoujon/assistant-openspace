@@ -4,6 +4,18 @@ Journal de développement : à **mettre à jour à chaque changement notable** (
 
 ---
 
+## 2026-06-19 — Fin de mission : message orchestrateur + téléchargement
+
+### Objectif
+
+À la fin de la première mission, afficher dans le fil Discussion un message de l’orchestrateur (« C’est terminé ! ») avec un bouton **Télécharger le rapport (.md)**.
+
+### Fichiers
+
+- `src/types.ts` (`missionDeliverableNote`), `src/lib/storage.ts`, `src/components/ChatPanel.tsx`, `src/index.css`, `docs/DEVBOOK.md`
+
+---
+
 ## 2026-06-19 — Plan global : perf, UX, robustesse
 
 ### Objectif

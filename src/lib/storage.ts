@@ -27,6 +27,8 @@ function parseChatMessage(v: unknown): ChatMessage | null {
     routingNote: typeof v.routingNote === "string" ? v.routingNote : undefined,
     artifactPatchNote:
       typeof v.artifactPatchNote === "boolean" ? v.artifactPatchNote : undefined,
+    missionDeliverableNote:
+      v.missionDeliverableNote === true ? true : undefined,
   };
 }
 

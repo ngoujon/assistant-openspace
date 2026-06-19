@@ -17,6 +17,8 @@ export interface ChatMessage {
   routingNote?: string;
   /** Réponse liée à une fusion discussion → livrable. */
   artifactPatchNote?: boolean;
+  /** Fin de mission : invite au téléchargement du livrable. */
+  missionDeliverableNote?: boolean;
 }
 
 /** Version archivée d’un livrable Markdown (fusion ou mission). */

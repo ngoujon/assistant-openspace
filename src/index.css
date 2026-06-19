@@ -2913,3 +2913,11 @@ body {
 .markdown-body p {
   margin: 0.35em 0;
 }
+
+.bubble-download-md-btn {
+  margin-top: 0.65rem;
+}
+
+.bubble-streaming-placeholder {
+  color: var(--muted);
+}
