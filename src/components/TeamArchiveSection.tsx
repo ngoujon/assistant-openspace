@@ -9,10 +9,6 @@ import { useTeamWorkspace } from "@/components/TeamWorkspaceContext";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { generateMemberSoulSeed } from "@/lib/generateMemberSeed";
 import {
-  MISTRAL_MISSION_INTER_STEP_MS,
-  sleepMs,
-} from "@/lib/llmRateLimit";
-import {
   appendTeamArchive,
   deleteTeamArchive,
   loadTeamArchives,
@@ -130,9 +126,6 @@ export function TeamArchiveSection({
             signal: ac.signal,
           });
           nextSouls[mem.id] = text;
-          if (llmProvider === "mistral" && i < ordered.length - 1) {
-            await sleepMs(MISTRAL_MISSION_INTER_STEP_MS, ac.signal);
-          }
         }
         replaceTeamArchiveEntry({
           ...entry,

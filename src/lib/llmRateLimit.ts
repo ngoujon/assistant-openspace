@@ -1,16 +1,9 @@
 /**
- * Pauses **Mistral uniquement** pour espacer les requêtes (429 / quotas).
- * Ollama n’en a pas besoin : pas d’export utilisé côté `llmProvider === "ollama"`.
+ * L'espacement entre requêtes Mistral (429 / quotas) est géré de façon
+ * centralisée par `mistralGateway` (voir `src/lib/mistralGateway.ts`) — un
+ * guichet unique partagé par tous les appelants, plutôt que des pauses
+ * fixes dispersées par site d'appel comme auparavant.
  */
-export const MISTRAL_MISSION_INTER_STEP_MS = 780;
-/** Après l’appel « titre sidebar », avant le travail des pôles. */
-export const MISTRAL_MISSION_AFTER_TITLE_MS = 600;
-/** Entre consignes du pilier et travail du sous-agent (deux appels rapprochés). */
-export const MISTRAL_MISSION_LEAD_TO_SUB_MS = 520;
-/** Entre routage orchestrateur et stream du membre (discussion). */
-export const MISTRAL_DISCUSSION_ROUTE_TO_STREAM_MS = 680;
-/** Entre fin du stream et fusion livrable (discussion). */
-export const MISTRAL_DISCUSSION_STREAM_TO_MERGE_MS = 520;
 
 /** Statuts HTTP souvent liés à surcharge / limite de débit (retry raisonnable). */
 export function isRetryableRateLimitStatus(status: number): boolean {
@@ -77,7 +70,15 @@ export async function sleepMs(ms: number, signal?: AbortSignal): Promise<void> {
 export async function fetchWithRateLimitRetries(
   doFetch: () => Promise<Response>,
   signal?: AbortSignal,
-  options?: { maxAttempts?: number },
+  options?: {
+    maxAttempts?: number;
+    /**
+     * Appelé dès qu'un statut 429/502/503 est reçu, avant l'attente — permet
+     * de prévenir un guichet partagé (ex. `mistralGateway`) pour qu'il mette
+     * en pause les *autres* appels en cours, pas seulement celui-ci.
+     */
+    onRateLimited?: (waitMs: number, status: number, attempt: number) => void;
+  },
 ): Promise<Response> {
   const maxAttempts = Math.max(1, options?.maxAttempts ?? 6);
   let lastBody = "";
@@ -101,7 +102,9 @@ export async function fetchWithRateLimitRetries(
       });
     }
 
-    await sleepMs(rateLimitBackoffMs(attempt, retryAfterMs), signal);
+    const waitMs = rateLimitBackoffMs(attempt, retryAfterMs);
+    options?.onRateLimited?.(waitMs, res.status, attempt);
+    await sleepMs(waitMs, signal);
   }
 
   return new Response(lastBody, {

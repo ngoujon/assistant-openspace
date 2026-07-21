@@ -1,18 +1,12 @@
 import { clampMistralTemperature } from "@/lib/appSettingsStorage";
 import { generateMissionConversationTitle } from "@/lib/discussionTeamChat";
-import { completeLlmChat } from "@/lib/llmChat";
+import { completeLlmChat, streamLlmChat } from "@/lib/llmChat";
 import {
   LLM_AGENT_OUTPUT_BUDGET_FR,
   LLM_MAX_TOKENS_AGENT_STEP,
   LLM_MAX_TOKENS_DOCUMENT,
 } from "@/lib/llmOutputLimits";
 import { mapWithConcurrency } from "@/lib/mapWithConcurrency";
-import {
-  MISTRAL_MISSION_AFTER_TITLE_MS,
-  MISTRAL_MISSION_INTER_STEP_MS,
-  MISTRAL_MISSION_LEAD_TO_SUB_MS,
-  sleepMs,
-} from "@/lib/llmRateLimit";
 import type { OllamaChatMessage } from "@/lib/ollama";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
@@ -44,6 +38,19 @@ export interface RunMissionOptions {
   mistralTemperature?: number;
   /** Journal des sorties intermédiaires par membre. */
   onAgentJournal?: (entry: MissionAgentJournalEntry) => void;
+  /**
+   * Si fourni, le rapport final (l'étape la plus longue — jusqu'à
+   * `LLM_MAX_TOKENS_DOCUMENT` tokens) est **streamé** token par token au lieu
+   * d'un appel bloquant : retour visuel pendant la génération plutôt qu'une
+   * attente silencieuse. Les étapes intermédiaires restent non-stream.
+   */
+  onFinalReportToken?: (chunk: string) => void;
+  /** Reprise après échec : réutilise le brief et les branches déjà terminées. */
+  resumeFrom?: MissionResumeState;
+  /** Appelé dès que le brief orchestrateur est disponible (repris ou frais). */
+  onOrchestratorBrief?: (brief: string) => void;
+  /** Appelé à chaque pilier terminé (repris ou frais) — pour permettre une reprise ultérieure. */
+  onBranchComplete?: (leadId: string, output: BranchOutput) => void;
 }
 
 function soul(souls: Record<string, string>, id: string): string {
@@ -53,7 +60,7 @@ function soul(souls: Record<string, string>, id: string): string {
   );
 }
 
-function bundleUserPayload(context: string, files: MissionFile[]): string {
+export function bundleUserPayload(context: string, files: MissionFile[]): string {
   const parts: string[] = [];
   if (context.trim()) {
     parts.push("## Contexte utilisateur\n\n" + context.trim());
@@ -119,8 +126,12 @@ Tu rédiges un **rapport synthétique mais exploitable** à partir des blocs fou
 **Interdit** : préambule du type « Voici le document » puis un bloc de code ; commence directement par \`# Titre\`.
 Chaque section doit contenir du **texte réel** (paragraphes, listes à puces avec éléments rédigés) issu des analyses fournies, pas un plan à trous.`;
 
-/** Rappel contexte/fichiers par étape (augmenter si le modèle le supporte). */
-const MAX_PAYLOAD_SLICE = 24_000;
+/**
+ * Rappel contexte/fichiers par étape (augmenter si le modèle le supporte).
+ * Exporté pour que l'UI (`MissionWorkspace`) puisse avertir avant l'envoi
+ * si le contexte + fichiers dépasse cette limite et sera tronqué.
+ */
+export const MAX_PAYLOAD_SLICE = 24_000;
 
 /** Délai max par requête mission (Ollama peut être très lent ; au-delà = message clair). */
 const MISSION_CHAT_TIMEOUT_MS = 40 * 60 * 1000;
@@ -153,7 +164,10 @@ async function missionComplete(
   temperature: number,
   maxTokens: number,
 ): Promise<string> {
-  const out = await completeLlmChat(llmProvider, mistralApiKey, model, messages, signal, {
+  // L'espacement entre appels Mistral est géré de façon centralisée par
+  // `mistralGateway` (voir src/lib/mistralGateway.ts) — plus de pause locale
+  // ici, elle ferait double emploi avec le guichet.
+  return completeLlmChat(llmProvider, mistralApiKey, model, messages, signal, {
     temperature,
     maxTokens,
     ...(llmProvider === "ollama"
@@ -161,13 +175,9 @@ async function missionComplete(
       : {}),
     timeoutMs: MISSION_CHAT_TIMEOUT_MS,
   });
-  if (llmProvider === "mistral") {
-    await sleepMs(MISTRAL_MISSION_INTER_STEP_MS, signal);
-  }
-  return out;
 }
 
-interface BranchOutput {
+export interface BranchOutput {
   leadLabel: string;
   /** Synthèse directeur (niveau pôle). */
   synthesis: string;
@@ -175,6 +185,22 @@ interface BranchOutput {
   subContributionsMarkdown?: string;
   /** Noms des spécialistes sous ce pôle (prompt final). */
   specialistLabels?: string[];
+}
+
+/**
+ * État réutilisable après un échec de mission (429 persistant, réseau,
+ * annulation…) : évite de repayer les étapes déjà réussies au relancement.
+ */
+export interface MissionResumeState {
+  orchestratorBrief: string;
+  /** Sorties de branche déjà obtenues, par id de pilier (lead.id). */
+  completedBranches: Record<string, BranchOutput>;
+}
+
+/** Nombre d'appels modèle qu'une branche (pilier + sous-agents) représente. */
+function leadCallCount(leadId: string, teamMembers: TreeMember[]): number {
+  const subs = childrenOf(leadId, teamMembers);
+  return subs.length === 0 ? 1 : subs.length * 2 + 1;
 }
 
 function buildFinalDocumentPrompt(
@@ -284,6 +310,10 @@ export async function runMissionPipeline(
     onConversationTitleSuggested,
     mistralTemperature: mistralTempOpt,
     onAgentJournal,
+    onFinalReportToken,
+    resumeFrom,
+    onOrchestratorBrief,
+    onBranchComplete,
   } = opts;
   const mistralTemp = clampMistralTemperature(mistralTempOpt);
   const agentStepTemp = llmProvider === "mistral" ? mistralTemp : TEMP;
@@ -307,7 +337,17 @@ export async function runMissionPipeline(
     );
   }
 
-  const totalSteps = countMissionModelCalls(teamMembers);
+  const resumedBranches = resumeFrom?.completedBranches ?? {};
+  const resumedCallCount =
+    (resumeFrom?.orchestratorBrief ? 1 : 0) +
+    Object.keys(resumedBranches).reduce(
+      (sum, leadId) => sum + leadCallCount(leadId, teamMembers),
+      0,
+    );
+  const totalSteps = Math.max(
+    1,
+    countMissionModelCalls(teamMembers) - resumedCallCount,
+  );
   let stepIndex = 0;
   const prog = (label: string) => {
     stepIndex += 1;
@@ -318,25 +358,31 @@ export async function runMissionPipeline(
     .map((l) => `## Pôle ${l.label}`)
     .join("\n");
 
-  prog("Orchestrateur — analyse du contexte et des fichiers…");
   const payloadSlice = slicePayloadForModel(payload);
-  const orchestratorBrief = await missionComplete(
-    llmProvider,
-    mistralApiKey,
-    model,
-    [
-      { role: "system", content: soul(souls, ORCHESTRATOR_ID) },
-      {
-        role: "user",
-        content: `${payloadSlice}\n\n---\nTâche : en tant qu’**orchestrateur**, pose un **cadre** pour l’équipe — **sans** réaliser toi toute l’analyse à leur place.\n\n1) **## Synthèse globale** : **6–10 lignes maximum** — enjeux, périmètre, risques transverses, hypothèses. Indique **2–3 angles** que l’utilisateur n’a probablement **pas** explicités (risques oubliés, dépendances).\n\n2) Pour **chaque pôle** ci-dessous, un brief **## Pôle …** de **4–8 lignes** : questions à trancher, livrables attendus, liens entre pôles — style **briefing**. **Une** piste « hors prompt initial » par pôle.\n\nEn-têtes obligatoires :\n\n## Synthèse globale\n${poleHeaders}\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
-      },
-    ],
-    signal,
-    agentStepTemp,
-    LLM_MAX_TOKENS_AGENT_STEP,
-  );
-
-  journal("Orchestrateur", "Brief global", orchestratorBrief);
+  let orchestratorBrief: string;
+  if (resumeFrom?.orchestratorBrief) {
+    orchestratorBrief = resumeFrom.orchestratorBrief;
+    onProgress("Reprise — brief orchestrateur déjà disponible.");
+  } else {
+    prog("Orchestrateur — analyse du contexte et des fichiers…");
+    orchestratorBrief = await missionComplete(
+      llmProvider,
+      mistralApiKey,
+      model,
+      [
+        { role: "system", content: soul(souls, ORCHESTRATOR_ID) },
+        {
+          role: "user",
+          content: `${payloadSlice}\n\n---\nTâche : en tant qu’**orchestrateur**, pose un **cadre** pour l’équipe — **sans** réaliser toi toute l’analyse à leur place.\n\n1) **## Synthèse globale** : **6–10 lignes maximum** — enjeux, périmètre, risques transverses, hypothèses. Indique **2–3 angles** que l’utilisateur n’a probablement **pas** explicités (risques oubliés, dépendances).\n\n2) Pour **chaque pôle** ci-dessous, un brief **## Pôle …** de **4–8 lignes** : questions à trancher, livrables attendus, liens entre pôles — style **briefing**. **Une** piste « hors prompt initial » par pôle.\n\nEn-têtes obligatoires :\n\n## Synthèse globale\n${poleHeaders}\n\n---\n\n${LLM_AGENT_OUTPUT_BUDGET_FR}`,
+        },
+      ],
+      signal,
+      agentStepTemp,
+      LLM_MAX_TOKENS_AGENT_STEP,
+    );
+    journal("Orchestrateur", "Brief global", orchestratorBrief);
+  }
+  onOrchestratorBrief?.(orchestratorBrief);
 
   if (onConversationTitleSuggested) {
     prog("Orchestrateur — titre de la conversation (sidebar)…");
@@ -355,15 +401,19 @@ export async function runMissionPipeline(
     } catch {
       /* titre optionnel : ne pas interrompre la mission */
     }
-    if (llmProvider === "mistral") {
-      await sleepMs(MISTRAL_MISSION_AFTER_TITLE_MS, signal);
-    }
   }
 
   const branchOutputs = await mapWithConcurrency(
     leads,
     concurrency,
     async (lead) => {
+      const resumed = resumedBranches[lead.id];
+      if (resumed) {
+        onProgress(`Reprise — ${lead.label} déjà terminé.`);
+        onBranchComplete?.(lead.id, resumed);
+        return resumed;
+      }
+
       const subs = childrenOf(lead.id, teamMembers);
 
       if (subs.length === 0) {
@@ -384,11 +434,13 @@ export async function runMissionPipeline(
           LLM_MAX_TOKENS_AGENT_STEP,
         );
         journal(lead.label, "Analyse directe", synthesis);
-        return {
+        const branchOutput: BranchOutput = {
           leadLabel: lead.label,
           synthesis,
           specialistLabels: [] as string[],
         };
+        onBranchComplete?.(lead.id, branchOutput);
+        return branchOutput;
       }
 
       const subResults = await mapWithConcurrency(
@@ -412,10 +464,6 @@ export async function runMissionPipeline(
             LLM_MAX_TOKENS_AGENT_STEP,
           );
           journal(lead.label, `Consignes → ${sub.label}`, delegation);
-
-          if (llmProvider === "mistral") {
-            await sleepMs(MISTRAL_MISSION_LEAD_TO_SUB_MS, signal);
-          }
 
           prog(`${sub.label} — travail spécialisé…`);
           const subWork = await missionComplete(
@@ -462,12 +510,14 @@ export async function runMissionPipeline(
       );
       journal(lead.label, "Synthèse du pôle", synthesis);
 
-      return {
+      const branchOutput: BranchOutput = {
         leadLabel: lead.label,
         synthesis,
         subContributionsMarkdown: combined,
         specialistLabels: subs.map((s) => s.label),
       };
+      onBranchComplete?.(lead.id, branchOutput);
+      return branchOutput;
     },
     signal,
   );
@@ -478,24 +528,44 @@ export async function runMissionPipeline(
     branchOutputs,
   );
 
-  const readme = await missionComplete(
-    llmProvider,
-    mistralApiKey,
-    model,
-    [
-      {
-        role: "system",
-        content: soul(souls, ORCHESTRATOR_ID) + ORCHESTRATOR_FINAL_SYSTEM_APPEND,
+  const finalMessages: OllamaChatMessage[] = [
+    {
+      role: "system",
+      content: soul(souls, ORCHESTRATOR_ID) + ORCHESTRATOR_FINAL_SYSTEM_APPEND,
+    },
+    {
+      role: "user",
+      content: finalUserPrompt,
+    },
+  ];
+
+  let readme: string;
+  if (onFinalReportToken) {
+    let accum = "";
+    await streamLlmChat(
+      llmProvider,
+      mistralApiKey,
+      model,
+      finalMessages,
+      (chunk) => {
+        accum += chunk;
+        onFinalReportToken(chunk);
       },
-      {
-        role: "user",
-        content: finalUserPrompt,
-      },
-    ],
-    signal,
-    finalStepTemp,
-    LLM_MAX_TOKENS_DOCUMENT,
-  );
+      signal,
+      { temperature: finalStepTemp, maxTokens: LLM_MAX_TOKENS_DOCUMENT },
+    );
+    readme = accum;
+  } else {
+    readme = await missionComplete(
+      llmProvider,
+      mistralApiKey,
+      model,
+      finalMessages,
+      signal,
+      finalStepTemp,
+      LLM_MAX_TOKENS_DOCUMENT,
+    );
+  }
 
   journal("Orchestrateur", "Rapport final", readme);
 

@@ -1,5 +1,18 @@
 import { fetchWithRateLimitRetries } from "@/lib/llmRateLimit";
+import { mistralGateway } from "@/lib/mistralGateway";
 import { assertChatModel, type OllamaChatMessage } from "@/lib/ollama";
+
+/** Tous les appels Mistral passent par le guichet — voir mistralGateway.ts. */
+function fetchMistralWithRetries(
+  doFetch: () => Promise<Response>,
+  signal?: AbortSignal,
+): Promise<Response> {
+  return mistralGateway.run(() =>
+    fetchWithRateLimitRetries(doFetch, signal, {
+      onRateLimited: (waitMs) => mistralGateway.reportRateLimited(waitMs),
+    }),
+  );
+}
 
 const BASE = "/api/mistral";
 
@@ -60,7 +73,9 @@ function isLikelyEmbeddingModelId(id: string): boolean {
 
 /** Identifiants de modèles exposés par l’API Mistral (chat / completion). */
 export async function fetchMistralModels(apiKey: string): Promise<string[]> {
-  const res = await fetch(`${BASE}/v1/models`, { headers: authHeaders(apiKey) });
+  const res = await fetchMistralWithRetries(() =>
+    fetch(`${BASE}/v1/models`, { headers: authHeaders(apiKey) }),
+  );
   if (res.status === 401) {
     throw new Error(
       "Mistral AI : clé API refusée (401). Vérifie la clé dans Paramètres ou sur console.mistral.ai.",
@@ -124,7 +139,7 @@ export async function completeMistralChat(
   const combined = mergeAbortWithTimeout(signal, options?.timeoutMs);
   let res: Response;
   try {
-    res = await fetchWithRateLimitRetries(
+    res = await fetchMistralWithRetries(
       () =>
         fetch(`${BASE}/v1/chat/completions`, {
           method: "POST",
@@ -176,6 +191,24 @@ export async function streamMistralChat(
   options?: { maxTokens?: number; temperature?: number },
 ): Promise<void> {
   assertChatModel(model);
+  // Toute la lecture du flux reste dans `mistralGateway.run` (pas seulement
+  // la requête initiale) : sinon la place de concurrence serait libérée dès
+  // les en-têtes reçus, alors que le flux continue ensuite pendant plusieurs
+  // secondes — un autre appel Mistral pourrait démarrer en parallèle malgré
+  // une concurrence configurée à 1.
+  await mistralGateway.run(() =>
+    streamMistralChatBody(apiKey, model, messages, onToken, signal, options),
+  );
+}
+
+async function streamMistralChatBody(
+  apiKey: string,
+  model: string,
+  messages: OllamaChatMessage[],
+  onToken: (chunk: string) => void,
+  signal?: AbortSignal,
+  options?: { maxTokens?: number; temperature?: number },
+): Promise<void> {
   const res = await fetchWithRateLimitRetries(
     () =>
       fetch(`${BASE}/v1/chat/completions`, {
@@ -193,6 +226,7 @@ export async function streamMistralChat(
         signal,
       }),
     signal,
+    { onRateLimited: (waitMs) => mistralGateway.reportRateLimited(waitMs) },
   );
   if (!res.ok) {
     const errText = await res.text();

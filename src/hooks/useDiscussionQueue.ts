@@ -65,16 +65,20 @@ export function useDiscussionQueue(
     [busy],
   );
 
+  /**
+   * Toujours passer par `enqueue` + `pump` : un appel direct à `runSendRef`
+   * ici (« si pas busy, envoie tout de suite ») créait une fenêtre de course —
+   * `busy` ne se met à jour qu'au rendu React suivant, donc deux envois
+   * rapprochés (double Entrée) pouvaient tous deux passer le test et créer
+   * chacun leur propre `AbortController`, s'écrasant l'un l'autre. `pump()`
+   * lit un ref synchrone (`pumpingRef`) et sérialise correctement.
+   */
   const trySendNow = useCallback(
     (text: string) => {
-      if (!busy && queueRef.current.length === 0) {
-        void runSendRef.current(text);
-        return true;
-      }
       enqueue(text);
       return false;
     },
-    [busy, enqueue],
+    [enqueue],
   );
 
   const removeQueued = useCallback((id: string) => {

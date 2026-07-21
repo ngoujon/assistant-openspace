@@ -29,6 +29,7 @@ function parseChatMessage(v: unknown): ChatMessage | null {
       typeof v.artifactPatchNote === "boolean" ? v.artifactPatchNote : undefined,
     missionDeliverableNote:
       v.missionDeliverableNote === true ? true : undefined,
+    interrupted: v.interrupted === true ? true : undefined,
   };
 }
 

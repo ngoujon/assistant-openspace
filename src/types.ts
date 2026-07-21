@@ -19,6 +19,8 @@ export interface ChatMessage {
   artifactPatchNote?: boolean;
   /** Fin de mission : invite au téléchargement du livrable. */
   missionDeliverableNote?: boolean;
+  /** Réponse coupée avant la fin (changement de conversation, bouton Arrêter). */
+  interrupted?: boolean;
 }
 
 /** Version archivée d’un livrable Markdown (fusion ou mission). */

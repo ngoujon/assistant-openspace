@@ -1,4 +1,5 @@
-import { useEffect, useId, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from "react";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -26,6 +27,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const titleId = useId();
   const descId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -38,6 +40,8 @@ export function ConfirmDialog({
     document.addEventListener("keydown", onDocKey);
     return () => document.removeEventListener("keydown", onDocKey);
   }, [open, onClose]);
+
+  useFocusTrap(open, dialogRef);
 
   if (!open) return null;
 
@@ -52,6 +56,7 @@ export function ConfirmDialog({
       onMouseDown={handleOverlayMouseDown}
     >
       <div
+        ref={dialogRef}
         className="modal-dialog modal-dialog-confirm"
         role="alertdialog"
         aria-modal="true"

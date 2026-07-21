@@ -107,7 +107,13 @@ export function splitBracketMentionsForVisual(text: string): BracketMentionVisua
   return parts;
 }
 
-/** Résout le libellé affiché dans `@[…]` vers un id membre. */
+/**
+ * Résout le libellé affiché dans `@[…]` vers un id membre.
+ * Comme `resolveMentionToken` : un libellé ambigu (plusieurs membres
+ * correspondants) retourne `null` plutôt que de router silencieusement
+ * vers le premier trouvé — sinon une mention verrouillée ambiguë pouvait
+ * désigner la mauvaise personne sans que l'utilisateur s'en aperçoive.
+ */
 export function resolveBracketMentionInner(
   innerEscaped: string,
   members: TreeMember[],
@@ -118,7 +124,7 @@ export function resolveBracketMentionInner(
   if (exact.length === 1) return exact[0].id;
   const n = normalizeKey(label);
   const byNorm = members.filter((m) => normalizeKey(m.label) === n);
-  if (byNorm.length >= 1) return byNorm[0].id;
+  if (byNorm.length === 1) return byNorm[0].id;
   return null;
 }
 

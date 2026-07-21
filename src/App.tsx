@@ -3,6 +3,8 @@ import { clampMistralTemperature, loadAppSettings } from "@/lib/appSettingsStora
 import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { fetchMistralModels } from "@/lib/mistral";
+import { mistralGateway } from "@/lib/mistralGateway";
+import { MistralGatewayBanner } from "@/components/MistralGatewayBanner";
 import { ActivitySidebar } from "@/components/ActivitySidebar";
 import { markdownFilenameFromConversationTitle } from "@/lib/downloadMarkdown";
 import { ChatPanel } from "@/components/ChatPanel";
@@ -94,6 +96,7 @@ export default function App() {
     setLlmProvider(s.llmProvider);
     setMistralApiKey(s.mistralApiKey);
     setMistralTemperature(clampMistralTemperature(s.mistralTemperature));
+    mistralGateway.configure(s.mistralRateProfile);
 
     if (s.llmProvider === "mistral" && !s.mistralApiKey.trim()) {
       setModel("");
@@ -433,6 +436,7 @@ export default function App() {
 
   return (
     <>
+      <MistralGatewayBanner />
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

@@ -9,10 +9,6 @@ import {
 } from "react";
 import { MissionWorkspace } from "@/components/MissionWorkspace";
 import {
-  markdownFilenameFromConversationTitle,
-  triggerMarkdownDownload,
-} from "@/lib/downloadMarkdown";
-import {
   applyDiscussionToArtifact,
   DISCUSSION_FIL_LINES_JSON,
   routeDiscussionMessage,
@@ -24,14 +20,9 @@ import {
 } from "@/lib/discussionMention";
 import { useDiscussionQueue } from "@/hooks/useDiscussionQueue";
 import { useStreamTokenBuffer } from "@/hooks/useStreamTokenBuffer";
-import {
-  MISTRAL_DISCUSSION_ROUTE_TO_STREAM_MS,
-  MISTRAL_DISCUSSION_STREAM_TO_MERGE_MS,
-  sleepMs,
-} from "@/lib/llmRateLimit";
 import { shouldAutoMergeArtifact } from "@/lib/shouldAutoMergeArtifact";
 import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
-import { DiscussionMessageBody } from "@/components/DiscussionMessageBody";
+import { MessageBubble } from "@/components/MessageBubble";
 import { unwrapMarkdownFence } from "@/lib/unwrapMarkdownFence";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
@@ -189,6 +180,8 @@ export function ChatPanel({
   const prevModeRef = useRef<ChatMode>(initialChatMode(conversation));
   const discussionActivityConvIdRef = useRef(conversation.id);
   const discussionBusySinceRef = useRef<number | null>(null);
+  /** Id de la conversation précédente — pour ne pas perdre la file d'attente au changement. */
+  const prevConversationIdRef = useRef(conversation.id);
 
   useEffect(() => {
     const refresh = () => setTeamMembers(loadTeamMembers());
@@ -414,8 +407,7 @@ export function ChatPanel({
 
   const runDiscussionSendOrPatch = useCallback(
     async (text: string) => {
-      try {
-        if (!model) {
+      if (!model) {
           setError(
             llmProvider === "mistral"
               ? "Aucun modèle Mistral disponible. Vérifie ta clé API dans Paramètres."
@@ -483,10 +475,7 @@ export function ChatPanel({
             mistralTemperature:
               llmProvider === "mistral" ? mistralTemperature : undefined,
           });
-
-          if (llmProvider === "mistral") {
-            await sleepMs(MISTRAL_DISCUSSION_ROUTE_TO_STREAM_MS, ac.signal);
-          }
+          // Espacement Mistral géré centralement par mistralGateway.
 
           const speakerLabel =
             members.find((m) => m.id === routing.responderId)?.label ??
@@ -566,9 +555,6 @@ export function ChatPanel({
                 transcriptMessages,
                 turnCutoffAfterId,
               );
-              if (llmProvider === "mistral") {
-                await sleepMs(MISTRAL_DISCUSSION_STREAM_TO_MERGE_MS, ac.signal);
-              }
               setIsRouting(true);
               appendDiscussionProgressLine(
                 "Application des retouches au livrable Markdown…",
@@ -613,6 +599,28 @@ export function ChatPanel({
           }
         } catch (e) {
           if ((e as Error).name === "AbortError") {
+            if (assistantId) {
+              const shellId = assistantId;
+              setMessages(convId, (prev) => {
+                const bubble = prev.find((m) => m.id === shellId);
+                if (!bubble?.content.trim()) {
+                  // Rien n'a été généré : retire la bulle vide plutôt que
+                  // de laisser un fantôme définitif dans l'historique.
+                  return prev.filter(
+                    (m) => m.id !== userMsg.id && m.id !== shellId,
+                  );
+                }
+                return prev.map((m) =>
+                  m.id === shellId ? { ...m, interrupted: true } : m,
+                );
+              });
+            } else {
+              // Interrompu pendant le routage, avant toute bulle assistant :
+              // retire le message utilisateur orphelin pour permettre un renvoi propre.
+              setMessages(convId, (prev) =>
+                prev.filter((m) => m.id !== userMsg.id),
+              );
+            }
             appendDiscussionProgressLine("Échange interrompu.");
             return;
           }
@@ -631,9 +639,6 @@ export function ChatPanel({
           setStreamingSpeakerLabel(null);
           abortRef.current = null;
         }
-      } catch {
-        /* erreurs gérées dans le bloc interne */
-      }
     },
     [
       llmProvider,
@@ -659,12 +664,31 @@ export function ChatPanel({
   const discussionQueue = useDiscussionQueue(runDiscussionSendOrPatch, busy);
 
   useEffect(() => {
+    const leavingId = prevConversationIdRef.current;
+    prevConversationIdRef.current = conversation.id;
+
     setError(null);
     abortRef.current?.abort();
     abortRef.current = null;
     setStreaming(false);
     setIsRouting(false);
     setStreamingSpeakerLabel(null);
+
+    if (leavingId !== conversation.id && discussionQueue.queue.length > 0) {
+      // Ne pas perdre silencieusement des messages en attente : ils sont
+      // reposés comme brouillons non envoyés sur la conversation quittée.
+      const pending = discussionQueue.queue;
+      setMessages(leavingId, (prev) => [
+        ...prev,
+        ...pending.map((q) => ({
+          id: q.id,
+          role: "user" as const,
+          content: q.text,
+          routingNote:
+            "Message resté en file d'attente, non envoyé (changement de conversation). Renvoie-le si besoin.",
+        })),
+      ]);
+    }
     discussionQueue.resetQueue();
     const hasArtifact = !!conversation.artifactMarkdown?.trim();
     const hasMessages = conversation.messages.length > 0;
@@ -853,7 +877,18 @@ export function ChatPanel({
           {activityAside ? (
             <div className="activity-inline-wrap">{activityAside}</div>
           ) : null}
-          <div className="chat-messages" role="log" aria-live="polite">
+          <div
+            className="chat-messages"
+            role="log"
+            /**
+             * Pas de région live pendant le streaming : le buffer flush le
+             * contenu toutes les ~80ms, ce qui ferait annoncer chaque
+             * incrément mot par mot à un lecteur d'écran. Le statut « en
+             * train d'écrire » (ci-dessous) et la fin de tour (panneau
+             * Activité, déjà `aria-live`) restent annoncés séparément.
+             */
+            aria-live={streaming ? "off" : "polite"}
+          >
             {conversation.messages.map((m, i) => {
               const isPendingAssistant =
                 streaming &&
@@ -867,46 +902,17 @@ export function ChatPanel({
                     ? `Équipe · ${m.speakerLabel}`
                     : "Assistant";
               return (
-                <article
+                <MessageBubble
                   key={m.id}
-                  className={`bubble bubble-${m.role}${m.artifactPatchNote ? " bubble-artifact-patch" : ""}`}
-                >
-                  <span className="bubble-role">{roleLine}</span>
-                  {isPendingAssistant && streamingSpeakerLabel ? (
-                    <p className="bubble-streaming-speaker" aria-live="polite">
-                      En train de répondre : {streamingSpeakerLabel}
-                    </p>
-                  ) : null}
-                  {m.routingNote && (
-                    <p className="bubble-routing-note">{m.routingNote}</p>
-                  )}
-                  <div className="bubble-content bubble-content--md">
-                    {m.content ? (
-                      <DiscussionMessageBody text={m.content} />
-                    ) : isPendingAssistant ? (
-                      <span className="bubble-streaming-placeholder">…</span>
-                    ) : (
-                      ""
-                    )}
-                  </div>
-                  {m.missionDeliverableNote &&
-                  conversation.artifactMarkdown?.trim() ? (
-                    <button
-                      type="button"
-                      className="btn-primary btn-compact bubble-download-md-btn"
-                      onClick={() =>
-                        triggerMarkdownDownload(
-                          conversation.artifactMarkdown!,
-                          markdownFilenameFromConversationTitle(
-                            conversation.title,
-                          ),
-                        )
-                      }
-                    >
-                      Télécharger le rapport (.md)
-                    </button>
-                  ) : null}
-                </article>
+                  message={m}
+                  roleLine={roleLine}
+                  isPendingAssistant={isPendingAssistant}
+                  pendingSpeakerLabel={
+                    isPendingAssistant ? streamingSpeakerLabel : null
+                  }
+                  artifactMarkdown={conversation.artifactMarkdown}
+                  conversationTitle={conversation.title}
+                />
               );
             })}
           </div>

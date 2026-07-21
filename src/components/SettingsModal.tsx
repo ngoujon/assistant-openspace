@@ -1,16 +1,42 @@
-import { useEffect, useId, useState, type MouseEvent } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import {
   clampMistralTemperature,
+  DEFAULT_MISTRAL_RATE_PROFILE,
   DEFAULT_MISTRAL_TEMPERATURE,
   DEFAULT_SEED_SYSTEM_PROMPT,
   DEFAULT_SEED_USER_TEMPLATE,
   loadAppSettings,
+  normalizeMistralRateProfile,
   saveAppSettings,
 } from "@/lib/appSettingsStorage";
 import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { fetchMistralModels } from "@/lib/mistral";
+import type { MistralRateProfile } from "@/lib/mistralGateway";
 import { fetchOllamaModels } from "@/lib/ollama";
+
+const MISTRAL_RATE_PROFILE_OPTIONS: {
+  value: MistralRateProfile;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    value: "free",
+    label: "Gratuit",
+    hint: "1 appel à la fois, bien espacé — le plus prudent contre les 429.",
+  },
+  {
+    value: "tier1",
+    label: "Payant (entrée de gamme)",
+    hint: "Jusqu'à 2 appels en parallèle, espacement réduit.",
+  },
+  {
+    value: "tier2",
+    label: "Payant (palier élevé)",
+    hint: "Jusqu'à 4 appels en parallèle — pour un compte avec un quota RPM confortable.",
+  },
+];
 import {
   applyWorkspaceImport,
   downloadWorkspaceExport,
@@ -25,10 +51,12 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const mistralKeyId = useId();
   const mistralModelSelectId = useId();
   const mistralTemperatureId = useId();
+  const mistralRateProfileId = useId();
   const ollamaModelSelectId = useId();
   const [seedSystem, setSeedSystem] = useState(DEFAULT_SEED_SYSTEM_PROMPT);
   const [seedUser, setSeedUser] = useState(DEFAULT_SEED_USER_TEMPLATE);
@@ -43,6 +71,8 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
   const [mistralTemperature, setMistralTemperature] = useState(
     DEFAULT_MISTRAL_TEMPERATURE,
   );
+  const [mistralRateProfile, setMistralRateProfile] =
+    useState<MistralRateProfile>(DEFAULT_MISTRAL_RATE_PROFILE);
   const [ollamaModelsList, setOllamaModelsList] = useState<string[]>([]);
   const [ollamaModelChoice, setOllamaModelChoice] = useState("");
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
@@ -61,6 +91,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
     setMistralApiKey(s.mistralApiKey);
     setMistralModelChoice(s.mistralChatModel?.trim() ?? "");
     setMistralTemperature(clampMistralTemperature(s.mistralTemperature));
+    setMistralRateProfile(normalizeMistralRateProfile(s.mistralRateProfile));
     setMistralModelsList([]);
     setMistralModelsError(null);
     setOllamaModelChoice(s.ollamaChatModel?.trim() ?? "");
@@ -155,6 +186,8 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
     return () => document.removeEventListener("keydown", onDocKey);
   }, [open, onClose]);
 
+  useFocusTrap(open, dialogRef);
+
   if (!open) return null;
 
   const handleOverlayMouseDown = (e: MouseEvent<HTMLDivElement>) => {
@@ -212,6 +245,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
           ? mistralModelChoice.trim()
           : prev.mistralChatModel,
       mistralTemperature: clampMistralTemperature(mistralTemperature),
+      mistralRateProfile,
       ollamaChatModel:
         llmProvider === "ollama"
           ? ollamaModelChoice.trim()
@@ -229,6 +263,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
       onMouseDown={handleOverlayMouseDown}
     >
       <div
+        ref={dialogRef}
         className="modal-dialog modal-dialog-settings"
         role="dialog"
         aria-modal="true"
@@ -393,6 +428,40 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
                     {mistralTemperature.toFixed(2)}
                   </span>
                 </div>
+                <label
+                  className="modal-field-label modal-settings-label-block"
+                  htmlFor={mistralRateProfileId}
+                >
+                  Débit Mistral
+                </label>
+                <p className="modal-settings-hint">
+                  Adapte la concurrence et l'espacement des appels à ton palier de
+                  compte — évite les rafales de <strong>429</strong> (trop de requêtes).
+                  En cas de doute, garde « Gratuit ».
+                </p>
+                <select
+                  id={mistralRateProfileId}
+                  className="modal-settings-input"
+                  value={mistralRateProfile}
+                  onChange={(e) =>
+                    setMistralRateProfile(
+                      normalizeMistralRateProfile(e.target.value),
+                    )
+                  }
+                >
+                  {MISTRAL_RATE_PROFILE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="modal-settings-hint">
+                  {
+                    MISTRAL_RATE_PROFILE_OPTIONS.find(
+                      (opt) => opt.value === mistralRateProfile,
+                    )?.hint
+                  }
+                </p>
               </>
             )}
             {llmProvider === "ollama" && (

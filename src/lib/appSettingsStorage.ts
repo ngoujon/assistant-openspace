@@ -1,4 +1,5 @@
 import { DEFAULT_LLM_PROVIDER, type LlmProvider } from "@/lib/llmProvider";
+import type { MistralRateProfile } from "@/lib/mistralGateway";
 
 const KEY = "openspace-app-settings-v1";
 
@@ -65,6 +66,20 @@ Réponds **uniquement** avec le corps du champ, en respectant **exactement** ces
 /** Température Mistral par défaut (0 = déterministe, 1 = plus créatif). */
 export const DEFAULT_MISTRAL_TEMPERATURE = 0.45;
 
+/**
+ * Profil de débit par défaut : le plus prudent — un compte gratuit a des
+ * quotas RPM très bas, mieux vaut sous-solliciter que déclencher des rafales
+ * de 429 dès la première mission.
+ */
+export const DEFAULT_MISTRAL_RATE_PROFILE: MistralRateProfile = "free";
+
+/** Valide/retombe sur le profil par défaut si la valeur stockée est inconnue. */
+export function normalizeMistralRateProfile(v: unknown): MistralRateProfile {
+  return v === "free" || v === "tier1" || v === "tier2"
+    ? v
+    : DEFAULT_MISTRAL_RATE_PROFILE;
+}
+
 /** Borne la température Mistral pour l’API (0–1). */
 export function clampMistralTemperature(n: unknown): number {
   if (typeof n === "number" && Number.isFinite(n)) {
@@ -88,6 +103,11 @@ export interface AppSettings {
   mistralChatModel: string;
   /** Température (0–1) pour tous les appels Mistral ; ignorée si fournisseur Ollama. */
   mistralTemperature: number;
+  /**
+   * Palier de compte Mistral — ajuste la concurrence et l'espacement du
+   * guichet (`mistralGateway`) pour rester sous le quota RPM réel.
+   */
+  mistralRateProfile: MistralRateProfile;
   /** Modèle Ollama pour le chat / mission / équipe (choisi dans Paramètres uniquement). */
   ollamaChatModel: string;
 }
@@ -100,6 +120,7 @@ function defaults(): AppSettings {
     mistralApiKey: "",
     mistralChatModel: "",
     mistralTemperature: DEFAULT_MISTRAL_TEMPERATURE,
+    mistralRateProfile: DEFAULT_MISTRAL_RATE_PROFILE,
     ollamaChatModel: "",
   };
 }
@@ -133,6 +154,9 @@ export function loadAppSettings(): AppSettings {
     const mistralTemperature = clampMistralTemperature(
       o.mistralTemperature ?? base.mistralTemperature,
     );
+    const mistralRateProfile = normalizeMistralRateProfile(
+      o.mistralRateProfile,
+    );
     const ollamaModel =
       typeof o.ollamaChatModel === "string"
         ? o.ollamaChatModel
@@ -144,6 +168,7 @@ export function loadAppSettings(): AppSettings {
       mistralApiKey: key,
       mistralChatModel: mistralModel,
       mistralTemperature,
+      mistralRateProfile,
       ollamaChatModel: ollamaModel,
     };
   } catch {
@@ -161,6 +186,7 @@ export function saveAppSettings(s: AppSettings): void {
       mistralApiKey: s.mistralApiKey,
       mistralChatModel: s.mistralChatModel,
       mistralTemperature: clampMistralTemperature(s.mistralTemperature),
+      mistralRateProfile: normalizeMistralRateProfile(s.mistralRateProfile),
       ollamaChatModel: s.ollamaChatModel,
     }),
   );

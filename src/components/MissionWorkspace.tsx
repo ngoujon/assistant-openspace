@@ -1,12 +1,21 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type DragEvent,
   type KeyboardEvent,
 } from "react";
-import { runMissionPipeline, type MissionFile } from "@/orchestration/pipeline";
+import { useStreamTokenBuffer } from "@/hooks/useStreamTokenBuffer";
+import {
+  bundleUserPayload,
+  countMissionModelCalls,
+  MAX_PAYLOAD_SLICE,
+  runMissionPipeline,
+  type BranchOutput,
+  type MissionFile,
+} from "@/orchestration/pipeline";
 import { MentionComboboxTextarea } from "@/components/MentionComboboxTextarea";
 import { buildMissionMentionPrefix } from "@/lib/discussionMention";
 import { loadAgentSouls } from "@/lib/teamSoulsStorage";
@@ -88,7 +97,19 @@ export function MissionWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [elapsedSec, setElapsedSec] = useState(0);
   const missionElapsedT0Ref = useRef<number | null>(null);
+  /**
+   * Brief orchestrateur + branches déjà terminées lors du dernier run —
+   * permet de reprendre après un échec (429 persistant, réseau…) sans
+   * repayer les étapes déjà réussies. Vidé au lancement d'une mission
+   * fraîche, conservé entre un échec et une reprise.
+   */
+  const resumeStateRef = useRef<{
+    orchestratorBrief?: string;
+    completedBranches: Record<string, BranchOutput>;
+  }>({ completedBranches: {} });
+  const [canResume, setCanResume] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const streamBuffer = useStreamTokenBuffer();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
   const [fileDropActive, setFileDropActive] = useState(false);
@@ -206,7 +227,8 @@ export function MissionWorkspace({
     abortRef.current?.abort();
   }, []);
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (opts?: { resume?: boolean }) => {
+    const isResume = opts?.resume === true;
     if (running) return;
     if (!context.trim() && files.length === 0) {
       setError("Ajoute un contexte et/ou au moins un fichier texte (.txt, .md).");
@@ -223,9 +245,16 @@ export function MissionWorkspace({
 
     setError(null);
     setResultMd(null);
-    setProgress([]);
     setRunning(true);
-    onMissionJournalClear?.();
+    streamBuffer.reset();
+    if (isResume) {
+      setProgress((p) => [...p, "— Reprise de la mission —"]);
+    } else {
+      setProgress([]);
+      onMissionJournalClear?.();
+      resumeStateRef.current = { completedBranches: {} };
+      setCanResume(false);
+    }
     const ac = new AbortController();
     abortRef.current = ac;
 
@@ -250,6 +279,14 @@ export function MissionWorkspace({
     const contextForPipeline =
       buildMissionMentionPrefix(context, membersTree) + context;
 
+    const resumeFrom =
+      isResume && resumeStateRef.current.orchestratorBrief
+        ? {
+            orchestratorBrief: resumeStateRef.current.orchestratorBrief,
+            completedBranches: resumeStateRef.current.completedBranches,
+          }
+        : undefined;
+
     try {
       const md = await runMissionPipeline({
         llmProvider,
@@ -262,20 +299,37 @@ export function MissionWorkspace({
         souls,
         teamMembers: membersTree,
         signal: ac.signal,
+        resumeFrom,
         onProgress: (label) => {
           setProgress((p) => [...p, label]);
         },
         onAgentJournal: (entry) => onAgentJournal?.(entry),
+        onFinalReportToken: (chunk) => {
+          streamBuffer.push(chunk, (flushed) =>
+            setResultMd((prev) => (prev ?? "") + flushed),
+          );
+        },
+        onOrchestratorBrief: (brief) => {
+          resumeStateRef.current.orchestratorBrief = brief;
+        },
+        onBranchComplete: (leadId, output) => {
+          resumeStateRef.current.completedBranches[leadId] = output;
+        },
       });
       const finalMd = unwrapMarkdownFence(md);
       setResultMd(finalMd);
       onArtifactProduced?.(finalMd, context);
+      // Mission aboutie : plus rien à reprendre.
+      resumeStateRef.current = { completedBranches: {} };
+      setCanResume(false);
     } catch (e) {
+      const hasResumableProgress = !!resumeStateRef.current.orchestratorBrief;
       if ((e as Error).name === "AbortError") {
         setProgress((p) => [...p, "Interrompu."]);
       } else {
         setError((e as Error).message || "Erreur pendant la mission.");
       }
+      setCanResume(hasResumableProgress);
     } finally {
       const t0 = missionElapsedT0Ref.current;
       if (t0 != null) {
@@ -296,9 +350,27 @@ export function MissionWorkspace({
     onArtifactProduced,
     onAgentJournal,
     onMissionJournalClear,
+    streamBuffer,
   ]);
 
   const canStart = (context.trim().length > 0 || files.length > 0) && !!model;
+
+  /** Aide à anticiper la durée et le risque de rate-limit avant de lancer. */
+  const estimatedCalls = useMemo(
+    () => countMissionModelCalls(teamMembers, false),
+    [teamMembers],
+  );
+
+  /**
+   * Le pipeline tronque silencieusement le contexte + fichiers au-delà de
+   * `MAX_PAYLOAD_SLICE` caractères (voir `slicePayloadForModel`) — le signaler
+   * ici plutôt que de laisser l'utilisateur découvrir après coup qu'une
+   * partie de son texte ou de ses fichiers n'a pas été lue par le modèle.
+   */
+  const payloadOverflowChars = useMemo(() => {
+    const total = bundleUserPayload(context, files).length;
+    return Math.max(0, total - MAX_PAYLOAD_SLICE);
+  }, [context, files]);
 
   const handleDownload = useCallback(() => {
     if (!resultMd) return;
@@ -412,7 +484,38 @@ export function MissionWorkspace({
           </ul>
         )}
 
+        {payloadOverflowChars > 0 && (
+          <div className="banner banner-warn">
+            Contexte + fichiers dépasse la limite lue par le modèle à chaque étape (
+            {MAX_PAYLOAD_SLICE.toLocaleString("fr-FR")} caractères) : les{" "}
+            <strong>{payloadOverflowChars.toLocaleString("fr-FR")} derniers caractères</strong>{" "}
+            seront ignorés. Raccourcis le contexte ou les fichiers si ce contenu est important.
+          </div>
+        )}
+
         {error && <div className="banner banner-error">{error}</div>}
+
+        {!running && canResume && (
+          <div className="banner banner-warn">
+            Une partie du travail est déjà terminée (brief orchestrateur
+            {Object.keys(resumeStateRef.current.completedBranches).length > 0
+              ? ` + ${Object.keys(resumeStateRef.current.completedBranches).length} pôle${Object.keys(resumeStateRef.current.completedBranches).length > 1 ? "s" : ""}`
+              : ""}
+            ). « Reprendre » évite de refaire ces appels.
+          </div>
+        )}
+
+        {!running && estimatedCalls > 0 && (
+          <p className="mission-call-estimate" role="status">
+            Cette mission va effectuer environ{" "}
+            <strong>
+              {estimatedCalls} appel{estimatedCalls > 1 ? "s" : ""} au modèle
+            </strong>
+            {llmProvider === "mistral"
+              ? " — vérifie ton quota Mistral si le compte est gratuit."
+              : "."}
+          </p>
+        )}
 
         <div className="mission-actions">
           {running ? (
@@ -420,30 +523,53 @@ export function MissionWorkspace({
               Arrêter la mission
             </button>
           ) : (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => void run()}
-              disabled={!canStart}
-            >
-              Lancer la mission
-            </button>
+            <>
+              {canResume && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void run({ resume: true })}
+                  disabled={!canStart}
+                >
+                  Reprendre la mission
+                </button>
+              )}
+              <button
+                type="button"
+                className={canResume ? "btn-secondary" : "btn-primary"}
+                onClick={() => void run()}
+                disabled={!canStart}
+              >
+                {canResume ? "Relancer depuis le début" : "Lancer la mission"}
+              </button>
+            </>
           )}
         </div>
 
         {resultMd && (
           <section className="mission-result" aria-label="Résultat">
             <div className="mission-result-head">
-              <h3 className="mission-result-title">Document généré</h3>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleDownload}
-              >
-                Télécharger le .md
-              </button>
+              <h3 className="mission-result-title">
+                {running ? "Rédaction du rapport final…" : "Document généré"}
+              </h3>
+              {!running && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleDownload}
+                >
+                  Télécharger le .md
+                </button>
+              )}
             </div>
-            <div className="mission-md-preview">{resultMd}</div>
+            <div
+              className="mission-md-preview"
+              role={running ? "status" : undefined}
+              aria-live={running ? "off" : undefined}
+            >
+              {resultMd}
+              {running ? <span className="mission-md-caret" aria-hidden="true" /> : null}
+            </div>
           </section>
         )}
       </div>

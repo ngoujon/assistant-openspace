@@ -1,5 +1,6 @@
-import { useEffect, useId, type MouseEvent } from "react";
+import { useEffect, useId, useRef, type MouseEvent } from "react";
 import { TeamArchiveSection } from "@/components/TeamArchiveSection";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import type { TreeMember } from "@/lib/teamTreeStorage";
 
 interface TeamArchiveModalProps {
@@ -18,6 +19,7 @@ export function TeamArchiveModal({
   onRestore,
 }: TeamArchiveModalProps) {
   const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -30,6 +32,8 @@ export function TeamArchiveModal({
     document.addEventListener("keydown", onDocKey);
     return () => document.removeEventListener("keydown", onDocKey);
   }, [open, onClose]);
+
+  useFocusTrap(open, dialogRef);
 
   if (!open) return null;
 
@@ -44,6 +48,7 @@ export function TeamArchiveModal({
       onMouseDown={handleOverlayMouseDown}
     >
       <div
+        ref={dialogRef}
         className="modal-dialog modal-dialog-archive"
         role="dialog"
         aria-modal="true"

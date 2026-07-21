@@ -6,6 +6,7 @@ import {
   type MouseEvent,
 } from "react";
 import { generateMemberSoulSeed } from "@/lib/generateMemberSeed";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import type { LlmProvider } from "@/lib/llmProvider";
 
 export interface SoulModalNode {
@@ -51,6 +52,7 @@ export function AgentSoulModal({
   const descId = useId();
   const nameInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(initialText);
   const [nameDraft, setNameDraft] = useState(initialLabel);
   const [genError, setGenError] = useState<string | null>(null);
@@ -81,6 +83,8 @@ export function AgentSoulModal({
     document.addEventListener("keydown", onDocKey);
     return () => document.removeEventListener("keydown", onDocKey);
   }, [node, onClose]);
+
+  useFocusTrap(!!node, dialogRef);
 
   if (!node) return null;
 
@@ -142,6 +146,7 @@ export function AgentSoulModal({
       onMouseDown={handleOverlayMouseDown}
     >
       <div
+        ref={dialogRef}
         className="modal-dialog modal-dialog-wide"
         role="dialog"
         aria-modal="true"
