@@ -31,7 +31,8 @@ export interface TeamWorkspaceProviderProps {
   children: ReactNode;
   model: string;
   llmProvider: LlmProvider;
-  mistralApiKey: string;
+  ollamaApiKey: string;
+  ollamaApiUrl: string;
 }
 
 export interface TeamWorkspaceValue {
@@ -43,7 +44,8 @@ export interface TeamWorkspaceValue {
   editParentLabel: string | null;
   model: string;
   llmProvider: LlmProvider;
-  mistralApiKey: string;
+  ollamaApiKey: string;
+  ollamaApiUrl: string;
   draggingId: string | null;
   dropTargetId: string | null;
   setDropTargetId: (id: string | null) => void;
@@ -80,7 +82,8 @@ export function TeamWorkspaceProvider({
   children,
   model,
   llmProvider,
-  mistralApiKey,
+  ollamaApiKey,
+  ollamaApiUrl,
 }: TeamWorkspaceProviderProps) {
   const [members, setMembers] = useState(loadTeamMembers);
   const [souls, setSouls] = useState(loadAgentSouls);
@@ -203,7 +206,8 @@ export function TeamWorkspaceProvider({
       editParentLabel,
       model,
       llmProvider,
-      mistralApiKey,
+      ollamaApiKey,
+      ollamaApiUrl,
       draggingId,
       dropTargetId,
       setDropTargetId,
@@ -226,7 +230,8 @@ export function TeamWorkspaceProvider({
       editParentLabel,
       model,
       llmProvider,
-      mistralApiKey,
+      ollamaApiKey,
+      ollamaApiUrl,
       draggingId,
       dropTargetId,
       handleOpen,

@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { clampMistralTemperature, loadAppSettings } from "@/lib/appSettingsStorage";
+import { clampOllamaTemperature, loadAppSettings } from "@/lib/appSettingsStorage";
 import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
-import { fetchMistralModels } from "@/lib/mistral";
-import { mistralGateway } from "@/lib/mistralGateway";
-import { MistralGatewayBanner } from "@/components/MistralGatewayBanner";
+import { fetchOllamaModels } from "@/lib/ollama";
 import { ActivitySidebar } from "@/components/ActivitySidebar";
 import { markdownFilenameFromConversationTitle } from "@/lib/downloadMarkdown";
 import { ChatPanel } from "@/components/ChatPanel";
@@ -14,7 +12,6 @@ import { Sidebar } from "@/components/Sidebar";
 import { TeamCentrePanel } from "@/components/TeamCentrePanel";
 import { TeamOrganisationAside } from "@/components/TeamOrganisationAside";
 import { TeamWorkspaceProvider } from "@/components/TeamWorkspaceContext";
-import { fetchOllamaModels } from "@/lib/ollama";
 import {
   appendArtifactVersion,
   loadConversations,
@@ -73,11 +70,14 @@ export default function App() {
   const [llmProvider, setLlmProvider] = useState<LlmProvider>(
     () => loadAppSettings().llmProvider,
   );
-  const [mistralApiKey, setMistralApiKey] = useState(
-    () => loadAppSettings().mistralApiKey,
+  const [ollamaApiKey, setOllamaApiKey] = useState(
+    () => loadAppSettings().ollamaApiKey,
   );
-  const [mistralTemperature, setMistralTemperature] = useState(() =>
-    clampMistralTemperature(loadAppSettings().mistralTemperature),
+  const [ollamaApiUrl, setOllamaApiUrl] = useState(
+    () => loadAppSettings().ollamaApiUrl,
+  );
+  const [ollamaTemperature, setOllamaTemperature] = useState(() =>
+    clampOllamaTemperature(loadAppSettings().ollamaTemperature),
   );
   const [llmError, setLlmError] = useState<string | null>(null);
   const [rightActivity, setRightActivity] = useState<RightActivityState>(() =>
@@ -94,34 +94,23 @@ export default function App() {
   const refreshLlmModels = useCallback(() => {
     const s = loadAppSettings();
     setLlmProvider(s.llmProvider);
-    setMistralApiKey(s.mistralApiKey);
-    setMistralTemperature(clampMistralTemperature(s.mistralTemperature));
-    mistralGateway.configure(s.mistralRateProfile);
+    setOllamaApiKey(s.ollamaApiKey);
+    setOllamaApiUrl(s.ollamaApiUrl);
+    setOllamaTemperature(clampOllamaTemperature(s.ollamaTemperature));
 
-    if (s.llmProvider === "mistral" && !s.mistralApiKey.trim()) {
+    if (s.llmProvider === "ollama" && !s.ollamaApiUrl.trim()) {
       setModel("");
       setLlmError(
-        "Mistral AI : renseigne ta clé API dans Paramètres (menu latéral).",
+        "Ollama Cloud : renseigne l'URL API dans Paramètres (menu latéral).",
       );
       return;
     }
 
-    const run =
-      s.llmProvider === "mistral"
-        ? () => fetchMistralModels(s.mistralApiKey.trim())
-        : fetchOllamaModels;
-
-    run()
+    fetchOllamaModels(s.ollamaApiUrl, s.ollamaApiKey)
       .then((m) => {
         setModel((prev) => {
-          if (s.llmProvider === "mistral") {
-            const saved = s.mistralChatModel?.trim() ?? "";
-            if (saved && m.includes(saved)) return saved;
-          }
-          if (s.llmProvider === "ollama") {
-            const saved = s.ollamaChatModel?.trim() ?? "";
-            if (saved && m.includes(saved)) return saved;
-          }
+          const saved = s.ollamaChatModel?.trim() ?? "";
+          if (saved && m.includes(saved)) return saved;
           if (prev && m.includes(prev)) return prev;
           return pickDefaultChatModel(m, s.llmProvider);
         });
@@ -397,8 +386,9 @@ export default function App() {
         conversation={active}
         model={model}
         llmProvider={llmProvider}
-        mistralApiKey={mistralApiKey}
-        mistralTemperature={mistralTemperature}
+        ollamaApiKey={ollamaApiKey}
+        ollamaApiUrl={ollamaApiUrl}
+        ollamaTemperature={ollamaTemperature}
         llmError={llmError}
         onRetryLlm={refreshLlmModels}
         setMessages={setConversationMessages}
@@ -436,7 +426,6 @@ export default function App() {
 
   return (
     <>
-      <MistralGatewayBanner />
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -445,7 +434,8 @@ export default function App() {
       <TeamWorkspaceProvider
         model={model}
         llmProvider={llmProvider}
-        mistralApiKey={mistralApiKey}
+        ollamaApiKey={ollamaApiKey}
+        ollamaApiUrl={ollamaApiUrl}
       >
         <Layout
           sidebar={sidebarEl}

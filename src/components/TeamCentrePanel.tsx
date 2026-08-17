@@ -19,7 +19,8 @@ export function TeamCentrePanel() {
     editParentLabel,
     model,
     llmProvider,
-    mistralApiKey,
+    ollamaApiKey,
+    ollamaApiUrl,
     handleCloseModal,
     handleSaveSoul,
   } = useTeamWorkspace();
@@ -38,7 +39,8 @@ export function TeamCentrePanel() {
       }
       model={model}
       llmProvider={llmProvider}
-      mistralApiKey={mistralApiKey}
+      ollamaApiKey={ollamaApiKey}
+      ollamaApiUrl={ollamaApiUrl}
       onClose={handleCloseModal}
       onSave={handleSaveSoul}
     />

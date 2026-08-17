@@ -47,7 +47,7 @@ export function TeamArchiveSection({
   onRestore,
   variant = "default",
 }: TeamArchiveSectionProps) {
-  const { model, llmProvider, mistralApiKey } = useTeamWorkspace();
+  const { model, llmProvider, ollamaApiKey, ollamaApiUrl } = useTeamWorkspace();
   const nameFieldId = useId();
   const seedAbortRef = useRef<AbortController | null>(null);
   const [archives, setArchives] = useState<TeamArchiveEntry[]>(loadTeamArchives);
@@ -118,7 +118,8 @@ export function TeamArchiveSection({
           const parent = mem.parentId ? byId.get(mem.parentId) : undefined;
           const text = await generateMemberSoulSeed({
             llmProvider,
-            mistralApiKey,
+            ollamaApiKey,
+            ollamaApiUrl,
             model: m,
             memberLabel: mem.label.trim(),
             parentId: mem.parentId,
@@ -142,7 +143,7 @@ export function TeamArchiveSection({
         seedAbortRef.current = null;
       }
     },
-    [llmProvider, mistralApiKey, model, refresh],
+    [llmProvider, ollamaApiKey, ollamaApiUrl, model, refresh],
   );
 
   const wrapClass =

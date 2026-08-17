@@ -1,8 +1,7 @@
 /**
- * L'espacement entre requêtes Mistral (429 / quotas) est géré de façon
- * centralisée par `mistralGateway` (voir `src/lib/mistralGateway.ts`) — un
+ * Gestion centralisée des rate limits (429 / quotas) — un
  * guichet unique partagé par tous les appelants, plutôt que des pauses
- * fixes dispersées par site d'appel comme auparavant.
+ * fixes dispersées par site d'appel.
  */
 
 /** Statuts HTTP souvent liés à surcharge / limite de débit (retry raisonnable). */

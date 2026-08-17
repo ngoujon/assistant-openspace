@@ -1,4 +1,13 @@
-const BASE = "/api/ollama";
+const DEFAULT_BASE = "/api/ollama";
+
+function authHeaders(apiKey: string): HeadersInit {
+  if (!apiKey.trim()) {
+    return {};
+  }
+  return {
+    Authorization: `Bearer ${apiKey.trim()}`,
+  };
+}
 
 /**
  * Heuristique rapide : modèles embedding / rerank (souvent exclus si /api/show
@@ -15,12 +24,15 @@ function isLikelyNonChatModelName(name: string): boolean {
 /**
  * Ollama 0.3+ expose `capabilities` : les seuls `embedding` ne supportent pas /api/chat.
  */
-async function modelSupportsChat(model: string): Promise<boolean> {
+async function modelSupportsChat(model: string, base: string, apiKey: string): Promise<boolean> {
   if (isLikelyNonChatModelName(model)) return false;
   try {
-    const res = await fetch(`${BASE}/api/show`, {
+    const res = await fetch(`${base}/api/show`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(apiKey),
+      },
       body: JSON.stringify({ model }),
     });
     if (!res.ok) return !isLikelyNonChatModelName(model);
@@ -49,26 +61,30 @@ export function assertChatModel(model: string): void {
 }
 
 /** Modèles utilisables pour le chat (exclut embedding / rerank). */
-let ollamaModelsCache: { names: string[]; fetchedAt: number } | null = null;
+let ollamaModelsCache: { names: string[]; fetchedAt: number; base: string; apiKey: string } | null = null;
 const OLLAMA_MODELS_CACHE_MS = 5 * 60 * 1000;
 
-export async function fetchOllamaModels(): Promise<string[]> {
+export async function fetchOllamaModels(base: string = DEFAULT_BASE, apiKey: string = ""): Promise<string[]> {
   const now = Date.now();
   if (
     ollamaModelsCache &&
-    now - ollamaModelsCache.fetchedAt < OLLAMA_MODELS_CACHE_MS
+    now - ollamaModelsCache.fetchedAt < OLLAMA_MODELS_CACHE_MS &&
+    ollamaModelsCache.base === base &&
+    ollamaModelsCache.apiKey === apiKey
   ) {
     return ollamaModelsCache.names;
   }
-  const res = await fetch(`${BASE}/api/tags`);
+  const res = await fetch(`${base}/api/tags`, {
+    headers: authHeaders(apiKey),
+  });
   if (!res.ok) {
-    throw new Error(`Ollama indisponible (${res.status}). Lance Ollama sur ce Mac.`);
+    throw new Error(`Ollama indisponible (${res.status}). Vérifie l'URL et la clé API.`);
   }
   const data = (await res.json()) as { models?: { name: string }[] };
   const names = data.models?.map((m) => m.name) ?? [];
-  const flags = await Promise.all(names.map((n) => modelSupportsChat(n)));
+  const flags = await Promise.all(names.map((n) => modelSupportsChat(n, base, apiKey)));
   const filtered = names.filter((_, i) => flags[i]);
-  ollamaModelsCache = { names: filtered, fetchedAt: now };
+  ollamaModelsCache = { names: filtered, fetchedAt: now, base, apiKey };
   return filtered;
 }
 
@@ -124,10 +140,16 @@ export async function completeOllamaChat(
     timeoutMs?: number;
     /** Plafond tokens générés (`num_predict` côté Ollama). */
     maxTokens?: number;
+    /** URL de base de l’API Ollama (par défaut: /api/ollama proxy local). */
+    apiUrl?: string;
+    /** Clé API Ollama Cloud (optionnel pour Ollama Cloud). */
+    apiKey?: string;
   },
 ): Promise<string> {
   assertChatModel(model);
   const combined = mergeAbortWithTimeout(signal, options?.timeoutMs);
+  const base = options?.apiUrl ?? DEFAULT_BASE;
+  const apiKey = options?.apiKey ?? "";
   const body: Record<string, unknown> = {
     model,
     messages,
@@ -146,9 +168,12 @@ export async function completeOllamaChat(
   }
   let res: Response;
   try {
-    res = await fetch(`${BASE}/api/chat`, {
+    res = await fetch(`${base}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(apiKey),
+      },
       body: JSON.stringify(body),
       signal: combined,
     });
@@ -160,7 +185,7 @@ export async function completeOllamaChat(
     }
     if (options?.timeoutMs && (e as Error).name === "AbortError") {
       throw new Error(
-        "Ollama n’a pas renvoyé de réponse dans le délai imparti. Vérifie qu’Ollama tourne, teste `ollama run <modèle>` en terminal, ou choisis un modèle plus petit.",
+        "Ollama n’a pas renvoyé de réponse dans le délai imparti. Vérifie la connexion, teste `ollama run <modèle>` en terminal, ou choisis un modèle plus petit.",
       );
     }
     throw e;
@@ -180,9 +205,18 @@ export async function streamOllamaChat(
   messages: OllamaChatMessage[],
   onToken: (chunk: string) => void,
   signal?: AbortSignal,
-  options?: { maxTokens?: number; temperature?: number },
+  options?: {
+    maxTokens?: number;
+    temperature?: number;
+    /** URL de base de l'API Ollama. */
+    apiUrl?: string;
+    /** Clé API Ollama Cloud. */
+    apiKey?: string;
+  },
 ): Promise<void> {
   assertChatModel(model);
+  const base = options?.apiUrl ?? DEFAULT_BASE;
+  const apiKey = options?.apiKey ?? "";
   const body: Record<string, unknown> = { model, messages, stream: true };
   const runOpts: Record<string, number> = {};
   if (options?.temperature != null) runOpts.temperature = options.temperature;
@@ -192,9 +226,12 @@ export async function streamOllamaChat(
   if (Object.keys(runOpts).length > 0) {
     body.options = runOpts;
   }
-  const res = await fetch(`${BASE}/api/chat`, {
+  const res = await fetch(`${base}/api/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(apiKey),
+    },
     body: JSON.stringify(body),
     signal,
   });

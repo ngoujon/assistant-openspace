@@ -1,4 +1,4 @@
-import { clampMistralTemperature } from "@/lib/appSettingsStorage";
+import { clampOllamaTemperature, loadAppSettings } from "@/lib/appSettingsStorage";
 import { generateMissionConversationTitle } from "@/lib/discussionTeamChat";
 import { completeLlmChat, streamLlmChat } from "@/lib/llmChat";
 import {
@@ -19,7 +19,6 @@ export interface MissionFile {
 
 export interface RunMissionOptions {
   llmProvider: LlmProvider;
-  mistralApiKey?: string;
   model: string;
   context: string;
   files: MissionFile[];
@@ -34,8 +33,10 @@ export interface RunMissionOptions {
    * Si absent, aucun appel supplémentaire.
    */
   onConversationTitleSuggested?: (title: string) => void;
-  /** Température Mistral (0–1) pour toute la mission ; ignoré si Ollama. */
-  mistralTemperature?: number;
+  /** Température Ollama (0–1) pour toute la mission. */
+  ollamaTemperature?: number;
+  ollamaApiKey?: string;
+  ollamaApiUrl?: string;
   /** Journal des sorties intermédiaires par membre. */
   onAgentJournal?: (entry: MissionAgentJournalEntry) => void;
   /**
@@ -157,23 +158,21 @@ function slicePayloadForModel(payload: string): string {
 
 async function missionComplete(
   llmProvider: LlmProvider,
-  mistralApiKey: string | undefined,
   model: string,
   messages: OllamaChatMessage[],
   signal: AbortSignal | undefined,
   temperature: number,
   maxTokens: number,
+  ollamaApiKey?: string,
+  ollamaApiUrl?: string,
 ): Promise<string> {
-  // L'espacement entre appels Mistral est géré de façon centralisée par
-  // `mistralGateway` (voir src/lib/mistralGateway.ts) — plus de pause locale
-  // ici, elle ferait double emploi avec le guichet.
-  return completeLlmChat(llmProvider, mistralApiKey, model, messages, signal, {
+  return completeLlmChat(llmProvider, model, messages, signal, {
     temperature,
     maxTokens,
-    ...(llmProvider === "ollama"
-      ? { keepAlive: MISSION_KEEP_ALIVE }
-      : {}),
+    keepAlive: MISSION_KEEP_ALIVE,
     timeoutMs: MISSION_CHAT_TIMEOUT_MS,
+    ollamaApiKey,
+    ollamaApiUrl,
   });
 }
 
@@ -299,7 +298,6 @@ export async function runMissionPipeline(
 ): Promise<string> {
   const {
     llmProvider,
-    mistralApiKey,
     model,
     context,
     files,
@@ -308,16 +306,18 @@ export async function runMissionPipeline(
     signal,
     onProgress,
     onConversationTitleSuggested,
-    mistralTemperature: mistralTempOpt,
+    ollamaTemperature: ollamaTempOpt,
+    ollamaApiKey,
+    ollamaApiUrl,
     onAgentJournal,
     onFinalReportToken,
     resumeFrom,
     onOrchestratorBrief,
     onBranchComplete,
   } = opts;
-  const mistralTemp = clampMistralTemperature(mistralTempOpt);
-  const agentStepTemp = llmProvider === "mistral" ? mistralTemp : TEMP;
-  const finalStepTemp = llmProvider === "mistral" ? mistralTemp : TEMP_FINAL;
+  const ollamaTemp = clampOllamaTemperature(ollamaTempOpt);
+  const agentStepTemp = TEMP;
+  const finalStepTemp = TEMP_FINAL;
   const payload = bundleUserPayload(context, files);
   const leads = leadsOf(teamMembers);
   const concurrency = missionConcurrencyLimit();
@@ -367,7 +367,6 @@ export async function runMissionPipeline(
     prog("Orchestrateur — analyse du contexte et des fichiers…");
     orchestratorBrief = await missionComplete(
       llmProvider,
-      mistralApiKey,
       model,
       [
         { role: "system", content: soul(souls, ORCHESTRATOR_ID) },
@@ -379,6 +378,8 @@ export async function runMissionPipeline(
       signal,
       agentStepTemp,
       LLM_MAX_TOKENS_AGENT_STEP,
+      ollamaApiKey,
+      ollamaApiUrl,
     );
     journal("Orchestrateur", "Brief global", orchestratorBrief);
   }
@@ -389,13 +390,14 @@ export async function runMissionPipeline(
     try {
       const title = await generateMissionConversationTitle({
         llmProvider,
-        mistralApiKey,
         model,
         souls,
         orchestratorBrief,
         userPayloadPreview: slicePayloadForModel(payload),
         signal,
-        mistralTemperature: mistralTemp,
+        ollamaTemperature: ollamaTemp,
+        ollamaApiKey,
+        ollamaApiUrl,
       });
       if (title) onConversationTitleSuggested(title);
     } catch {
@@ -420,7 +422,6 @@ export async function runMissionPipeline(
         prog(`${lead.label} — analyse directe (sans sous-agent)…`);
         const synthesis = await missionComplete(
           llmProvider,
-          mistralApiKey,
           model,
           [
             { role: "system", content: soul(souls, lead.id) },
@@ -432,6 +433,8 @@ export async function runMissionPipeline(
           signal,
           agentStepTemp,
           LLM_MAX_TOKENS_AGENT_STEP,
+          ollamaApiKey,
+          ollamaApiUrl,
         );
         journal(lead.label, "Analyse directe", synthesis);
         const branchOutput: BranchOutput = {
@@ -450,7 +453,6 @@ export async function runMissionPipeline(
           prog(`${lead.label} → ${sub.label} — consignes au sous-agent…`);
           const delegation = await missionComplete(
             llmProvider,
-            mistralApiKey,
             model,
             [
               { role: "system", content: soul(souls, lead.id) },
@@ -462,13 +464,14 @@ export async function runMissionPipeline(
             signal,
             agentStepTemp,
             LLM_MAX_TOKENS_AGENT_STEP,
+            ollamaApiKey,
+            ollamaApiUrl,
           );
           journal(lead.label, `Consignes → ${sub.label}`, delegation);
 
           prog(`${sub.label} — travail spécialisé…`);
           const subWork = await missionComplete(
             llmProvider,
-            mistralApiKey,
             model,
             [
               { role: "system", content: soul(souls, sub.id) },
@@ -480,6 +483,8 @@ export async function runMissionPipeline(
             signal,
             agentStepTemp,
             LLM_MAX_TOKENS_AGENT_STEP,
+            ollamaApiKey,
+            ollamaApiUrl,
           );
           journal(sub.label, "Travail spécialisé", subWork);
           return { sub, subWork };
@@ -495,7 +500,6 @@ export async function runMissionPipeline(
       prog(`${lead.label} — intégration des apports du pôle (reprise du détail)…`);
       const synthesis = await missionComplete(
         llmProvider,
-        mistralApiKey,
         model,
         [
           { role: "system", content: soul(souls, lead.id) },
@@ -507,6 +511,8 @@ export async function runMissionPipeline(
         signal,
         agentStepTemp,
         LLM_MAX_TOKENS_AGENT_STEP,
+        ollamaApiKey,
+        ollamaApiUrl,
       );
       journal(lead.label, "Synthèse du pôle", synthesis);
 
@@ -544,7 +550,6 @@ export async function runMissionPipeline(
     let accum = "";
     await streamLlmChat(
       llmProvider,
-      mistralApiKey,
       model,
       finalMessages,
       (chunk) => {
@@ -552,18 +557,24 @@ export async function runMissionPipeline(
         onFinalReportToken(chunk);
       },
       signal,
-      { temperature: finalStepTemp, maxTokens: LLM_MAX_TOKENS_DOCUMENT },
+      {
+        temperature: finalStepTemp,
+        maxTokens: LLM_MAX_TOKENS_DOCUMENT,
+        ollamaApiKey,
+        ollamaApiUrl,
+      },
     );
     readme = accum;
   } else {
     readme = await missionComplete(
       llmProvider,
-      mistralApiKey,
       model,
       finalMessages,
       signal,
       finalStepTemp,
       LLM_MAX_TOKENS_DOCUMENT,
+      ollamaApiKey,
+      ollamaApiUrl,
     );
   }
 

@@ -1,42 +1,16 @@
 import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import {
-  clampMistralTemperature,
-  DEFAULT_MISTRAL_RATE_PROFILE,
-  DEFAULT_MISTRAL_TEMPERATURE,
+  clampOllamaTemperature,
+  DEFAULT_OLLAMA_TEMPERATURE,
+  DEFAULT_OLLAMA_API_URL,
   DEFAULT_SEED_SYSTEM_PROMPT,
   DEFAULT_SEED_USER_TEMPLATE,
   loadAppSettings,
-  normalizeMistralRateProfile,
   saveAppSettings,
 } from "@/lib/appSettingsStorage";
 import { pickDefaultChatModel } from "@/lib/llmModelPreference";
-import type { LlmProvider } from "@/lib/llmProvider";
-import { fetchMistralModels } from "@/lib/mistral";
-import type { MistralRateProfile } from "@/lib/mistralGateway";
 import { fetchOllamaModels } from "@/lib/ollama";
-
-const MISTRAL_RATE_PROFILE_OPTIONS: {
-  value: MistralRateProfile;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    value: "free",
-    label: "Gratuit",
-    hint: "1 appel à la fois, bien espacé — le plus prudent contre les 429.",
-  },
-  {
-    value: "tier1",
-    label: "Payant (entrée de gamme)",
-    hint: "Jusqu'à 2 appels en parallèle, espacement réduit.",
-  },
-  {
-    value: "tier2",
-    label: "Payant (palier élevé)",
-    hint: "Jusqu'à 4 appels en parallèle — pour un compte avec un quota RPM confortable.",
-  },
-];
 import {
   applyWorkspaceImport,
   downloadWorkspaceExport,
@@ -53,26 +27,17 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  const mistralKeyId = useId();
-  const mistralModelSelectId = useId();
-  const mistralTemperatureId = useId();
-  const mistralRateProfileId = useId();
+  const ollamaApiKeyId = useId();
+  const ollamaApiUrlId = useId();
+  const ollamaTemperatureId = useId();
   const ollamaModelSelectId = useId();
   const [seedSystem, setSeedSystem] = useState(DEFAULT_SEED_SYSTEM_PROMPT);
   const [seedUser, setSeedUser] = useState(DEFAULT_SEED_USER_TEMPLATE);
-  const [llmProvider, setLlmProvider] = useState<LlmProvider>("mistral");
-  const [mistralApiKey, setMistralApiKey] = useState("");
-  const [mistralModelsList, setMistralModelsList] = useState<string[]>([]);
-  const [mistralModelChoice, setMistralModelChoice] = useState("");
-  const [mistralModelsLoading, setMistralModelsLoading] = useState(false);
-  const [mistralModelsError, setMistralModelsError] = useState<string | null>(
-    null,
+  const [ollamaApiKey, setOllamaApiKey] = useState("");
+  const [ollamaApiUrl, setOllamaApiUrl] = useState(DEFAULT_OLLAMA_API_URL);
+  const [ollamaTemperature, setOllamaTemperature] = useState(
+    DEFAULT_OLLAMA_TEMPERATURE,
   );
-  const [mistralTemperature, setMistralTemperature] = useState(
-    DEFAULT_MISTRAL_TEMPERATURE,
-  );
-  const [mistralRateProfile, setMistralRateProfile] =
-    useState<MistralRateProfile>(DEFAULT_MISTRAL_RATE_PROFILE);
   const [ollamaModelsList, setOllamaModelsList] = useState<string[]>([]);
   const [ollamaModelChoice, setOllamaModelChoice] = useState("");
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
@@ -87,13 +52,9 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
     const s = loadAppSettings();
     setSeedSystem(s.seedSystemPrompt);
     setSeedUser(s.seedUserTemplate);
-    setLlmProvider(s.llmProvider);
-    setMistralApiKey(s.mistralApiKey);
-    setMistralModelChoice(s.mistralChatModel?.trim() ?? "");
-    setMistralTemperature(clampMistralTemperature(s.mistralTemperature));
-    setMistralRateProfile(normalizeMistralRateProfile(s.mistralRateProfile));
-    setMistralModelsList([]);
-    setMistralModelsError(null);
+    setOllamaApiKey(s.ollamaApiKey ?? "");
+    setOllamaApiUrl(s.ollamaApiUrl ?? DEFAULT_OLLAMA_API_URL);
+    setOllamaTemperature(clampOllamaTemperature(s.ollamaTemperature));
     setOllamaModelChoice(s.ollamaChatModel?.trim() ?? "");
     setOllamaModelsList([]);
     setOllamaModelsError(null);
@@ -102,53 +63,10 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
 
   useEffect(() => {
     if (!open) return;
-    if (llmProvider !== "mistral" || !mistralApiKey.trim()) {
-      setMistralModelsLoading(false);
-      setMistralModelsList([]);
-      setMistralModelsError(null);
-      return;
-    }
-    let cancelled = false;
-    setMistralModelsLoading(true);
-    setMistralModelsError(null);
-    fetchMistralModels(mistralApiKey.trim())
-      .then((list) => {
-        if (cancelled) return;
-        setMistralModelsList(list);
-        setMistralModelChoice((cur) => {
-          const t = cur.trim();
-          if (t && list.includes(t)) return t;
-          const s = loadAppSettings();
-          const saved = s.mistralChatModel?.trim() ?? "";
-          if (saved && list.includes(saved)) return saved;
-          return pickDefaultChatModel(list, "mistral");
-        });
-      })
-      .catch((e: Error) => {
-        if (cancelled) return;
-        setMistralModelsList([]);
-        setMistralModelsError(e.message);
-      })
-      .finally(() => {
-        if (!cancelled) setMistralModelsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, llmProvider, mistralApiKey]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (llmProvider !== "ollama") {
-      setOllamaModelsLoading(false);
-      setOllamaModelsList([]);
-      setOllamaModelsError(null);
-      return;
-    }
     let cancelled = false;
     setOllamaModelsLoading(true);
     setOllamaModelsError(null);
-    fetchOllamaModels()
+    fetchOllamaModels(ollamaApiUrl, ollamaApiKey)
       .then((list) => {
         if (cancelled) return;
         setOllamaModelsList(list);
@@ -172,7 +90,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
     return () => {
       cancelled = true;
     };
-  }, [open, llmProvider]);
+  }, [open, ollamaApiUrl, ollamaApiKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -211,45 +129,31 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
       setSaveError("Le gabarit utilisateur pour le seed ne peut pas être vide.");
       return;
     }
-    if (llmProvider === "mistral" && !mistralApiKey.trim()) {
-      setSaveError(
-        "Avec Mistral AI, renseigne ta clé API (ou repasse sur Ollama local).",
-      );
+    const urlTrim = ollamaApiUrl.trim();
+    if (!urlTrim) {
+      setSaveError("L'URL Ollama Cloud ne peut pas être vide.");
+      return;
+    }
+    try {
+      new URL(urlTrim);
+    } catch {
+      setSaveError("L'URL Ollama Cloud n'est pas valide.");
       return;
     }
     if (
-      llmProvider === "mistral" &&
-      mistralApiKey.trim() &&
-      mistralModelsList.length > 0 &&
-      !mistralModelChoice.trim()
-    ) {
-      setSaveError("Choisis un modèle Mistral dans la liste.");
-      return;
-    }
-    if (
-      llmProvider === "ollama" &&
       ollamaModelsList.length > 0 &&
       !ollamaModelChoice.trim()
     ) {
       setSaveError("Choisis un modèle Ollama dans la liste.");
       return;
     }
-    const prev = loadAppSettings();
     saveAppSettings({
       seedSystemPrompt: sys,
       seedUserTemplate: usr,
-      llmProvider,
-      mistralApiKey: mistralApiKey.trim(),
-      mistralChatModel:
-        llmProvider === "mistral"
-          ? mistralModelChoice.trim()
-          : prev.mistralChatModel,
-      mistralTemperature: clampMistralTemperature(mistralTemperature),
-      mistralRateProfile,
-      ollamaChatModel:
-        llmProvider === "ollama"
-          ? ollamaModelChoice.trim()
-          : prev.ollamaChatModel,
+      ollamaApiKey: ollamaApiKey.trim(),
+      ollamaApiUrl: urlTrim,
+      ollamaChatModel: ollamaModelChoice.trim(),
+      ollamaTemperature: clampOllamaTemperature(ollamaTemperature),
     });
     setSaveError(null);
     onSaved?.();
@@ -293,220 +197,120 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
             aria-labelledby="settings-llm-heading"
           >
             <h3 className="modal-settings-section-title" id="settings-llm-heading">
-              Fournisseur LLM
+              Fournisseur LLM : Ollama Cloud
             </h3>
             <p className="modal-settings-intro">
-              Par défaut l’app utilise <strong>Mistral AI</strong> (API cloud). Tu peux
-              repasser sur <strong>Ollama</strong> installé sur ta machine pour tout
-              exécuter en local. Les requêtes passent par le même domaine que l’UI (
-              <code className="modal-settings-code">/api/mistral</code> ou{" "}
+              L’app utilise <strong>Ollama Cloud</strong> pour accéder aux modèles. Les requêtes
+              passent par le même domaine que l’UI (
               <code className="modal-settings-code">/api/ollama</code>) pour éviter les
               blocages CORS.
             </p>
-            <fieldset className="modal-settings-fieldset">
-              <legend className="modal-settings-legend-sr">Choisir le fournisseur</legend>
-              <label className="modal-settings-radio-row">
-                <input
-                  type="radio"
-                  name="llm-provider"
-                  checked={llmProvider === "mistral"}
-                  onChange={() => setLlmProvider("mistral")}
-                />
-                <span>
-                  <strong>Mistral AI</strong> (cloud, compte sur{" "}
-                  <a
-                    href="https://console.mistral.ai/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    console.mistral.ai
-                  </a>
-                  )
-                </span>
-              </label>
-              <label className="modal-settings-radio-row">
-                <input
-                  type="radio"
-                  name="llm-provider"
-                  checked={llmProvider === "ollama"}
-                  onChange={() => setLlmProvider("ollama")}
-                />
-                <span>
-                  <strong>Ollama</strong> (local,{" "}
-                  <code className="modal-settings-code">ollama serve</code> sur ce Mac)
-                </span>
-              </label>
-            </fieldset>
-            {llmProvider === "mistral" && (
-              <>
-                <label className="modal-field-label" htmlFor={mistralKeyId}>
-                  Clé API Mistral
-                </label>
-                <input
-                  id={mistralKeyId}
-                  type="password"
-                  className="modal-settings-input"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder="Colle la clé créée sur console.mistral.ai"
-                  value={mistralApiKey}
-                  onChange={(e) => setMistralApiKey(e.target.value)}
-                />
-                <p className="modal-settings-hint">
-                  Indique ta clé ici : elle est enregistrée <strong>dans ce navigateur</strong>{" "}
-                  (localStorage), pas sur un serveur OpenSpace. Pour la rotation ou la
-                  révocation, utilise la console Mistral.
-                </p>
-                <label
-                  className="modal-field-label modal-settings-label-block"
-                  htmlFor={mistralModelSelectId}
-                >
-                  Modèle (Mistral AI)
-                </label>
-                <p className="modal-settings-hint">
-                  Utilisé pour le chat, les missions et l’édition d’équipe (Organisation).
-                  Tu ne peux pas le changer depuis la barre du chat.
-                </p>
-                {mistralModelsLoading && (
-                  <p className="modal-settings-hint" aria-live="polite">
-                    Chargement des modèles…
-                  </p>
-                )}
-                {mistralModelsError && (
-                  <p className="modal-gen-error" role="alert">
-                    {mistralModelsError}
-                  </p>
-                )}
-                {!mistralModelsLoading && mistralApiKey.trim() && (
-                  <select
-                    id={mistralModelSelectId}
-                    className="modal-settings-input"
-                    value={mistralModelChoice}
-                    onChange={(e) => setMistralModelChoice(e.target.value)}
-                    disabled={mistralModelsList.length === 0}
-                  >
-                    {mistralModelsList.length === 0 ? (
-                      <option value="">—</option>
-                    ) : (
-                      mistralModelsList.map((id) => (
-                        <option key={id} value={id}>
-                          {id}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                )}
-                <label
-                  className="modal-field-label modal-settings-label-block"
-                  htmlFor={mistralTemperatureId}
-                >
-                  Température (Mistral)
-                </label>
-                <p className="modal-settings-hint">
-                  S’applique au <strong>chat</strong>, aux <strong>missions</strong>, à la{" "}
-                  <strong>fusion du livrable</strong> et à la <strong>génération de seeds</strong>.
-                  Plus bas = plus déterministe ; plus haut = plus de variété (0 à 1).
-                </p>
-                <div className="modal-settings-temp-row">
-                  <input
-                    id={mistralTemperatureId}
-                    type="range"
-                    className="modal-settings-range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={mistralTemperature}
-                    onChange={(e) =>
-                      setMistralTemperature(Number(e.target.value))
-                    }
-                    aria-valuemin={0}
-                    aria-valuemax={1}
-                    aria-valuenow={mistralTemperature}
-                    aria-valuetext={`${mistralTemperature.toFixed(2)}`}
-                  />
-                  <span className="modal-settings-temp-value" aria-live="polite">
-                    {mistralTemperature.toFixed(2)}
-                  </span>
-                </div>
-                <label
-                  className="modal-field-label modal-settings-label-block"
-                  htmlFor={mistralRateProfileId}
-                >
-                  Débit Mistral
-                </label>
-                <p className="modal-settings-hint">
-                  Adapte la concurrence et l'espacement des appels à ton palier de
-                  compte — évite les rafales de <strong>429</strong> (trop de requêtes).
-                  En cas de doute, garde « Gratuit ».
-                </p>
-                <select
-                  id={mistralRateProfileId}
-                  className="modal-settings-input"
-                  value={mistralRateProfile}
-                  onChange={(e) =>
-                    setMistralRateProfile(
-                      normalizeMistralRateProfile(e.target.value),
-                    )
-                  }
-                >
-                  {MISTRAL_RATE_PROFILE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+            <label className="modal-field-label" htmlFor={ollamaApiKeyId}>
+              Clé API Ollama Cloud (optionnel)
+            </label>
+            <input
+              id={ollamaApiKeyId}
+              type="password"
+              className="modal-settings-input"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Laisse vide si tu utilises Ollama sans authentification"
+              value={ollamaApiKey}
+              onChange={(e) => setOllamaApiKey(e.target.value)}
+            />
+            <p className="modal-settings-hint">
+              Si tu as besoin d’authentifier auprès d’Ollama Cloud, indique ta clé ici.
+              Elle est enregistrée <strong>dans ce navigateur</strong> (localStorage), pas sur
+              un serveur OpenSpace.
+            </p>
+            <label className="modal-field-label" htmlFor={ollamaApiUrlId}>
+              URL Ollama Cloud
+            </label>
+            <input
+              id={ollamaApiUrlId}
+              type="url"
+              className="modal-settings-input"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="https://api.ollama.cloud/v1"
+              value={ollamaApiUrl}
+              onChange={(e) => setOllamaApiUrl(e.target.value)}
+            />
+            <p className="modal-settings-hint">
+              L’adresse de base d’Ollama Cloud (incluant le protocol et le chemin d’API si
+              nécessaire). Par défaut : https://api.ollama.cloud/v1
+            </p>
+            <label
+              className="modal-field-label modal-settings-label-block"
+              htmlFor={ollamaModelSelectId}
+            >
+              Modèle (Ollama Cloud)
+            </label>
+            <p className="modal-settings-hint">
+              Utilisé pour le chat, les missions et l’édition d’équipe (Organisation).
+              Choix disponible ici uniquement — plus dans la barre du chat.
+            </p>
+            {ollamaModelsLoading && (
+              <p className="modal-settings-hint" aria-live="polite">
+                Chargement des modèles Ollama…
+              </p>
+            )}
+            {ollamaModelsError && (
+              <p className="modal-gen-error" role="alert">
+                {ollamaModelsError}
+              </p>
+            )}
+            {!ollamaModelsLoading && (
+              <select
+                id={ollamaModelSelectId}
+                className="modal-settings-input"
+                value={ollamaModelChoice}
+                onChange={(e) => setOllamaModelChoice(e.target.value)}
+                disabled={ollamaModelsList.length === 0}
+              >
+                {ollamaModelsList.length === 0 ? (
+                  <option value="">—</option>
+                ) : (
+                  ollamaModelsList.map((id) => (
+                    <option key={id} value={id}>
+                      {id}
                     </option>
-                  ))}
-                </select>
-                <p className="modal-settings-hint">
-                  {
-                    MISTRAL_RATE_PROFILE_OPTIONS.find(
-                      (opt) => opt.value === mistralRateProfile,
-                    )?.hint
-                  }
-                </p>
-              </>
+                  ))
+                )}
+              </select>
             )}
-            {llmProvider === "ollama" && (
-              <>
-                <label
-                  className="modal-field-label modal-settings-label-block"
-                  htmlFor={ollamaModelSelectId}
-                >
-                  Modèle (Ollama)
-                </label>
-                <p className="modal-settings-hint">
-                  Utilisé pour le chat, les missions et l’édition d’équipe (Organisation).
-                  Choix disponible ici uniquement — plus dans la barre du chat.
-                </p>
-                {ollamaModelsLoading && (
-                  <p className="modal-settings-hint" aria-live="polite">
-                    Chargement des modèles Ollama…
-                  </p>
-                )}
-                {ollamaModelsError && (
-                  <p className="modal-gen-error" role="alert">
-                    {ollamaModelsError}
-                  </p>
-                )}
-                {!ollamaModelsLoading && (
-                  <select
-                    id={ollamaModelSelectId}
-                    className="modal-settings-input"
-                    value={ollamaModelChoice}
-                    onChange={(e) => setOllamaModelChoice(e.target.value)}
-                    disabled={ollamaModelsList.length === 0}
-                  >
-                    {ollamaModelsList.length === 0 ? (
-                      <option value="">—</option>
-                    ) : (
-                      ollamaModelsList.map((id) => (
-                        <option key={id} value={id}>
-                          {id}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                )}
-              </>
-            )}
+            <label
+              className="modal-field-label modal-settings-label-block"
+              htmlFor={ollamaTemperatureId}
+            >
+              Température (Ollama)
+            </label>
+            <p className="modal-settings-hint">
+              S’applique au <strong>chat</strong>, aux <strong>missions</strong>, à la{" "}
+              <strong>fusion du livrable</strong> et à la <strong>génération de seeds</strong>.
+              Plus bas = plus déterministe ; plus haut = plus de variété (0 à 1).
+            </p>
+            <div className="modal-settings-temp-row">
+              <input
+                id={ollamaTemperatureId}
+                type="range"
+                className="modal-settings-range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={ollamaTemperature}
+                onChange={(e) =>
+                  setOllamaTemperature(Number(e.target.value))
+                }
+                aria-valuemin={0}
+                aria-valuemax={1}
+                aria-valuenow={ollamaTemperature}
+                aria-valuetext={`${ollamaTemperature.toFixed(2)}`}
+              />
+              <span className="modal-settings-temp-value" aria-live="polite">
+                {ollamaTemperature.toFixed(2)}
+              </span>
+            </div>
           </section>
 
           <section

@@ -58,9 +58,10 @@ function isTextMissionFile(file: File): boolean {
 
 interface MissionWorkspaceProps {
   llmProvider: LlmProvider;
-  mistralApiKey: string;
-  /** Température Mistral (0–1), Paramètres ; ignorée si Ollama. */
-  mistralTemperature: number;
+  ollamaApiKey: string;
+  ollamaApiUrl: string;
+  /** Température Ollama (0–1), Paramètres. */
+  ollamaTemperature: number;
   model: string;
   /** Alimente la colonne droite (et la bande mobile) avec la progression. */
   onActivityReport?: (payload: {
@@ -76,8 +77,9 @@ interface MissionWorkspaceProps {
 
 export function MissionWorkspace({
   llmProvider,
-  mistralApiKey,
-  mistralTemperature,
+  ollamaApiKey,
+  ollamaApiUrl,
+  ollamaTemperature,
   model,
   onActivityReport,
   onArtifactProduced,
@@ -236,9 +238,7 @@ export function MissionWorkspace({
     }
     if (!model) {
       setError(
-        llmProvider === "mistral"
-          ? "Aucun modèle Mistral. Vérifie ta clé API dans Paramètres."
-          : "Aucun modèle Ollama. Lance Ollama et télécharge un modèle.",
+        "Aucun modèle Ollama. Lance Ollama et télécharge un modèle.",
       );
       return;
     }
@@ -290,9 +290,9 @@ export function MissionWorkspace({
     try {
       const md = await runMissionPipeline({
         llmProvider,
-        mistralApiKey,
-        mistralTemperature:
-          llmProvider === "mistral" ? mistralTemperature : undefined,
+        ollamaApiKey,
+        ollamaApiUrl,
+        ollamaTemperature,
         model,
         context: contextForPipeline,
         files: missionFiles,
@@ -344,8 +344,9 @@ export function MissionWorkspace({
     teamMembers,
     files,
     llmProvider,
-    mistralApiKey,
-    mistralTemperature,
+    ollamaApiKey,
+    ollamaApiUrl,
+    ollamaTemperature,
     model,
     onArtifactProduced,
     onAgentJournal,
@@ -511,9 +512,7 @@ export function MissionWorkspace({
             <strong>
               {estimatedCalls} appel{estimatedCalls > 1 ? "s" : ""} au modèle
             </strong>
-            {llmProvider === "mistral"
-              ? " — vérifie ton quota Mistral si le compte est gratuit."
-              : "."}
+            .
           </p>
         )}
 

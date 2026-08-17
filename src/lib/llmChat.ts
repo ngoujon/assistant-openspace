@@ -1,9 +1,5 @@
 import type { LlmProvider } from "@/lib/llmProvider";
 import {
-  completeMistralChat,
-  streamMistralChat,
-} from "@/lib/mistral";
-import {
   completeOllamaChat,
   streamOllamaChat,
   type OllamaChatMessage,
@@ -14,56 +10,52 @@ export type CompleteLlmOptions = {
   /** Ollama uniquement : garde le modèle chargé entre requêtes. */
   keepAlive?: string;
   timeoutMs?: number;
-  /** Plafond tokens de sortie (Mistral : `max_tokens` ; Ollama : `num_predict`). */
+  /** Plafond tokens de sortie (`num_predict` côté Ollama). */
   maxTokens?: number;
+  /** URL de l'API Ollama Cloud. */
+  ollamaApiUrl?: string;
+  /** Clé API Ollama Cloud. */
+  ollamaApiKey?: string;
 };
 
 export async function completeLlmChat(
   provider: LlmProvider,
-  mistralApiKey: string | undefined,
   model: string,
   messages: OllamaChatMessage[],
   signal?: AbortSignal,
   options?: CompleteLlmOptions,
 ): Promise<string> {
-  if (provider === "mistral") {
-    return completeMistralChat(mistralApiKey ?? "", model, messages, signal, {
-      temperature: options?.temperature,
-      timeoutMs: options?.timeoutMs,
-      maxTokens: options?.maxTokens,
-    });
-  }
   return completeOllamaChat(model, messages, signal, {
     temperature: options?.temperature,
     keepAlive: options?.keepAlive,
     timeoutMs: options?.timeoutMs,
     maxTokens: options?.maxTokens,
+    apiUrl: options?.ollamaApiUrl,
+    apiKey: options?.ollamaApiKey,
   });
 }
 
 export type StreamLlmOptions = {
   maxTokens?: number;
   temperature?: number;
+  /** URL de l'API Ollama Cloud. */
+  ollamaApiUrl?: string;
+  /** Clé API Ollama Cloud. */
+  ollamaApiKey?: string;
 };
 
 export async function streamLlmChat(
   provider: LlmProvider,
-  mistralApiKey: string | undefined,
   model: string,
   messages: OllamaChatMessage[],
   onToken: (chunk: string) => void,
   signal?: AbortSignal,
   options?: StreamLlmOptions,
 ): Promise<void> {
-  if (provider === "mistral") {
-    await streamMistralChat(mistralApiKey ?? "", model, messages, onToken, signal, {
-      maxTokens: options?.maxTokens,
-      temperature: options?.temperature,
-    });
-    return;
-  }
   await streamOllamaChat(model, messages, onToken, signal, {
     maxTokens: options?.maxTokens,
     temperature: options?.temperature,
+    apiUrl: options?.ollamaApiUrl,
+    apiKey: options?.ollamaApiKey,
   });
 }

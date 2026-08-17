@@ -25,7 +25,8 @@ interface AgentSoulModalProps {
   parentOptions: { id: string; label: string }[];
   model: string;
   llmProvider: LlmProvider;
-  mistralApiKey: string;
+  ollamaApiKey: string;
+  ollamaApiUrl: string;
   onClose: () => void;
   onSave: (
     text: string,
@@ -44,7 +45,8 @@ export function AgentSoulModal({
   parentOptions,
   model,
   llmProvider,
-  mistralApiKey,
+  ollamaApiKey,
+  ollamaApiUrl,
   onClose,
   onSave,
 }: AgentSoulModalProps) {
@@ -125,7 +127,8 @@ export function AgentSoulModal({
     try {
       const text = await generateMemberSoulSeed({
         llmProvider,
-        mistralApiKey,
+        ollamaApiKey,
+        ollamaApiUrl,
         model,
         memberLabel: nameDraft.trim(),
         parentId: effectiveParentId,

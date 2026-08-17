@@ -1,5 +1,5 @@
 import {
-  clampMistralTemperature,
+  clampOllamaTemperature,
   interpolateSeedUserTemplate,
   loadAppSettings,
 } from "@/lib/appSettingsStorage";
@@ -10,11 +10,12 @@ import { ORCHESTRATOR_ID } from "@/lib/teamTreeStorage";
 
 export interface GenerateSeedInput {
   llmProvider: LlmProvider;
-  mistralApiKey?: string;
   model: string;
   memberLabel: string;
   parentId: string | null;
   parentLabel: string | null;
+  ollamaApiKey?: string;
+  ollamaApiUrl?: string;
   signal?: AbortSignal;
 }
 
@@ -26,11 +27,12 @@ export async function generateMemberSoulSeed(
 ): Promise<string> {
   const {
     llmProvider,
-    mistralApiKey,
     model,
     memberLabel,
     parentId,
     parentLabel,
+    ollamaApiKey,
+    ollamaApiUrl,
     signal,
   } = input;
   const place =
@@ -46,20 +48,21 @@ export async function generateMemberSoulSeed(
     memberLabel,
     place,
   );
-  const temperature =
-    llmProvider === "mistral"
-      ? clampMistralTemperature(settings.mistralTemperature)
-      : 0.5;
+  const temperature = clampOllamaTemperature(settings.ollamaTemperature);
 
   return completeLlmChat(
     llmProvider,
-    mistralApiKey,
     model,
     [
       { role: "system", content: system },
       { role: "user", content: user },
     ],
     signal,
-    { temperature, maxTokens: LLM_MAX_TOKENS_SEED },
+    {
+      temperature,
+      maxTokens: LLM_MAX_TOKENS_SEED,
+      ollamaApiKey,
+      ollamaApiUrl,
+    },
   );
 }

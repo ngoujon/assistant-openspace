@@ -1,5 +1,5 @@
 import {
-  clampMistralTemperature,
+  clampOllamaTemperature,
   loadAppSettings,
 } from "@/lib/appSettingsStorage";
 import { completeLlmChat, streamLlmChat } from "@/lib/llmChat";
@@ -13,9 +13,9 @@ import type { LlmProvider } from "@/lib/llmProvider";
 import { ORCHESTRATOR_ID, type TreeMember } from "@/lib/teamTreeStorage";
 import type { ChatMessage } from "@/types";
 
-function mistralTemperatureForCall(explicit: number | undefined): number {
-  return clampMistralTemperature(
-    explicit ?? loadAppSettings().mistralTemperature,
+function ollamaTemperatureForCall(explicit: number | undefined): number {
+  return clampOllamaTemperature(
+    explicit ?? loadAppSettings().ollamaTemperature,
   );
 }
 
@@ -184,7 +184,6 @@ export function buildDirectMentionBrief(
 
 export async function routeDiscussionMessage(opts: {
   llmProvider: LlmProvider;
-  mistralApiKey?: string;
   model: string;
   souls: Record<string, string>;
   members: TreeMember[];
@@ -198,12 +197,13 @@ export async function routeDiscussionMessage(opts: {
   artifactMarkdown?: string | null;
   /** Plusieurs @[…] résolus : consigne pour l’orchestrateur (un seul orateur chat, angles combinés). */
   multiMentionRoutingHint?: string | null;
-  /** Température Mistral (0–1) ; défaut = Paramètres. */
-  mistralTemperature?: number;
+  /** Température Ollama (0–1) ; défaut = Paramètres. */
+  ollamaTemperature?: number;
+  ollamaApiKey?: string;
+  ollamaApiUrl?: string;
 }): Promise<DiscussionRouting> {
   const {
     llmProvider,
-    mistralApiKey,
     model,
     souls,
     members,
@@ -213,7 +213,9 @@ export async function routeDiscussionMessage(opts: {
     missionUserBrief,
     artifactMarkdown,
     multiMentionRoutingHint: multiMentionRaw,
-    mistralTemperature: mistralTempOpt,
+    ollamaTemperature: ollamaTempOpt,
+    ollamaApiKey,
+    ollamaApiUrl,
   } = opts;
 
   const multiMentionRoutingHint = multiMentionRaw?.trim();
@@ -246,7 +248,6 @@ export async function routeDiscussionMessage(opts: {
 
   const raw = await completeLlmChat(
     llmProvider,
-    mistralApiKey,
     model,
     [
       { role: "system", content: orchSoul },
@@ -254,11 +255,10 @@ export async function routeDiscussionMessage(opts: {
     ],
     signal,
     {
-      temperature:
-        llmProvider === "mistral"
-          ? mistralTemperatureForCall(mistralTempOpt)
-          : 0.25,
+      temperature: ollamaTemperatureForCall(ollamaTempOpt) || 0.25,
       maxTokens: LLM_MAX_TOKENS_ROUTING,
+      ollamaApiKey,
+      ollamaApiUrl,
     },
   );
 
@@ -322,7 +322,6 @@ export function buildDiscussionStreamMessages(opts: {
 
 export async function streamDiscussionReply(opts: {
   llmProvider: LlmProvider;
-  mistralApiKey?: string;
   model: string;
   souls: Record<string, string>;
   responderId: string;
@@ -332,23 +331,24 @@ export async function streamDiscussionReply(opts: {
   artifactMarkdown?: string | null;
   onToken: (chunk: string) => void;
   signal?: AbortSignal;
-  /** Température Mistral (0–1) ; défaut = Paramètres. */
-  mistralTemperature?: number;
+  /** Température Ollama (0–1) ; défaut = Paramètres. */
+  ollamaTemperature?: number;
+  ollamaApiKey?: string;
+  ollamaApiUrl?: string;
 }): Promise<void> {
-  const { mistralTemperature: mistralTempOpt, ...streamPayload } = opts;
+  const { ollamaTemperature: ollamaTempOpt, ollamaApiKey, ollamaApiUrl, ...streamPayload } = opts;
   const messages = buildDiscussionStreamMessages(streamPayload);
   await streamLlmChat(
     opts.llmProvider,
-    opts.mistralApiKey,
     opts.model,
     messages,
     opts.onToken,
     opts.signal,
     {
       maxTokens: LLM_MAX_TOKENS_AGENT_STEP,
-      ...(opts.llmProvider === "mistral"
-        ? { temperature: mistralTemperatureForCall(mistralTempOpt) }
-        : {}),
+      temperature: ollamaTemperatureForCall(ollamaTempOpt),
+      ollamaApiKey,
+      ollamaApiUrl,
     },
   );
 }
@@ -367,18 +367,18 @@ function sanitizeConversationTitle(raw: string): string {
  */
 export async function generateDiscussionConversationTitle(opts: {
   llmProvider: LlmProvider;
-  mistralApiKey?: string;
   model: string;
   souls: Record<string, string>;
   /** Fil récent (markdown libre), déjà formaté. */
   recentTranscript: string;
   signal?: AbortSignal;
-  mistralTemperature?: number;
+  ollamaTemperature?: number;
+  ollamaApiKey?: string;
+  ollamaApiUrl?: string;
 }): Promise<string> {
   const orchSoul = soul(opts.souls, ORCHESTRATOR_ID);
   const raw = await completeLlmChat(
     opts.llmProvider,
-    opts.mistralApiKey,
     opts.model,
     [
       { role: "system", content: orchSoul },
@@ -403,11 +403,10 @@ Réponds par **le titre uniquement**, rien d’autre.`,
     ],
     opts.signal,
     {
-      temperature:
-        opts.llmProvider === "mistral"
-          ? mistralTemperatureForCall(opts.mistralTemperature)
-          : 0.25,
+      temperature: ollamaTemperatureForCall(opts.ollamaTemperature) || 0.25,
       maxTokens: LLM_MAX_TOKENS_ROUTING,
+      ollamaApiKey: opts.ollamaApiKey,
+      ollamaApiUrl: opts.ollamaApiUrl,
     },
   );
   return sanitizeConversationTitle(raw);
@@ -418,7 +417,6 @@ Réponds par **le titre uniquement**, rien d’autre.`,
  */
 export async function generateMissionConversationTitle(opts: {
   llmProvider: LlmProvider;
-  mistralApiKey?: string;
   model: string;
   souls: Record<string, string>;
   /** Sortie de la première passe orchestrateur (brief pôles). */
@@ -426,14 +424,15 @@ export async function generateMissionConversationTitle(opts: {
   /** Contexte + fichiers (tronqué comme dans le pipeline mission). */
   userPayloadPreview: string;
   signal?: AbortSignal;
-  mistralTemperature?: number;
+  ollamaTemperature?: number;
+  ollamaApiKey?: string;
+  ollamaApiUrl?: string;
 }): Promise<string | null> {
   const orchSoul = soul(opts.souls, ORCHESTRATOR_ID);
   const briefSlice = opts.orchestratorBrief.slice(0, 6000);
   const ctxSlice = opts.userPayloadPreview.slice(0, 3500);
   const raw = await completeLlmChat(
     opts.llmProvider,
-    opts.mistralApiKey,
     opts.model,
     [
       { role: "system", content: orchSoul },
@@ -462,11 +461,10 @@ Réponds par **le titre uniquement**, rien d’autre.`,
     ],
     opts.signal,
     {
-      temperature:
-        opts.llmProvider === "mistral"
-          ? mistralTemperatureForCall(opts.mistralTemperature)
-          : 0.25,
+      temperature: ollamaTemperatureForCall(opts.ollamaTemperature) || 0.25,
       maxTokens: LLM_MAX_TOKENS_ROUTING,
+      ollamaApiKey: opts.ollamaApiKey,
+      ollamaApiUrl: opts.ollamaApiUrl,
     },
   );
   const t = sanitizeConversationTitle(raw);
@@ -481,7 +479,6 @@ const MAX_DISCUSS_FOR_PATCH = 48_000;
  */
 export async function applyDiscussionToArtifact(opts: {
   llmProvider: LlmProvider;
-  mistralApiKey?: string;
   model: string;
   souls: Record<string, string>;
   discussionMessages: ChatMessage[];
@@ -489,18 +486,21 @@ export async function applyDiscussionToArtifact(opts: {
   /** Brief « Contexte » de la mission (première demande), pour ancrer les retouches. */
   missionUserBrief?: string | null;
   signal?: AbortSignal;
-  mistralTemperature?: number;
+  ollamaTemperature?: number;
+  ollamaApiKey?: string;
+  ollamaApiUrl?: string;
 }): Promise<string> {
   const {
     llmProvider,
-    mistralApiKey,
     model,
     souls,
     discussionMessages,
     artifactMarkdown,
     missionUserBrief,
     signal,
-    mistralTemperature: mistralTempOpt,
+    ollamaTemperature: ollamaTempOpt,
+    ollamaApiKey,
+    ollamaApiUrl,
   } = opts;
   const orchSoul = soul(souls, ORCHESTRATOR_ID);
   const discussion = formatHistoryForRouting(
@@ -552,7 +552,6 @@ Réponds par **le document Markdown complet révisé**, sans préambule ni post-
 
   return completeLlmChat(
     llmProvider,
-    mistralApiKey,
     model,
     [
       { role: "system", content: orchSoul },
@@ -560,11 +559,10 @@ Réponds par **le document Markdown complet révisé**, sans préambule ni post-
     ],
     signal,
     {
-      temperature:
-        llmProvider === "mistral"
-          ? mistralTemperatureForCall(mistralTempOpt)
-          : 0.35,
+      temperature: ollamaTemperatureForCall(ollamaTempOpt) || 0.35,
       maxTokens: LLM_MAX_TOKENS_DOCUMENT,
+      ollamaApiKey,
+      ollamaApiUrl,
     },
   );
 }

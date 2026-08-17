@@ -44,7 +44,7 @@ function initialChatMode(conversation: Conversation): ChatMode {
 }
 
 function llmProviderLabel(provider: LlmProvider): string {
-  return provider === "mistral" ? "Mistral" : "Ollama";
+  return "Ollama";
 }
 
 const MISSION_COMPLETE_ASSISTANT_TEXT =
@@ -103,9 +103,10 @@ interface ChatPanelProps {
   conversation: Conversation;
   model: string;
   llmProvider: LlmProvider;
-  mistralApiKey: string;
-  /** Température Mistral (0–1) depuis Paramètres. */
-  mistralTemperature: number;
+  ollamaApiKey: string;
+  ollamaApiUrl: string;
+  /** Température Ollama (0–1) depuis Paramètres. */
+  ollamaTemperature: number;
   llmError: string | null;
   onRetryLlm: () => void;
   /** Premier argument = conversation ciblée (obligatoire pour les tours async). */
@@ -146,8 +147,9 @@ export function ChatPanel({
   conversation,
   model,
   llmProvider,
-  mistralApiKey,
-  mistralTemperature,
+  ollamaApiKey,
+  ollamaApiUrl,
+  ollamaTemperature,
   llmError,
   onRetryLlm,
   setMessages,
@@ -385,15 +387,15 @@ export function ChatPanel({
       const souls = loadAgentSouls();
       const raw = await applyDiscussionToArtifact({
         llmProvider,
-        mistralApiKey,
+        ollamaApiKey,
+        ollamaApiUrl,
         model,
         souls,
         discussionMessages: opts.discussionMessages,
         artifactMarkdown: opts.artifactMarkdown,
         missionUserBrief: opts.missionUserBrief ?? undefined,
         signal: opts.signal,
-        mistralTemperature:
-          llmProvider === "mistral" ? mistralTemperature : undefined,
+        ollamaTemperature,
       });
       const finalMd = unwrapMarkdownFence(raw);
       onConversationArtifact(opts.conversationId, finalMd, {
@@ -402,16 +404,14 @@ export function ChatPanel({
         pendingArtifactMerge: false,
       });
     },
-    [llmProvider, mistralApiKey, mistralTemperature, model, onConversationArtifact],
+    [llmProvider, ollamaApiKey, ollamaApiUrl, ollamaTemperature, model, onConversationArtifact],
   );
 
   const runDiscussionSendOrPatch = useCallback(
     async (text: string) => {
       if (!model) {
           setError(
-            llmProvider === "mistral"
-              ? "Aucun modèle Mistral disponible. Vérifie ta clé API dans Paramètres."
-              : "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
+            "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
           );
           return;
         }
@@ -462,7 +462,8 @@ export function ChatPanel({
 
           const routing = await routeDiscussionMessage({
             llmProvider,
-            mistralApiKey,
+            ollamaApiKey,
+            ollamaApiUrl,
             model,
             souls,
             members,
@@ -472,10 +473,8 @@ export function ChatPanel({
             multiMentionRoutingHint,
             missionUserBrief: turnMissionBrief,
             artifactMarkdown: turnArtifactMd,
-            mistralTemperature:
-              llmProvider === "mistral" ? mistralTemperature : undefined,
+            ollamaTemperature,
           });
-          // Espacement Mistral géré centralement par mistralGateway.
 
           const speakerLabel =
             members.find((m) => m.id === routing.responderId)?.label ??
@@ -501,7 +500,8 @@ export function ChatPanel({
           streamBuffer.reset();
           await streamDiscussionReply({
             llmProvider,
-            mistralApiKey,
+            ollamaApiKey,
+            ollamaApiUrl,
             model,
             souls,
             responderId: routing.responderId,
@@ -509,8 +509,7 @@ export function ChatPanel({
             historyWithLatestUser: historyWithUser,
             missionUserBrief: turnMissionBrief,
             artifactMarkdown: turnArtifactMd,
-            mistralTemperature:
-              llmProvider === "mistral" ? mistralTemperature : undefined,
+            ollamaTemperature,
             onToken: (chunk) => {
               assistantAccum += chunk;
               streamBuffer.push(chunk, (flushed) => {
@@ -642,8 +641,9 @@ export function ChatPanel({
     },
     [
       llmProvider,
-      mistralApiKey,
-      mistralTemperature,
+      ollamaApiKey,
+      ollamaApiUrl,
+      ollamaTemperature,
       model,
       conversation.id,
       conversation.messages,
@@ -770,9 +770,7 @@ export function ChatPanel({
     if (!text) return;
     if (!model) {
       setError(
-        llmProvider === "mistral"
-          ? "Aucun modèle Mistral disponible. Vérifie ta clé API dans Paramètres."
-          : "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
+        "Aucun modèle Ollama détecté. Installe un modèle : ollama pull llama3.2",
       );
       return;
     }
@@ -780,7 +778,7 @@ export function ChatPanel({
     setShowMissionDraftHint(false);
     setError(null);
     discussionQueue.trySendNow(text);
-  }, [input, model, llmProvider, discussionQueue]);
+  }, [input, model, discussionQueue]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -821,8 +819,9 @@ export function ChatPanel({
         >
           <MissionWorkspace
             llmProvider={llmProvider}
-            mistralApiKey={mistralApiKey}
-            mistralTemperature={mistralTemperature}
+            ollamaApiKey={ollamaApiKey}
+            ollamaApiUrl={ollamaApiUrl}
+            ollamaTemperature={ollamaTemperature}
             model={model}
             onActivityReport={reportMissionActivity}
             onArtifactProduced={(md, missionUserBrief) => {
