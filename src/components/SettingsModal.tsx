@@ -76,7 +76,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
           const s = loadAppSettings();
           const saved = s.ollamaChatModel?.trim() ?? "";
           if (saved && list.includes(saved)) return saved;
-          return pickDefaultChatModel(list, "ollama");
+          return pickDefaultChatModel(list);
         });
       })
       .catch((e: Error) => {
@@ -150,6 +150,7 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
     saveAppSettings({
       seedSystemPrompt: sys,
       seedUserTemplate: usr,
+      llmProvider: "ollama",
       ollamaApiKey: ollamaApiKey.trim(),
       ollamaApiUrl: urlTrim,
       ollamaChatModel: ollamaModelChoice.trim(),

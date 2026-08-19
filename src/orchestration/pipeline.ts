@@ -1,4 +1,4 @@
-import { clampOllamaTemperature, loadAppSettings } from "@/lib/appSettingsStorage";
+import { clampOllamaTemperature } from "@/lib/appSettingsStorage";
 import { generateMissionConversationTitle } from "@/lib/discussionTeamChat";
 import { completeLlmChat, streamLlmChat } from "@/lib/llmChat";
 import {
@@ -157,7 +157,6 @@ function slicePayloadForModel(payload: string): string {
 }
 
 async function missionComplete(
-  llmProvider: LlmProvider,
   model: string,
   messages: OllamaChatMessage[],
   signal: AbortSignal | undefined,
@@ -166,7 +165,7 @@ async function missionComplete(
   ollamaApiKey?: string,
   ollamaApiUrl?: string,
 ): Promise<string> {
-  return completeLlmChat(llmProvider, model, messages, signal, {
+  return completeLlmChat(model, messages, signal, {
     temperature,
     maxTokens,
     keepAlive: MISSION_KEEP_ALIVE,
@@ -366,7 +365,6 @@ export async function runMissionPipeline(
   } else {
     prog("Orchestrateur — analyse du contexte et des fichiers…");
     orchestratorBrief = await missionComplete(
-      llmProvider,
       model,
       [
         { role: "system", content: soul(souls, ORCHESTRATOR_ID) },
@@ -421,7 +419,6 @@ export async function runMissionPipeline(
       if (subs.length === 0) {
         prog(`${lead.label} — analyse directe (sans sous-agent)…`);
         const synthesis = await missionComplete(
-          llmProvider,
           model,
           [
             { role: "system", content: soul(souls, lead.id) },
@@ -452,7 +449,6 @@ export async function runMissionPipeline(
         async (sub) => {
           prog(`${lead.label} → ${sub.label} — consignes au sous-agent…`);
           const delegation = await missionComplete(
-            llmProvider,
             model,
             [
               { role: "system", content: soul(souls, lead.id) },
@@ -471,7 +467,6 @@ export async function runMissionPipeline(
 
           prog(`${sub.label} — travail spécialisé…`);
           const subWork = await missionComplete(
-            llmProvider,
             model,
             [
               { role: "system", content: soul(souls, sub.id) },
@@ -499,7 +494,6 @@ export async function runMissionPipeline(
       const subNameList = subs.map((s) => s.label).join(", ");
       prog(`${lead.label} — intégration des apports du pôle (reprise du détail)…`);
       const synthesis = await missionComplete(
-        llmProvider,
         model,
         [
           { role: "system", content: soul(souls, lead.id) },
@@ -549,7 +543,6 @@ export async function runMissionPipeline(
   if (onFinalReportToken) {
     let accum = "";
     await streamLlmChat(
-      llmProvider,
       model,
       finalMessages,
       (chunk) => {
@@ -567,7 +560,6 @@ export async function runMissionPipeline(
     readme = accum;
   } else {
     readme = await missionComplete(
-      llmProvider,
       model,
       finalMessages,
       signal,

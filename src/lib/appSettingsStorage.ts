@@ -66,7 +66,7 @@ Réponds **uniquement** avec le corps du champ, en respectant **exactement** ces
 export const DEFAULT_OLLAMA_TEMPERATURE = 0.45;
 
 /** URL Ollama Cloud par défaut. */
-export const DEFAULT_OLLAMA_API_URL = "https://api.ollama.ai";
+export const DEFAULT_OLLAMA_API_URL = "https://ollama.com";
 
 /** Borne la température Ollama pour l’API (0–1). */
 export function clampOllamaTemperature(n: unknown): number {

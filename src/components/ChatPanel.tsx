@@ -43,7 +43,7 @@ function initialChatMode(conversation: Conversation): ChatMode {
   return hasArtifact || hasMessages ? "free" : "mission";
 }
 
-function llmProviderLabel(provider: LlmProvider): string {
+function llmProviderLabel(): string {
   return "Ollama";
 }
 
@@ -797,7 +797,7 @@ export function ChatPanel({
           </p>
           {model ? (
             <p className="chat-llm-indicator" aria-label="Fournisseur et modèle actifs">
-              {llmProviderLabel(llmProvider)}
+              {llmProviderLabel()}
               {model ? ` · ${model}` : ""}
             </p>
           ) : null}

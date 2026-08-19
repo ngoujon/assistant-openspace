@@ -112,7 +112,7 @@ export default function App() {
           const saved = s.ollamaChatModel?.trim() ?? "";
           if (saved && m.includes(saved)) return saved;
           if (prev && m.includes(prev)) return prev;
-          return pickDefaultChatModel(m, s.llmProvider);
+          return pickDefaultChatModel(m);
         });
         setLlmError(null);
       })

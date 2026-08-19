@@ -1,4 +1,3 @@
-import type { LlmProvider } from "@/lib/llmProvider";
 import {
   completeOllamaChat,
   streamOllamaChat,
@@ -19,7 +18,6 @@ export type CompleteLlmOptions = {
 };
 
 export async function completeLlmChat(
-  provider: LlmProvider,
   model: string,
   messages: OllamaChatMessage[],
   signal?: AbortSignal,
@@ -45,7 +43,6 @@ export type StreamLlmOptions = {
 };
 
 export async function streamLlmChat(
-  provider: LlmProvider,
   model: string,
   messages: OllamaChatMessage[],
   onToken: (chunk: string) => void,

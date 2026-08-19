@@ -26,7 +26,6 @@ export async function generateMemberSoulSeed(
   input: GenerateSeedInput,
 ): Promise<string> {
   const {
-    llmProvider,
     model,
     memberLabel,
     parentId,
@@ -51,7 +50,6 @@ export async function generateMemberSoulSeed(
   const temperature = clampOllamaTemperature(settings.ollamaTemperature);
 
   return completeLlmChat(
-    llmProvider,
     model,
     [
       { role: "system", content: system },

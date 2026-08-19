@@ -203,7 +203,6 @@ export async function routeDiscussionMessage(opts: {
   ollamaApiUrl?: string;
 }): Promise<DiscussionRouting> {
   const {
-    llmProvider,
     model,
     souls,
     members,
@@ -247,7 +246,6 @@ export async function routeDiscussionMessage(opts: {
   const userBlock = `${docCtx}${multiSection}## Membres de l’équipe (utilise les ids exacts ci-dessous)\n${roster}\n\n---\n## Fil de discussion\n${hist}\n\n---\nTâche : tu es **l’orchestrateur**. **Priorité absolue** : la discussion sert à **faire évoluer le rapport Markdown** — **pas** une conversation générique ni un long compte rendu dans le chat.\n\nL’utilisateur s’adresse à l’équipe : **toi**, tu choisis **un seul** \`responderId\` pour la réponse **dans le fil** ce tour. Cette réponse doit tenir en **${DISCUSSION_FIL_LINES_FR}** : **résumé des modifications** (ce qui change dans le .md), puis **1 à 3 questions courtes** en fin si nécessaire. Le **détail** est dans le **fichier** après **fusion**. Un **livrable** et le **brief initial** peuvent figurer plus haut : sers-t’en pour le routage.\n\n- Le champ JSON \`brief\` doit **répéter explicitement** cette contrainte : **${DISCUSSION_FIL_LINES_JSON}**, style télégraphique, résumé des retouches, questions en fin — **interdit** de demander un « rapport détaillé » ou un texte long dans le fil.\n- Si une section **Mentions multiples** figure plus haut : un **seul** membre parle dans le chat, mais son \`brief\` intègre les angles de **toutes** les personnes nommées.\n- Si un **membre** répond : \`brief\` = consigne stricte **brièveté** + résumé modifications + questions optionnelles.\n- Si **toi** l’orchestrateur réponds : \`responderId\` = \`${ORCHESTRATOR_ID}\`.\n\nRéponds par **un seul objet JSON** valide, sans markdown ni texte autour :\n{\n  "responderId": "…",\n  "brief": "…",\n  "userNote": "…"\n}\n\n\`userNote\` : une phrase **optionnelle** pour l’utilisateur (ex. qui répond ce tour).`;
 
   const raw = await completeLlmChat(
-    llmProvider,
     model,
     [
       { role: "system", content: orchSoul },
@@ -339,7 +337,6 @@ export async function streamDiscussionReply(opts: {
   const { ollamaTemperature: ollamaTempOpt, ollamaApiKey, ollamaApiUrl, ...streamPayload } = opts;
   const messages = buildDiscussionStreamMessages(streamPayload);
   await streamLlmChat(
-    opts.llmProvider,
     opts.model,
     messages,
     opts.onToken,
@@ -378,7 +375,6 @@ export async function generateDiscussionConversationTitle(opts: {
 }): Promise<string> {
   const orchSoul = soul(opts.souls, ORCHESTRATOR_ID);
   const raw = await completeLlmChat(
-    opts.llmProvider,
     opts.model,
     [
       { role: "system", content: orchSoul },
@@ -432,7 +428,6 @@ export async function generateMissionConversationTitle(opts: {
   const briefSlice = opts.orchestratorBrief.slice(0, 6000);
   const ctxSlice = opts.userPayloadPreview.slice(0, 3500);
   const raw = await completeLlmChat(
-    opts.llmProvider,
     opts.model,
     [
       { role: "system", content: orchSoul },
@@ -491,7 +486,6 @@ export async function applyDiscussionToArtifact(opts: {
   ollamaApiUrl?: string;
 }): Promise<string> {
   const {
-    llmProvider,
     model,
     souls,
     discussionMessages,
@@ -551,7 +545,6 @@ ${doc}
 Réponds par **le document Markdown complet révisé**, sans préambule ni post-scriptum.`;
 
   return completeLlmChat(
-    llmProvider,
     model,
     [
       { role: "system", content: orchSoul },
