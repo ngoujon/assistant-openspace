@@ -18,6 +18,8 @@ export interface WorkspaceExportPayload {
 }
 
 export function buildWorkspaceExport(): WorkspaceExportPayload {
+  const { ollamaApiKey: _ollamaApiKey, ...appSettingsWithoutSecrets } =
+    loadAppSettings();
   return {
     formatVersion: EXPORT_FORMAT_VERSION,
     exportedAt: Date.now(),
@@ -25,7 +27,7 @@ export function buildWorkspaceExport(): WorkspaceExportPayload {
     teamMembers: loadTeamMembers(),
     teamSouls: loadAgentSouls(),
     teamArchives: loadTeamArchives(),
-    appSettings: loadAppSettings(),
+    appSettings: { ...appSettingsWithoutSecrets, ollamaApiKey: "" },
   };
 }
 

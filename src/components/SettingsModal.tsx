@@ -323,7 +323,8 @@ export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
             </h3>
             <p className="modal-settings-hint">
               Exporte ou importe conversations, équipe, archives et paramètres (JSON
-              local).
+              local). La clé secrète Ollama Cloud n'est jamais incluse dans l'export ;
+              il faudra la ressaisir après une restauration.
             </p>
             <div className="modal-settings-data-actions">
               <button
