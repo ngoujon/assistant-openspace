@@ -2,16 +2,14 @@
 
 ## Vue d’ensemble
 
-Application **SPA** React montée sur Vite. En **développement**, le serveur Vite sert les assets et proxifie les appels **Mistral** (`/api/mistral`) et **Ollama** (`/api/ollama`). En **Docker**, nginx sert le build statique et les mêmes préfixes (`docs/docker.md`).
+Application **SPA** React montée sur Vite. En **développement**, le serveur Vite sert les assets et proxifie les appels **Ollama** (`/api/ollama`, vers Ollama local ou Ollama Cloud). En **Docker**, nginx sert le build statique et le même préfixe (`docs/docker.md`).
 
 ```mermaid
 flowchart LR
   Browser[Navigateur :3004]
   Vite[Vite dev server]
-  Mistral[Mistral API]
-  Ollama[Ollama :11434]
+  Ollama[Ollama local / Ollama Cloud]
   Browser --> Vite
-  Vite -->|"/api/mistral/*"| Mistral
   Vite -->|"/api/ollama/*"| Ollama
 ```
 
@@ -36,13 +34,12 @@ Styles globaux dans `src/index.css` : thème sombre minimal (variables CSS), pas
 | `components/TeamArchiveModal.tsx` | Modale listant les compositions archivées (s’appuie sur `TeamArchiveSection`) |
 | `lib/teamTreeStorage.ts` | Membres, reparentage, profondeur max 3 (`openspace-team-tree-v1`) |
 | `lib/teamTreeDisplay.ts` | Conversion liste → arbre d’affichage (`DisplayNode`) |
-| `lib/generateMemberSeed.ts` | Appel LLM (Mistral ou Ollama) pour proposer un texte « âme et rôle » |
+| `lib/generateMemberSeed.ts` | Appel LLM (Ollama) pour proposer un texte « âme et rôle » |
 | `components/AgentSoulModal.tsx` | Modale d’édition (Échap / Entrée / Maj+Entrée) |
 | `data/teamSeeds.ts` | Textes initiaux (seeds) par id de nœud |
 | `lib/teamSoulsStorage.ts` | Lecture / écriture `openspace-team-souls-v1` |
 | `lib/ollama.ts` | Tags Ollama, `streamOllamaChat`, `completeOllamaChat` |
-| `lib/mistral.ts` | Modèles Mistral, chat complet et stream (SSE) |
-| `lib/llmChat.ts` | `completeLlmChat` / `streamLlmChat` selon le fournisseur |
+| `lib/llmChat.ts` | `completeLlmChat` / `streamLlmChat` |
 | `orchestration/pipeline.ts` | `runMissionPipeline` : orchestrateur → branches → README |
 | `lib/storage.ts` | Sérialisation conversations `localStorage` |
 | `types.ts` | Types partagés |

@@ -18,7 +18,7 @@ alwaysApply: true
 
 ## LLM et réseau
 
-- Ne pas appeler `11434` ni `api.mistral.ai` en dur depuis le navigateur : passer par **`/api/ollama`** ou **`/api/mistral`** (proxies Vite / nginx) pour la stratégie CORS / déploiement.
+- Ne pas appeler `11434` en dur depuis le navigateur : passer par **`/api/ollama`** (proxy Vite / nginx) pour la stratégie CORS / déploiement.
 - Gérer **streaming** et **AbortController** pour ne pas laisser de requêtes pendantes ; messages d’erreur compréhensibles pour l’utilisateur.
 
 ## Style et UX

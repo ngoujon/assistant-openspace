@@ -73,8 +73,8 @@ export async function fetchWithRateLimitRetries(
     maxAttempts?: number;
     /**
      * Appelé dès qu'un statut 429/502/503 est reçu, avant l'attente — permet
-     * de prévenir un guichet partagé (ex. `mistralGateway`) pour qu'il mette
-     * en pause les *autres* appels en cours, pas seulement celui-ci.
+     * de prévenir un guichet partagé pour qu'il mette en pause les *autres*
+     * appels en cours, pas seulement celui-ci.
      */
     onRateLimited?: (waitMs: number, status: number, attempt: number) => void;
   },

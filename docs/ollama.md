@@ -1,10 +1,8 @@
 # Intégration Ollama
 
-Pour **Mistral AI** (défaut possible dans l’app), voir `docs/mistral.md` et **Paramètres** dans l’UI.
-
 ## Contexte
 
-L’application parle à l’API HTTP d’Ollama, normalement exposée sur **`http://127.0.0.1:11434`**.
+L’application parle à l’API HTTP d’Ollama : par défaut **Ollama Cloud** (clé API et URL configurées dans **Paramètres**), ou un serveur local normalement exposé sur **`http://127.0.0.1:11434`** en changeant l’URL.
 
 ## Proxy de développement (Vite)
 

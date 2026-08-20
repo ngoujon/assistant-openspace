@@ -945,51 +945,6 @@ body {
   margin: 0 0 0.5rem;
 }
 
-.mistral-gateway-banner {
-  position: fixed;
-  top: 0.75rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 900;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.9rem;
-  border-radius: 999px;
-  background: var(--bg-raised);
-  border: 1px solid rgba(251, 191, 36, 0.28);
-  box-shadow: var(--shadow-md);
-  color: var(--warn);
-  font-size: 0.8125rem;
-  line-height: 1.3;
-  max-width: min(92vw, 30rem);
-}
-
-.mistral-gateway-banner-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 999px;
-  background: var(--warn);
-  flex: none;
-  animation: mistral-gateway-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes mistral-gateway-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mistral-gateway-banner-dot {
-    animation: none;
-  }
-}
-
 .chat-messages {
   flex: 1;
   overflow: auto;
