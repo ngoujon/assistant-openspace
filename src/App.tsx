@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { clampOllamaTemperature, loadAppSettings } from "@/lib/appSettingsStorage";
+import {
+  clampOllamaTemperature,
+  consumeAppSettingsResetNotice,
+  loadAppSettings,
+} from "@/lib/appSettingsStorage";
 import { pickDefaultChatModel } from "@/lib/llmModelPreference";
 import type { LlmProvider } from "@/lib/llmProvider";
 import { fetchOllamaModels } from "@/lib/ollama";
@@ -93,6 +97,7 @@ export default function App() {
 
   const refreshLlmModels = useCallback(() => {
     const s = loadAppSettings();
+    const resetNotice = consumeAppSettingsResetNotice();
     setLlmProvider(s.llmProvider);
     setOllamaApiKey(s.ollamaApiKey);
     setOllamaApiUrl(s.ollamaApiUrl);
@@ -101,7 +106,8 @@ export default function App() {
     if (s.llmProvider === "ollama" && !s.ollamaApiUrl.trim()) {
       setModel("");
       setLlmError(
-        "Ollama Cloud : renseigne l'URL API dans Paramètres (menu latéral).",
+        resetNotice ??
+          "Ollama Cloud : renseigne l'URL API dans Paramètres (menu latéral).",
       );
       return;
     }
@@ -114,9 +120,9 @@ export default function App() {
           if (prev && m.includes(prev)) return prev;
           return pickDefaultChatModel(m);
         });
-        setLlmError(null);
+        setLlmError(resetNotice);
       })
-      .catch((e: Error) => setLlmError(e.message));
+      .catch((e: Error) => setLlmError(resetNotice ?? e.message));
   }, []);
 
   useEffect(() => {

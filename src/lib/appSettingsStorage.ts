@@ -68,6 +68,40 @@ export const DEFAULT_OLLAMA_TEMPERATURE = 0.45;
 /** URL Ollama Cloud par défaut. */
 export const DEFAULT_OLLAMA_API_URL = "https://api.ollama.cloud/v1";
 
+/**
+ * URL d'API obsolètes issues d'anciens fournisseurs / anciens défauts cassés
+ * (migration Mistral → Ollama Cloud, puis correction du domaine invalide).
+ * Un réglage local pointant encore vers l'une d'elles est réinitialisé
+ * automatiquement au chargement plutôt que de bloquer l'app sans message clair.
+ */
+const STALE_OLLAMA_API_URLS = new Set([
+  "https://ollama.com",
+  "https://api.ollama.ai",
+  "https://api.mistral.ai",
+  "https://api.mistral.ai/v1",
+]);
+
+function normalizeUrlForComparison(u: string): string {
+  return u.trim().replace(/\/+$/, "").toLowerCase();
+}
+
+function isStaleOllamaApiUrl(u: string): boolean {
+  return STALE_OLLAMA_API_URLS.has(normalizeUrlForComparison(u));
+}
+
+let pendingResetNotice: string | null = null;
+
+/**
+ * Message expliquant une réinitialisation automatique des réglages IA
+ * détectée lors du dernier `loadAppSettings()`, à consommer une seule fois
+ * (ex: affichage d'un bandeau) pour informer l'utilisateur.
+ */
+export function consumeAppSettingsResetNotice(): string | null {
+  const notice = pendingResetNotice;
+  pendingResetNotice = null;
+  return notice;
+}
+
 /** Borne la température Ollama pour l’API (0–1). */
 export function clampOllamaTemperature(n: unknown): number {
   if (typeof n === "number" && Number.isFinite(n)) {
@@ -126,10 +160,12 @@ export function loadAppSettings(): AppSettings {
     const prov: LlmProvider = "ollama";
     const apiKey =
       typeof o.ollamaApiKey === "string" ? o.ollamaApiKey : base.ollamaApiKey;
-    const apiUrl =
+    const rawApiUrl =
       typeof o.ollamaApiUrl === "string" && o.ollamaApiUrl.trim()
         ? o.ollamaApiUrl.trim()
         : base.ollamaApiUrl;
+    const wasStale = isStaleOllamaApiUrl(rawApiUrl);
+    const apiUrl = wasStale ? base.ollamaApiUrl : rawApiUrl;
     const ollamaModel =
       typeof o.ollamaChatModel === "string"
         ? o.ollamaChatModel
@@ -137,7 +173,7 @@ export function loadAppSettings(): AppSettings {
     const ollamaTemperature = clampOllamaTemperature(
       o.ollamaTemperature ?? base.ollamaTemperature,
     );
-    return {
+    const settings: AppSettings = {
       seedSystemPrompt: sys,
       seedUserTemplate: usr,
       llmProvider: prov,
@@ -146,6 +182,12 @@ export function loadAppSettings(): AppSettings {
       ollamaChatModel: ollamaModel,
       ollamaTemperature,
     };
+    if (wasStale) {
+      pendingResetNotice =
+        "Tes réglages IA pointaient vers une ancienne adresse invalide (précédent fournisseur ou URL cassée) : ils ont été réinitialisés automatiquement vers l'adresse Ollama Cloud par défaut.";
+      saveAppSettings(settings);
+    }
+    return settings;
   } catch {
     return base;
   }
