@@ -40,15 +40,15 @@ Implémentation du plan d’amélioration global : parallélisation mission, fus
 
 ---
 
-## 2026-05-11 — Paramètres : température Mistral (0–1)
+## 2026-05-11 — Paramètres : température Mistral (0–1) [REVERTÉE]
 
 ### Objectif
 
-Réglage **Température** dans la modale Paramètres lorsque le fournisseur est **Mistral AI** : valeur persistée (`mistralTemperature` dans `openspace-app-settings-v1`), appliquée au chat, mission, fusion discussion et seeds ; Ollama inchangé (températures internes pipeline / discussion).
+Réglage **Température** dans la modale Paramètres lorsque le fournisseur est **Mistral AI**. Cette fonctionnalité a été revertée lors de la migration vers Ollama Cloud uniquement.
 
 ### Fichiers
 
-- `src/lib/appSettingsStorage.ts`, `src/components/SettingsModal.tsx`, `src/App.tsx`, `src/components/ChatPanel.tsx`, `src/components/MissionWorkspace.tsx`, `src/orchestration/pipeline.ts`, `src/lib/discussionTeamChat.ts`, `src/lib/generateMemberSeed.ts`, `src/lib/mistral.ts`, `src/lib/ollama.ts`, `src/lib/llmChat.ts`, `src/index.css`, `docs/DEVBOOK.md`
+- `src/lib/appSettingsStorage.ts`, `src/components/SettingsModal.tsx`, `src/App.tsx`, `src/components/ChatPanel.tsx`, `src/components/MissionWorkspace.tsx`, `src/orchestration/pipeline.ts`, `src/lib/discussionTeamChat.ts`, `src/lib/generateMemberSeed.ts`, `src/lib/ollama.ts`, `src/lib/llmChat.ts`, `src/index.css`, `docs/DEVBOOK.md`
 
 ---
 
@@ -56,7 +56,7 @@ Réglage **Température** dans la modale Paramètres lorsque le fournisseur est 
 
 ### Objectif
 
-Supprimer les paragraphes **« 1ʳᵉ réponse longe »** et **« au-delà de 15–20 min… »** (Mistral / Ollama) sous la durée en mission ; le prop `llmProvider` sur `ActivitySidebar` n’est plus nécessaire.
+Supprimer les paragraphes **« 1ʳᵉ réponse longe »** et **« au-delà de 15–20 min… »** (Ollama) sous la durée en mission ; le prop `llmProvider` sur `ActivitySidebar` n’est plus nécessaire.
 
 ### Fichiers
 
@@ -68,11 +68,11 @@ Supprimer les paragraphes **« 1ʳᵉ réponse longe »** et **« au-delà de 15
 
 ### Objectif
 
-Réduire les **504 / timeouts** et la lenteur : chaque appel **Mistral** ou **Ollama** fixe désormais un **plafond de tokens générés** — ~**½ page** par étape « agent » (mission, stream discussion), **384** pour routage / titres, **8192** par défaut pour rapport final mission et **fusion livrable** discussion ; seeds **1536**. Variables `VITE_OPENSPACE_MAX_AGENT_TOKENS` et `VITE_OPENSPACE_MAX_DOCUMENT_TOKENS` (bornées dans `llmOutputLimits.ts`). Prompts mission réalignés (plus d’exigence de dizaines de pages par étape).
+Réduire les **504 / timeouts** et la lenteur : chaque appel LLM fixe désormais un **plafond de tokens générés** — ~**½ page** par étape « agent » (mission, stream discussion), **384** pour routage / titres, **8192** par défaut pour rapport final mission et **fusion livrable** discussion ; seeds **1536**. Variables `VITE_OPENSPACE_MAX_AGENT_TOKENS` et `VITE_OPENSPACE_MAX_DOCUMENT_TOKENS` (bornées dans `llmOutputLimits.ts`). Prompts mission réalignés (plus d’exigence de dizaines de pages par étape).
 
 ### Fichiers
 
-- `src/lib/llmOutputLimits.ts`, `src/lib/ollama.ts`, `src/lib/mistral.ts`, `src/lib/llmChat.ts`, `src/orchestration/pipeline.ts`, `src/lib/discussionTeamChat.ts`, `src/lib/generateMemberSeed.ts`, `src/vite-env.d.ts`, `README.md`, `docs/DEVBOOK.md`
+- `src/lib/llmOutputLimits.ts`, `src/lib/ollama.ts`, `src/lib/llmChat.ts`, `src/orchestration/pipeline.ts`, `src/lib/discussionTeamChat.ts`, `src/lib/generateMemberSeed.ts`, `src/vite-env.d.ts`, `README.md`, `docs/DEVBOOK.md`
 
 ---
 
@@ -92,7 +92,7 @@ En **Mission équipe**, la durée n’était plus fiable à l’arrêt (remise �
 
 ### Objectif
 
-Dans la modale **Archives des compositions**, un bouton **Régénérer les âmes** (à gauche de **Restaurer**) relance la génération de seed **pour chaque membre** de l’archive via le LLM configuré, met à jour l’entrée `localStorage` (`replaceTeamArchiveEntry`), avec confirmation et pause Mistral entre appels.
+Dans la modale **Archives des compositions**, un bouton **Régénérer les âmes** (à gauche de **Restaurer**) relance la génération de seed **pour chaque membre** de l’archive via le LLM configuré, met à jour l’entrée `localStorage` (`replaceTeamArchiveEntry`), avec confirmation et pause entre appels LLM.
 
 ### Fichiers
 
@@ -213,7 +213,7 @@ Afficher le contenu des messages de **discussion** avec mise en forme Markdown (
 
 ### Objectif
 
-Aligner Ollama sur Mistral : le **modèle de chat** est choisi dans **Paramètres** (`ollamaChatModel` en localStorage), listé via `fetchOllamaModels` ; suppression du sélecteur dans la barre du chat.
+Le **modèle de chat** Ollama est choisi dans **Paramètres** (`ollamaChatModel` en localStorage), listé via `fetchOllamaModels` ; suppression du sélecteur dans la barre du chat.
 
 ### Fichiers
 
@@ -221,30 +221,22 @@ Aligner Ollama sur Mistral : le **modèle de chat** est choisi dans **Paramètre
 
 ---
 
-## 2026-05-10 — Mistral AI (défaut) et bascule Ollama
+## 2026-05-10 — Mistral AI (défaut) et bascule Ollama [REVERTÉE]
 
 ### Objectif
 
-Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local, avec **Mistral par défaut** et la **clé API** saisie dans **Paramètres** (localStorage). Trafic navigateur via `/api/mistral` (proxy Vite / nginx) pour le même motif que Ollama : CORS et déploiement unifié.
+Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local, avec **Mistral par défaut** et la **clé API** saisie dans **Paramètres** (localStorage).
 
-### Décisions
+### Note
 
-- **Routeur** : `src/lib/llmChat.ts` (`completeLlmChat` / `streamLlmChat`) selon `LlmProvider` ; client Mistral dans `src/lib/mistral.ts` (OpenAI-compatible `/v1/chat/completions` + SSE stream).
-- **Réglages** : `AppSettings` étendu (`llmProvider`, `mistralApiKey`, `mistralChatModel`, `ollamaChatModel`) dans `src/lib/appSettingsStorage.ts` ; UI dans `SettingsModal`.
-- **Clé** : stockée **uniquement côté navigateur** ; le proxy relaie l’en-tête `Authorization` vers `https://api.mistral.ai`.
-
-### Fichiers clés
-
-- `vite.config.ts`, `nginx.conf` — proxy `/api/mistral` → `api.mistral.ai`.
-- `src/App.tsx` — chargement modèles selon fournisseur, `refreshLlmModels` après enregistrement des paramètres.
+Cette étape a été ultérieurement revertée lors de la migration de 2026-08-17 vers **Ollama Cloud** comme fournisseur LLM unique. Tous les fichiers et proxies Mistral ont été supprimés, et le support de plusieurs fournisseurs LLM a été simplifié pour n’utiliser que Ollama Cloud (voir commit `63fb7e7` et `bb79f9c`).
 
 ### Changelog (condensé)
 
 | Date | Changement |
 |------|------------|
 | 2026-05-11 | Discussion : **compositeur vide** à l’entrée (plus de reprise du brief mission dans le champ) |
-| 2026-05-11 | Paramètres : **température Mistral** (0–1) pour chat, mission, fusion, seeds ; stream Mistral avec `temperature` |
-| 2026-05-11 | Activité mission : suppression des **textes d’attente** (1ʳᵉ réponse longue, délai 15–20 min / clé API) |
+| 2026-05-11 | Activité mission : suppression des **textes d’attente** (1ʳᵉ réponse longue, délai) |
 | 2026-05-11 | LLM : plafonds **max_tokens** / **num_predict** (agent ~512, document 8192, routage 384) + prompts mission **denses** |
 | 2026-05-11 | Activité : **temps de traitement** affiché à la fin (mission : durée persistée corrigée ; discussion : dernier envoi) |
 | 2026-05-10 | Conversations : **plus de renommage automatique** après mission ni après discussion (titre sidebar stable) |
@@ -257,8 +249,6 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Discussion : réponses fil **3–7 lignes max**, style télégraphique, **1–3 questions** en fin ; routage / stream / mentions multiples alignés |
 | 2026-05-10 | Activité : étapes « neutres » (gris) → pastille **SYSTEME** à la place du point ou d’une pastille vide |
 | 2026-05-10 | Compositeur @ : miroir aligné sur le littéral `@[…]` + sync scroll ; Activité discussion : une seule timeline (mission + session) |
-| 2026-05-10 | LLM : Mistral AI (défaut) + Ollama local ; clé API dans Paramètres ; proxies `/api/mistral` et doc |
-| 2026-05-10 | Mistral : choix du modèle uniquement dans Paramètres (`mistralChatModel`) |
 | 2026-05-10 | Ollama : choix du modèle dans Paramètres (`ollamaChatModel`) — plus de sélecteur dans la barre du chat |
 | 2026-05-10 | UI : typographie Plus Jakarta Sans, palette / rayons / ombres harmonisés, colonnes latérales vitrées, onglets et bulles de chat affinés |
 | 2026-05-10 | Mission : zone glisser-déposer + clic pour fichiers .txt / .md (remplace le bouton « Ajouter des fichiers ») |
@@ -278,7 +268,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Discussion : file d’attente au-dessus du compositeur (compteur, repli, édition, retrait) ; envoi séquentiel après réponse ou « Arrêter » |
 | 2026-05-10 | Chat projet : plus d’onglets Mission / Discussion ; mission au départ puis passage auto en discussion après livrable ; libellé de phase non cliquable |
 | 2026-05-10 | Discussion : persistance `missionUserBrief` + contexte routage/stream/fusion ; consignes anti-recopie du livrable dans le chat |
-| 2026-05-10 | Mistral : retries 429/502/503 + `Retry-After` ; pause mission entre étapes ; pause courte routage → stream |
+| 2026-05-10 | LLM : retries 429/502/503 + `Retry-After` ; pause mission entre étapes ; pause courte routage → stream |
 | 2026-05-10 | UI : `.chat-input` pleine largeur (`width: 100%`, `box-sizing`) + file discussion `align-items: stretch` |
 | 2026-05-10 | Discussion : suppression du paragraphe d’aide sous le livrable (`discussion-routing-hint`) |
 | 2026-05-10 | Discussion : suppression du message vide (`chat-empty`) au-dessus du fil |
@@ -287,7 +277,7 @@ Permettre d’utiliser l’**API Mistral** (cloud) en plus d’**Ollama** local,
 | 2026-05-10 | Mentions `@[Libellé]` : rendu type badge dans le compositeur (miroir sous le textarea) et dans les bulles de discussion (`MentionRichText`, `splitBracketMentionsForVisual`) |
 | 2026-05-10 | Discussion : si livrable + `missionUserBrief` mais fil vide, premier message utilisateur = brief mission (note « Mission équipe ») ; titre sidebar préservé s’il n’est plus « Nouveau projet » ; prompts sans doubler le brief (`missionBriefUnlessEchoedInHistory`) |
 | 2026-05-10 | Activité (discussion) : frise d’étapes cumulative (`discussionProgress`) + `MissionStepTimeline` ; journal à chaque envoi (routage, intervenant, stream, fusion) ; reset au changement de projet ; parse mission enrichi pour lignes discussion |
-| 2026-05-10 | Mistral : pauses mission / discussion centralisées (`llmRateLimit.ts`) — inter-étape ~780 ms, après titre, entre pilier et sous-agent, routage→stream et stream→fusion |
+| 2026-05-10 | LLM : pauses mission / discussion centralisées (`llmRateLimit.ts`) — inter-étape ~780 ms, après titre, entre pilier et sous-agent, routage→stream et stream→fusion |
 | 2026-05-10 | Discussion : consignes anti-chatbot (chat minimal, .md prioritaire) ; fusion orchestrateur interprète messages courts + fil multi-intervenants ; plusieurs `@[…]` → routage orchestrateur avec `multiMentionRoutingHint` (un orateur, angles combinés) |
 
 ## 2026-03-28 — Bootstrap UI + Chat Ollama
@@ -403,7 +393,7 @@ Créer des **membres** sous l’orchestrateur, les **réorganiser par glisser-d�
 
 ### Décisions
 
-- **`completeLlmChat`** (`stream: false`) pour enchaîner les étapes sans parser plusieurs streams (Ollama ou Mistral).
+- **`completeLlmChat`** (`stream: false`) pour enchaîner les étapes sans parser plusieurs streams (Ollama).
 - Prompts **system** = textes « âme et rôle » (`loadAgentSouls` + seeds).
 - **~11 appels** modèle par mission ; annulation via **`AbortController`**.
 - UI : mode **Mission équipe** (défaut) vs **Discussion** dans l’onglet Chat ; `docs/mission-orchestration.md` décrit le flux.
