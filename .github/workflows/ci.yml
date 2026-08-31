@@ -7,7 +7,9 @@ on:
     branches: [main, master]
 
 jobs:
-  build-and-test:
+  test:
+    # Les tests ne demandent ni réseau ni Electron : ils travaillent dans un dossier
+    # temporaire. Le build de l'app, lui, est macOS seulement (voir scripts/build-app.sh).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,5 +18,4 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npm run test
-      - run: npm run build
+      - run: npm test

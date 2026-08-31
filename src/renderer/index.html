@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';" />
+    <title>Assistant OpenSpace</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="titlebar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="5" r="2.4" />
+            <circle cx="5.4" cy="18.4" r="2.4" />
+            <circle cx="18.6" cy="18.4" r="2.4" />
+            <path d="M12 7.4v3.4M5.4 16v-2.2a2 2 0 0 1 2-2h9.2a2 2 0 0 1 2 2V16" />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="name">Assistant OpenSpace</div>
+          <div class="sub" id="status-line"><span class="dot pending"></span>Démarrage…</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btn-barre" class="icon-btn" title="Missions (⌘L)" aria-label="Missions">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M4 6.5h16M4 12h16M4 17.5h16" />
+          </svg>
+        </button>
+        <button id="btn-panneau" class="icon-btn" title="Équipe et livrables (⌘D)" aria-label="Équipe et livrables">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="5.5" r="2.1" />
+            <circle cx="6" cy="18" r="2.1" />
+            <circle cx="18" cy="18" r="2.1" />
+            <path d="M12 7.6v3.2M6 15.9v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" />
+          </svg>
+        </button>
+        <button id="btn-new" class="icon-btn" title="Nouvelle mission (⌘N)" aria-label="Nouvelle mission">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+        <button id="btn-settings" class="icon-btn" title="Réglages" aria-label="Réglages">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="3.2" />
+            <path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2L5.5 5.5" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="corps">
+      <aside id="barre" class="barre">
+        <div class="barre-tete">
+          <div class="champ-recherche">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <circle cx="11" cy="11" r="6.2" />
+              <path d="M15.6 15.6L20 20" />
+            </svg>
+            <input type="search" id="recherche" placeholder="Rechercher…" autocomplete="off" spellcheck="false" />
+          </div>
+          <button id="btn-new-barre" class="neuve">Nouvelle mission</button>
+        </div>
+        <div id="liste-missions" class="convs"></div>
+      </aside>
+
+      <div class="poignee" id="poignee-barre" title="Glisser pour redimensionner · double-clic pour la largeur par défaut"></div>
+
+      <div class="colonne">
+        <section id="settings" class="panneau hidden">
+          <label class="row">
+            <span>Orchestrateur</span>
+            <select id="model">
+              <option value="claude-opus-5">Opus 5 — le plus fin</option>
+              <option value="claude-sonnet-5">Sonnet 5 — plus rapide</option>
+              <option value="claude-haiku-4-5">Haiku 4.5 — express</option>
+            </select>
+          </label>
+          <label class="row">
+            <span>L'équipe travaille avec</span>
+            <select id="modele-equipe">
+              <option value="inherit">Le même modèle que lui</option>
+              <option value="claude-sonnet-5">Sonnet 5 — plus rapide</option>
+              <option value="claude-haiku-4-5">Haiku 4.5 — express</option>
+            </select>
+          </label>
+          <label class="row">
+            <span>Ampleur du livrable</span>
+            <select id="ampleur">
+              <option value="note">Note — ~1 200 mots</option>
+              <option value="document">Document — ~3 000 mots</option>
+              <option value="dossier">Dossier — ~7 500 mots</option>
+            </select>
+          </label>
+          <label class="row">
+            <span>Langue de rédaction</span>
+            <select id="langue">
+              <option value="français">Français</option>
+              <option value="anglais">Anglais</option>
+            </select>
+          </label>
+          <label class="row">
+            <span>Autonomie</span>
+            <select id="autonomie">
+              <option value="auto">L'équipe agit seule, sans rien demander</option>
+              <option value="prudent">Me demander avant les actions sensibles</option>
+            </select>
+          </label>
+          <p class="note-inline">En autonomie, l'orchestrateur mène la mission de bout en bout : il convoque les pôles, publie le livrable et le retouche sans jamais s'arrêter pour demander. En mode prudent, une carte s'ouvre avant une commande, une écriture hors du dossier ou un effacement.<br>Changer l'ampleur, la langue, l'autonomie ou le modèle de l'équipe repart sur une mission neuve : ces règles vivent dans les consignes.</p>
+
+          <h4>Dossier des livrables</h4>
+          <div id="chemin-dossier" class="chemin"></div>
+          <div class="boutons">
+            <button id="btn-choisir" class="link-btn">Changer de dossier…</button>
+            <button id="btn-ouvrir-dossier-2" class="link-btn">Ouvrir dans le Finder…</button>
+          </div>
+        </section>
+
+        <main id="scroll">
+          <div id="thread"></div>
+        </main>
+
+        <footer>
+          <div id="composer">
+            <textarea id="input" rows="1" placeholder="Quelle mission pour l'équipe ?" autofocus></textarea>
+            <button id="btn-send" class="send" aria-label="Envoyer">
+              <svg class="ic-send" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+              <svg class="ic-stop" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2.5" />
+              </svg>
+            </button>
+          </div>
+          <div class="hint"><kbd>↩</kbd> envoyer · <kbd>⇧↩</kbd> nouvelle ligne · <kbd>esc</kbd> stop — tu peux écrire pendant qu'ils travaillent</div>
+        </footer>
+      </div>
+
+      <div class="poignee" id="poignee-panneau" title="Glisser pour redimensionner · double-clic pour la largeur par défaut"></div>
+
+      <aside id="panneau" class="panneau-droite">
+        <div class="onglets">
+          <button id="onglet-equipe" class="onglet actif">Équipe</button>
+          <button id="onglet-livrables" class="onglet">Livrables</button>
+        </div>
+
+        <section id="vue-equipe" class="vue">
+          <div id="arbre" class="arbre"></div>
+          <div class="equipe-pied">
+            <button id="btn-ajouter-pole" class="lien">+ Ajouter un pôle</button>
+            <button id="btn-archiver" class="lien">Mettre de côté…</button>
+            <button id="btn-equipe-defaut" class="lien">Équipe par défaut</button>
+          </div>
+          <div id="archives" class="archives"></div>
+        </section>
+
+        <section id="vue-livrables" class="vue hidden">
+          <div class="portee">
+            <button id="portee-mission" class="onglet-mini actif">Cette mission</button>
+            <button id="portee-tous" class="onglet-mini">Tous</button>
+          </div>
+          <div id="liste-livrables" class="docs"></div>
+          <div class="equipe-pied">
+            <button id="btn-ouvrir-dossier" class="lien">Ouvrir le dossier</button>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <div id="modale" class="modale hidden">
+      <div class="modale-fond"></div>
+      <div class="modale-boite" role="dialog" aria-modal="true" aria-labelledby="modale-titre">
+        <div class="modale-tete">
+          <input id="modale-nom" class="modale-nom" aria-label="Nom du membre" spellcheck="false" />
+          <button id="modale-fermer" class="icon-btn" aria-label="Fermer">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <div id="modale-titre" class="modale-sous"></div>
+        <label class="row modale-parent">
+          <span>Rattaché sous</span>
+          <select id="modale-rattachement"></select>
+        </label>
+        <textarea id="modale-ame" class="modale-ame" spellcheck="false" placeholder="Tu es …
+
+Rôle : …
+
+Âme : …"></textarea>
+        <div class="modale-pied">
+          <button id="modale-proposer" class="lien">Proposer une âme</button>
+          <span class="grandit"></span>
+          <button id="modale-supprimer" class="lien danger">Retirer de l'équipe</button>
+          <button id="modale-enregistrer" class="primary">Enregistrer</button>
+        </div>
+        <div class="hint modale-hint"><kbd>⌘↩</kbd> enregistrer · <kbd>esc</kbd> fermer</div>
+      </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

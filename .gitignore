@@ -1,8 +1,6 @@
-# macOS AppleDouble (forks de ressources sur volumes exFAT / non-Apple)
-._*
-
-node_modules
-dist
-*.local
-*.tsbuildinfo
-.playwright-mcp
+node_modules/
+build/
+preview.png
+assets/icon-1024.png
+assets/AppIcon.iconset/
+.DS_Store

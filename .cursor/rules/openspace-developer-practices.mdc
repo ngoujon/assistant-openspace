@@ -1,32 +1,52 @@
 ---
-description: Bonnes pratiques développeur pour le dépôt OpenSpace Localhost
+description: Bonnes pratiques développeur pour l'Assistant OpenSpace
 alwaysApply: true
 ---
 
-# Pratiques de développement — OpenSpace
+# Pratiques de développement — Assistant OpenSpace
+
+App Electron + Claude Agent SDK. Une équipe virtuelle (orchestrateur, pôles, spécialistes)
+produit un livrable Markdown versionné. Voir `README.md` pour le fonctionnement.
 
 ## Portée et changements
 
-- Modifier uniquement le code nécessaire à la demande ; éviter les refactors opportunistes non demandés.
-- Après une évolution fonctionnelle ou documentaire notable : **mettre à jour** `docs/DEVBOOK.md` (section datée ou tableau changelog) et **commiter** avec un message clair en français.
+- Modifier uniquement le code nécessaire à la demande ; éviter les refactors opportunistes.
+- Le **README est la documentation** : pas de `docs/` parallèle, pas de changelog séparé.
+  Une évolution notable se répercute dans la section concernée du README.
 
-## TypeScript et React
+## Règles métier
 
-- TypeScript **strict** : pas de `any` implicite ; typer les réponses API (types dédiés ou `unknown` + garde).
-- Préférer les composants **contrôlés** et l’état local minimal ; remonter l’état quand plusieurs vues en dépendent.
-- Effets `useEffect` : dépendances complètes ; éviter les mises à jour d’état en cascade fragiles (préférer un seul flux de vérité).
+- Ce qui compte doit être **imposé, pas demandé** : une règle d'organisation vit dans
+  `src/agent/gardes.mjs` (hooks `PreToolUse`), pas seulement dans le prompt. Le prompt dit
+  pourquoi, le hook garantit.
+- Toucher aux règles de `src/agent/prompt.mjs` : **incrémenter `PROMPT_VERSION`**, sinon des
+  missions enregistrées sous d'anciennes règles seraient reprises telles quelles.
+- Une contribution d'équipe se **mesure** à la sortie de l'outil `Agent` ; elle ne se déclare
+  pas par le modèle. Le générique du livrable ne doit jamais pouvoir mentir.
+- Rien ne s'écrase : republier un livrable crée une version, supprimer passe par la corbeille.
+  C'est ce qui permet de ne rien faire valider.
 
-## LLM et réseau
+## Style de code
 
-- Ne pas appeler `11434` en dur depuis le navigateur : passer par **`/api/ollama`** (proxy Vite / nginx) pour la stratégie CORS / déploiement.
-- Gérer **streaming** et **AbortController** pour ne pas laisser de requêtes pendantes ; messages d’erreur compréhensibles pour l’utilisateur.
+- JavaScript ES modules, pas de TypeScript, pas de framework côté fenêtre : DOM à la main.
+- **Commentaires en français**, et ils disent *pourquoi*, jamais *quoi*. Un commentaire qui
+  paraphrase la ligne suivante est du bruit.
+- Nommage du domaine en français (`membres`, `livrable`, `mission`, `ame`) ; les identifiants
+  du SDK restent tels quels (`subagent_type`, `tool_use_id`).
+- Fonctions courtes, early return, pas d'abstraction anticipée.
 
-## Style et UX
+## Interface
 
-- Interface et textes utilisateur en **français** sauf termes techniques usuels (Ollama, modèle, stream).
-- Respecter la grille existante (sidebar / centre / HUD : Organisation · Activité) pour la cohérence visuelle.
+- Textes utilisateur en français, tutoiement, ton direct. Des mots plutôt que des symboles
+  sur les boutons : on doit savoir ce qu'on clique sans deviner.
+- Respecter la grille : missions (gauche) · fil (centre) · équipe et livrables (droite).
+- Les variables CSS de `src/renderer/style.css` portent le thème clair et sombre : ne pas
+  écrire de couleur en dur.
+- Aucun accès Node depuis la page : tout passe par `src/preload.cjs` (contextIsolation).
 
-## Documentation
+## Tests
 
-- Le **README** reste la porte d’entrée (installation, ports, liens vers `docs/`).
-- Détails techniques (API, architecture, décisions) dans **`docs/`** ; ne pas dupliquer de longs blocs entre README et DEVBOOK sans lien explicite.
+- `npm test` doit rester **hors réseau et hors Electron**, dans un dossier temporaire
+  (`OPENSPACE_DATA_DIR`, `OPENSPACE_LIVRABLES`). Toute règle métier ajoutée vient avec son cas.
+- `npm run selftest` couvre la chaîne réelle (spécialiste → pôle → livrable) : le lancer après
+  une modification de `session.mjs`, `equipe.mjs` (agent) ou `gardes.mjs`.
