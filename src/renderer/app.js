@@ -1512,6 +1512,13 @@ api.onEvent((evt) => {
     case 'reprise-possible': proposerReprise(); break
     case 'resumed': addNote('Reprise de la mission précédente.'); break
     case 'mission':
+      // Changer de fil : les pièces préparées pour l'autre mission ne partent pas
+      // avec celle-ci. On les oublie, fichiers copiés compris.
+      if (missionCourante && evt.id !== missionCourante && piecesEnCours.length) {
+        for (const piece of piecesEnCours) api.pieces.oublier(piece.chemin)
+        piecesEnCours = []
+        renderPieces()
+      }
       missionCourante = evt.id
       restaurer(evt.evenements)
       // Une mission qui travaillait pendant qu'on regardait ailleurs travaille toujours.
