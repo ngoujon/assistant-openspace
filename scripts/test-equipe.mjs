@@ -61,14 +61,35 @@ E.enregistrerEquipe(membres)
 const relue = E.chargerEquipe()
 assert.deepEqual(relue.map((m) => m.id).sort(), membres.map((m) => m.id).sort())
 
-// 9. Les archives : mettre de côté, revenir.
-E.archiver('Équipe produit', membres)
-const archives = E.archives()
-assert.equal(archives.length, 1)
-E.enregistrerEquipe(E.equipeParDefaut())
-assert.equal(E.chargerEquipe().length, 7)
-E.restaurerArchive(archives[0].id)
-assert.equal(E.chargerEquipe().length, membres.length, 'la composition archivée revient telle quelle')
+// 9. Le gestionnaire d'équipes : plusieurs organigrammes, un seul au travail.
+assert.equal(E.equipes().length, 1, 'une seule équipe au départ')
+assert.equal(E.equipes()[0].actif, true)
+
+const idProduit = E.creerEquipe('Équipe produit', membres)
+assert.equal(E.equipes().length, 2)
+assert.equal(E.equipeActive().nom, 'Équipe produit', 'créer une équipe bascule dessus')
+assert.equal(E.chargerEquipe().length, membres.length)
+
+// L'équipe active est celle qu'on modifie — les autres ne bougent pas.
+const [premiere] = E.equipes().filter((e) => !e.actif)
+E.enregistrerEquipe(E.supprimerMembre(E.chargerEquipe(), 'cto'))
+assert.equal(E.equipes().find((e) => e.id === idProduit).membres, membres.length - 2, 'le pôle et son spécialiste sont partis')
+E.activerEquipe(premiere.id)
+assert.equal(E.chargerEquipe().some((m) => m.id === 'cto'), true, "l'autre équipe est intacte")
+
+// Dupliquer, renommer.
+const idCopie = E.dupliquerEquipe(idProduit)
+assert.equal(E.equipeActive().id, idCopie)
+assert.match(E.equipeActive().nom, /copie/)
+E.renommerEquipe(idCopie, 'Appel d\'offres')
+assert.equal(E.equipes().find((e) => e.id === idCopie).nom, "Appel d'offres")
+
+// Supprimer celle qui travaille bascule sur une autre ; la dernière ne part pas.
+E.supprimerEquipe(idCopie)
+assert.equal(E.equipes().length, 2)
+assert.ok(E.equipes().some((e) => e.actif), 'il reste toujours une équipe au travail')
+E.supprimerEquipe(E.equipes().find((e) => !e.actif).id)
+assert.throws(() => E.supprimerEquipe(E.equipeActive().id), /au moins une équipe/)
 
 // 10. L'équipe devient des sous-agents : un par membre, sauf l'orchestrateur.
 const agents = definitionsAgents(membres, { ampleur: 'document', langue: 'français' })

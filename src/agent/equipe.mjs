@@ -40,6 +40,8 @@ c'est **de la matière** que l'orchestrateur assemblera dans un livrable unique.
   (page lue, fichier ouvert), tu le dis et tu donnes la source.
 - Tu finis par \`## Points ouverts\` : ce qui manque, ce qui reste à décider, ce qui dépend
   d'un autre pôle. Cette section n'est jamais vide et elle n'est pas décorative.
+- Si le brief te donne des **chemins de fichiers** ou des **adresses**, ce sont les sources de
+  l'utilisateur : tu les ouvres (\`Read\`, \`WebFetch\`) avant d'écrire, et tu dis ce que tu en tires.
 - Tu ne rédiges **jamais** le document final et tu ne parles pas à la place des autres pôles.`
 
 const CONSIGNES_POLE = (enfants) => `

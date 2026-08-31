@@ -12,6 +12,7 @@ import {
 } from './espace/livrables.mjs'
 import * as Equipe from './espace/equipe.mjs'
 import * as Missions from './espace/missions.mjs'
+import * as Pieces from './espace/pieces.mjs'
 import { tracer, cheminJournal } from './espace/journal.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -221,8 +222,19 @@ function diffuserLivrables() {
 }
 
 function diffuserEquipe() {
+  emit({ k: 'equipe', ...etatEquipe() })
+}
+
+/** Ce que la colonne de droite a besoin de savoir : l'organigramme en service, et les autres. */
+function etatEquipe() {
   const membres = Equipe.chargerEquipe()
-  emit({ k: 'equipe', membres, arbre: Equipe.arbre(membres), archives: Equipe.archives() })
+  const active = Equipe.equipeActive()
+  return {
+    membres,
+    arbre: Equipe.arbre(membres),
+    equipes: Equipe.equipes(),
+    equipeActive: { id: active.id, nom: active.nom },
+  }
 }
 
 /** La liste des missions, chacune portant son état réel : en cours, en attente, en plan. */
@@ -246,9 +258,13 @@ function diffuserListe() {
   emit({ k: 'missions', liste: listeMissions(), courante: courante?.id || null })
 }
 
-function noterUtilisateur(missionId, texte) {
+function noterUtilisateur(missionId, texte, pieces) {
   viderTampon(missionId)
-  majListe(Missions.ajouter(missionId, { k: 'user', texte }))
+  majListe(Missions.ajouter(missionId, {
+    k: 'user',
+    texte,
+    pieces: pieces?.length ? pieces.map((p) => ({ nom: p.nom, genre: p.genre, libelle: p.libelle, taille: p.taille, chemin: p.chemin })) : undefined,
+  }))
 }
 
 /** Un argument d'outil lisible en une ligne, pour rejouer le fil plus tard. */
@@ -444,9 +460,13 @@ function reprendreMission(id) {
  * Achemine une demande vers son fil. Si deux missions travaillent déjà, elle attend
  * son tour — et on le dit, plutôt que de laisser croire qu'il ne se passe rien.
  */
-function demander(missionId, texte) {
-  noterUtilisateur(missionId, texte)
-  const sort = pool.envoyer(missionId, texte)
+function demander(missionId, texte, pieces = []) {
+  noterUtilisateur(missionId, texte, pieces)
+  // Ce que le modèle reçoit n'est pas tout à fait ce que l'utilisateur a tapé : les
+  // pièces jointes deviennent des chemins à ouvrir, les adresses collées des
+  // sources à lire. Le fil, lui, garde le message tel qu'il a été écrit.
+  const message = `${texte}${Pieces.blocPieces(pieces)}${Pieces.blocLiens(Pieces.liensDuTexte(texte))}`
+  const sort = pool.envoyer(missionId, message)
   if (sort === 'attente') {
     const note = `En attente : ${MAX_EN_PARALLELE} missions travaillent déjà. `
       + 'Celle-ci partira dès qu\'une place se libère — tu peux continuer à écrire en attendant.'
@@ -466,11 +486,17 @@ function demander(missionId, texte) {
  */
 function equipeModifiee(membres) {
   Equipe.enregistrerEquipe(membres)
+  equipeChangee('Équipe modifiée : la suite repart sur un contexte neuf.')
+  return Equipe.chargerEquipe()
+}
+
+/** L'organigramme en service n'est plus le même : on le diffuse et on repart à neuf. */
+function equipeChangee(note) {
   diffuserEquipe()
-  emit({ k: 'note', text: 'Équipe modifiée : la suite repart sur un contexte neuf.' })
+  emit({ k: 'note', text: note })
   pool.toutArreter()
   diffuserListe()
-  return Equipe.chargerEquipe()
+  return etatEquipe()
 }
 
 // ---------------------------------------------------------------------- IPC
@@ -502,15 +528,17 @@ function wireIpc() {
       totalLivrables: listerLivrables().length,
       missions: listeMissions(),
       membres,
-      arbre: Equipe.arbre(membres),
-      archives: Equipe.archives(),
+      ...etatEquipe(),
       version: app.getVersion(),
     }
   })
 
-  ipcMain.on('chat:send', (_e, text) => {
-    if (!text?.trim() || !courante) return
-    demander(courante.id, text.trim())
+  ipcMain.on('chat:send', (_e, { texte, pieces } = {}) => {
+    const propre = String(texte || '').trim()
+    if (!courante) return
+    // Une pièce jointe seule est une demande en soi : « regarde ça ».
+    if (!propre && !pieces?.length) return
+    demander(courante.id, propre || 'Analyse la ou les pièces jointes.', pieces || [])
   })
   ipcMain.on('chat:interrupt', () => { if (courante) pool.interrompre(courante.id) })
   ipcMain.on('chat:config', (_e, patch) => {
@@ -548,10 +576,7 @@ function wireIpc() {
 
   // ---------------------------------------------------------------- équipe
 
-  ipcMain.handle('equipe:get', () => {
-    const membres = Equipe.chargerEquipe()
-    return { membres, arbre: Equipe.arbre(membres), archives: Equipe.archives() }
-  })
+  ipcMain.handle('equipe:get', () => etatEquipe())
   ipcMain.handle('equipe:ajouter', (_e, { parentId, label }) => {
     const membres = Equipe.ajouterMembre(Equipe.chargerEquipe(), parentId, label)
     return equipeModifiee(membres)
@@ -588,19 +613,50 @@ function wireIpc() {
     return equipeModifiee(Equipe.supprimerMembre(membres, id))
   })
   ipcMain.handle('equipe:defaut', () => equipeModifiee(Equipe.equipeParDefaut()))
-  ipcMain.handle('equipe:archiver', (_e, nom) => {
-    Equipe.archiver(nom, Equipe.chargerEquipe())
-    diffuserEquipe()
-    return Equipe.archives()
+
+  // --------------------------------------------- le gestionnaire d'équipes
+  //
+  // Changer d'équipe, c'est changer les sous-agents branchés sur la session : on
+  // repart donc sur un contexte neuf, comme pour toute modification d'organigramme.
+
+  ipcMain.handle('equipes:activer', (_e, id) => {
+    Equipe.activerEquipe(id)
+    return equipeChangee(`Équipe « ${Equipe.equipeActive().nom} » : la suite repart sur un contexte neuf.`)
   })
-  ipcMain.handle('equipe:restaurer', (_e, id) => {
-    const membres = Equipe.restaurerArchive(id)
-    return equipeModifiee(membres)
+  ipcMain.handle('equipes:creer', (_e, { nom, depuis } = {}) => {
+    Equipe.creerEquipe(nom, depuis === 'actuelle' ? Equipe.chargerEquipe() : undefined)
+    return equipeChangee(`Nouvelle équipe « ${Equipe.equipeActive().nom} » : la suite repart sur un contexte neuf.`)
   })
-  ipcMain.handle('equipe:oublier-archive', (_e, id) => {
-    Equipe.supprimerArchive(id)
+  ipcMain.handle('equipes:dupliquer', (_e, id) => {
+    Equipe.dupliquerEquipe(id)
+    return equipeChangee(`Copie « ${Equipe.equipeActive().nom} » : la suite repart sur un contexte neuf.`)
+  })
+  ipcMain.handle('equipes:renommer', (_e, { id, nom }) => {
+    Equipe.renommerEquipe(id, nom)
     diffuserEquipe()
-    return Equipe.archives()
+    return etatEquipe()
+  })
+  ipcMain.handle('equipes:supprimer', async (_e, id) => {
+    const cible = Equipe.equipes().find((x) => x.id === id)
+    if (!cible) return etatEquipe()
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'warning',
+      buttons: ['Supprimer', 'Annuler'],
+      defaultId: 1,
+      cancelId: 1,
+      message: `Supprimer l'équipe « ${cible.nom} » ?`,
+      detail: `${cible.membres - 1} membre(s) et leurs âmes disparaissent. Les livrables déjà produits ne changent pas.`,
+    })
+    if (response !== 0) return etatEquipe()
+    try {
+      Equipe.supprimerEquipe(id)
+    } catch (err) {
+      return { ...etatEquipe(), refus: String(err?.message || err) }
+    }
+    // Supprimer celle qui travaillait bascule sur une autre : les sessions suivent.
+    return cible.actif
+      ? equipeChangee(`Équipe « ${Equipe.equipeActive().nom} » : la suite repart sur un contexte neuf.`)
+      : etatEquipe()
   })
   ipcMain.handle('equipe:proposer-ame', async (_e, { id, label }) => {
     try {
@@ -612,7 +668,46 @@ function wireIpc() {
       return { erreur: String(err?.message || err) }
     }
   })
-  ipcMain.on('equipe:ouvrir-fichier', () => ouvrirFichier(P.equipe()))
+  ipcMain.on('equipe:ouvrir-fichier', () => ouvrirFichier(P.equipes()))
+
+  // ---------------------------------------------------------- pièces jointes
+  //
+  // Tout ce que l'utilisateur dépose est copié dans les données de la mission : l'agent
+  // travaille sur une copie stable, et le fil retrouve ses pièces des semaines plus
+  // tard même si l'original a bougé.
+
+  const joindreTout = (chemins) => {
+    const pieces = []
+    const refus = []
+    for (const chemin of chemins || []) {
+      try {
+        pieces.push(Pieces.joindre(courante?.id, chemin))
+      } catch (err) {
+        refus.push(String(err?.message || err))
+      }
+    }
+    return { pieces, refus }
+  }
+
+  ipcMain.handle('pieces:choisir', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Joindre des fichiers à la mission',
+      buttonLabel: 'Joindre',
+      properties: ['openFile', 'multiSelections'],
+    })
+    if (canceled || !filePaths?.length) return { pieces: [], refus: [] }
+    return joindreTout(filePaths)
+  })
+  ipcMain.handle('pieces:deposer', (_e, chemins) => joindreTout(chemins))
+  ipcMain.handle('pieces:coller', (_e, { nom, base64 }) => {
+    try {
+      return { pieces: [Pieces.joindreDonnees(courante?.id, { nom, base64 })], refus: [] }
+    } catch (err) {
+      return { pieces: [], refus: [String(err?.message || err)] }
+    }
+  })
+  ipcMain.on('pieces:oublier', (_e, chemin) => Pieces.oublier(chemin))
+  ipcMain.on('pieces:ouvrir', (_e, chemin) => ouvrirFichier(chemin))
 
   // -------------------------------------------------------------- livrables
 
@@ -722,6 +817,11 @@ function buildMenu() {
           click: () => emit({ k: 'basculer-panneau' }),
         },
         {
+          label: 'Gérer les équipes…',
+          accelerator: 'CmdOrCtrl+E',
+          click: () => emit({ k: 'ouvrir-equipes' }),
+        },
+        {
           label: 'Largeur optimale',
           accelerator: 'CmdOrCtrl+0',
           click: () => {
@@ -735,7 +835,7 @@ function buildMenu() {
         { label: 'Interrompre', accelerator: 'CmdOrCtrl+.', click: () => { if (courante) pool.interrompre(courante.id) } },
         { type: 'separator' },
         { label: 'Ouvrir le dossier des livrables', accelerator: 'CmdOrCtrl+Shift+O', click: () => shell.openPath(P.livrables()) },
-        { label: "Ouvrir le fichier de l'équipe", click: () => ouvrirFichier(P.equipe()) },
+        { label: "Ouvrir le fichier des équipes", click: () => ouvrirFichier(P.equipes()) },
         { label: 'Ouvrir le journal de bord', click: () => shell.openPath(cheminJournal()) },
       ],
     },

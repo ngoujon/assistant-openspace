@@ -1,8 +1,21 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
+
+/**
+ * Le chemin d'un fichier glissé dans la fenêtre. Depuis Electron 32, `File.path`
+ * n'existe plus : c'est le seul moyen de retrouver l'original sur le disque, et
+ * donc de le joindre sans en recharger les octets dans la page.
+ */
+function cheminDeFichier(file) {
+  try {
+    return webUtils?.getPathForFile ? webUtils.getPathForFile(file) : ''
+  } catch {
+    return ''
+  }
+}
 
 contextBridge.exposeInMainWorld('openspace', {
   init: () => ipcRenderer.invoke('app:init'),
-  send: (text) => ipcRenderer.send('chat:send', text),
+  send: (texte, pieces) => ipcRenderer.send('chat:send', { texte, pieces }),
   interrupt: () => ipcRenderer.send('chat:interrupt'),
   setConfig: (patch) => ipcRenderer.send('chat:config', patch),
   replyPermission: (id, answer) => ipcRenderer.send('perm:reply', { id, answer }),
@@ -16,6 +29,15 @@ contextBridge.exposeInMainWorld('openspace', {
     remove: (id) => ipcRenderer.invoke('mission:delete', id),
   },
 
+  pieces: {
+    cheminDe: cheminDeFichier,
+    choisir: () => ipcRenderer.invoke('pieces:choisir'),
+    deposer: (chemins) => ipcRenderer.invoke('pieces:deposer', chemins),
+    coller: (nom, base64) => ipcRenderer.invoke('pieces:coller', { nom, base64 }),
+    oublier: (chemin) => ipcRenderer.send('pieces:oublier', chemin),
+    ouvrir: (chemin) => ipcRenderer.send('pieces:ouvrir', chemin),
+  },
+
   equipe: {
     get: () => ipcRenderer.invoke('equipe:get'),
     add: (parentId, label) => ipcRenderer.invoke('equipe:ajouter', { parentId, label }),
@@ -24,9 +46,12 @@ contextBridge.exposeInMainWorld('openspace', {
     reparent: (id, parentId) => ipcRenderer.invoke('equipe:rattacher', { id, parentId }),
     remove: (id) => ipcRenderer.invoke('equipe:supprimer', id),
     reset: () => ipcRenderer.invoke('equipe:defaut'),
-    archive: (nom) => ipcRenderer.invoke('equipe:archiver', nom),
-    restore: (id) => ipcRenderer.invoke('equipe:restaurer', id),
-    forget: (id) => ipcRenderer.invoke('equipe:oublier-archive', id),
+    // Le gestionnaire : plusieurs équipes nommées, une seule active.
+    activer: (id) => ipcRenderer.invoke('equipes:activer', id),
+    creer: (nom, depuis) => ipcRenderer.invoke('equipes:creer', { nom, depuis }),
+    dupliquer: (id) => ipcRenderer.invoke('equipes:dupliquer', id),
+    renommer: (id, nom) => ipcRenderer.invoke('equipes:renommer', { id, nom }),
+    supprimer: (id) => ipcRenderer.invoke('equipes:supprimer', id),
     proposerAme: (id, label) => ipcRenderer.invoke('equipe:proposer-ame', { id, label }),
     openFile: () => ipcRenderer.send('equipe:ouvrir-fichier'),
   },

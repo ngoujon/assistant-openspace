@@ -57,10 +57,14 @@ export const P = {
   /** Un fichier par mission : métadonnées et fil rejouable. */
   missions: () => path.join(root, 'missions'),
   mission: (id) => path.join(root, 'missions', `${id}.json`),
-  /** L'organigramme et l'âme de chaque membre : la seule vraie configuration de l'app. */
+  /** Les équipes nommées et celle qui est active : la vraie configuration de l'app. */
+  equipes: () => path.join(root, 'equipes.json'),
+  /** Ancien fichier « une seule équipe » : lu une fois, pour la reprise. */
   equipe: () => path.join(root, 'equipe.json'),
-  /** Les compositions d'équipe mises de côté, pour y revenir plus tard. */
+  /** Anciennes compositions mises de côté : lues une fois, pour la reprise. */
   archives: () => path.join(root, 'equipe-archives.json'),
+  /** Les pièces jointes d'une mission, copiées à l'envoi pour rester lisibles. */
+  pieces: (missionId) => path.join(root, 'pieces', String(missionId || 'sans-mission')),
   livrables: () => livrables,
   livrable: (nom) => path.join(livrables, nom),
   /** Les versions précédentes d'un livrable, rangées à côté de lui. */

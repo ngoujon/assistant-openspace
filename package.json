@@ -12,7 +12,7 @@
     "icon": "bash scripts/make-icon.sh",
     "build": "bash scripts/build-app.sh",
     "install-app": "bash scripts/install-app.sh",
-    "test": "node scripts/test-equipe.mjs && node scripts/test-gardes.mjs && node scripts/test-livrables.mjs && node scripts/test-conversations.mjs",
+    "test": "node scripts/test-equipe.mjs && node scripts/test-gardes.mjs && node scripts/test-livrables.mjs && node scripts/test-conversations.mjs && node scripts/test-pieces.mjs",
     "selftest": "node scripts/selftest.mjs"
   },
   "dependencies": {

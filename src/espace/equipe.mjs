@@ -1,9 +1,13 @@
-// L'équipe : un organigramme et, pour chaque membre, son « âme et rôle ».
+// Les équipes : des organigrammes nommés, et pour chaque membre son « âme et rôle ».
 //
 // C'est le seul vrai réglage de cette application. Tout le reste en découle : les
 // sous-agents branchés sur la session, l'ordre du travail pendant une mission, le
-// choix de qui répond en discussion. On la garde donc dans un fichier JSON lisible,
-// que l'utilisateur peut ouvrir, sauvegarder ou copier d'une machine à l'autre.
+// choix de qui répond en discussion.
+//
+// On en garde **plusieurs**, dont une seule est active : une mission d'appel d'offres
+// et une refonte de site ne se traitent pas avec les mêmes métiers, et refaire
+// l'organigramme à la main chaque fois serait absurde. Le tout vit dans un fichier
+// JSON lisible, que l'utilisateur peut ouvrir, sauvegarder ou copier d'une machine à l'autre.
 //
 // Trois niveaux, pas quatre : l'orchestrateur, ses directeurs (les pôles), et leurs
 // spécialistes. Au-delà, personne ne saurait plus qui intègre le travail de qui.
@@ -111,25 +115,174 @@ function valide(liste) {
     }))
 }
 
-export function chargerEquipe() {
+export function equipeParDefaut() {
+  return structuredClone(EQUIPE_PAR_DEFAUT)
+}
+
+// ------------------------------------------------- la bibliothèque d'équipes
+//
+// Un seul fichier : la liste des équipes et laquelle est active. Le reste de
+// l'application ne connaît que `chargerEquipe()` — l'équipe active — et n'a donc
+// pas à savoir qu'il y en a d'autres rangées à côté.
+
+const NOM_PAR_DEFAUT = 'Équipe par défaut'
+const maintenant = () => new Date().toISOString()
+
+function nouvelIdEquipe() {
+  return `e${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`
+}
+
+function equipeValide(brute, i = 0) {
+  const membres = valide(brute?.membres)
+  if (!membres?.length) return null
+  return {
+    id: typeof brute.id === 'string' && brute.id ? brute.id : nouvelIdEquipe(),
+    nom: String(brute.nom || '').trim().slice(0, 80) || `Équipe ${i + 1}`,
+    cree_le: brute.cree_le || maintenant(),
+    maj_le: brute.maj_le || brute.cree_le || maintenant(),
+    membres,
+  }
+}
+
+/**
+ * Reprend ce qui traîne d'une version précédente : l'équipe unique devient la
+ * première de la bibliothèque, et chaque composition mise de côté devient une
+ * équipe à part entière. Personne ne perd son organigramme en mettant à jour.
+ */
+function migrer() {
+  const equipes = []
   try {
     const brut = JSON.parse(fs.readFileSync(P.equipe(), 'utf8'))
-    const liste = valide(brut?.membres || brut)
-    if (liste?.length) return liste
+    const e = equipeValide({ nom: NOM_PAR_DEFAUT, membres: brut?.membres || brut })
+    if (e) equipes.push(e)
   } catch {}
-  return structuredClone(EQUIPE_PAR_DEFAUT)
+  try {
+    for (const a of JSON.parse(fs.readFileSync(P.archives(), 'utf8'))) {
+      const e = equipeValide({ nom: a?.nom, cree_le: a?.cree_le, membres: a?.membres })
+      if (e) equipes.push(e)
+    }
+  } catch {}
+  if (!equipes.length) {
+    equipes.push(equipeValide({ nom: NOM_PAR_DEFAUT, membres: equipeParDefaut() }))
+  }
+  return { actif: equipes[0].id, equipes }
+}
+
+function lireBibliotheque() {
+  try {
+    const brut = JSON.parse(fs.readFileSync(P.equipes(), 'utf8'))
+    const equipes = (Array.isArray(brut?.equipes) ? brut.equipes : [])
+      .map(equipeValide)
+      .filter(Boolean)
+    if (equipes.length) {
+      const actif = equipes.some((e) => e.id === brut.actif) ? brut.actif : equipes[0].id
+      return { actif, equipes }
+    }
+  } catch {}
+  return ecrireBibliotheque(migrer())
+}
+
+function ecrireBibliotheque(biblio) {
+  ensureDonnees()
+  fs.writeFileSync(P.equipes(), JSON.stringify(biblio, null, 2))
+  return biblio
+}
+
+/** Les équipes rangées, la plus récemment touchée d'abord, avec celle qui est active. */
+export function equipes() {
+  const { actif, equipes: liste } = lireBibliotheque()
+  return liste
+    .map((e) => ({
+      id: e.id,
+      nom: e.nom,
+      cree_le: e.cree_le,
+      maj_le: e.maj_le,
+      membres: e.membres.length,
+      poles: enfantsDe(ORCHESTRATEUR, e.membres).length,
+      actif: e.id === actif,
+    }))
+    .sort((a, b) => Number(b.actif) - Number(a.actif) || b.maj_le.localeCompare(a.maj_le))
+}
+
+export function equipeActive() {
+  const { actif, equipes: liste } = lireBibliotheque()
+  return liste.find((e) => e.id === actif) || liste[0]
+}
+
+/** L'organigramme en service. C'est tout ce que le reste de l'application connaît. */
+export function chargerEquipe() {
+  return structuredClone(equipeActive().membres)
 }
 
 export function enregistrerEquipe(membres) {
   const liste = valide(membres)
   if (!liste) throw new Error("Équipe invalide : l'orchestrateur est obligatoire.")
-  ensureDonnees()
-  fs.writeFileSync(P.equipe(), JSON.stringify({ membres: liste }, null, 2))
+  const biblio = lireBibliotheque()
+  const cible = biblio.equipes.find((e) => e.id === biblio.actif) || biblio.equipes[0]
+  cible.membres = liste
+  cible.maj_le = maintenant()
+  ecrireBibliotheque(biblio)
   return liste
 }
 
-export function equipeParDefaut() {
-  return structuredClone(EQUIPE_PAR_DEFAUT)
+/** Bascule sur une autre équipe. C'est elle, ensuite, que les missions font travailler. */
+export function activerEquipe(id) {
+  const biblio = lireBibliotheque()
+  if (!biblio.equipes.some((e) => e.id === id)) throw new Error('Équipe inconnue.')
+  biblio.actif = id
+  ecrireBibliotheque(biblio)
+  return chargerEquipe()
+}
+
+/**
+ * Ajoute une équipe et bascule dessus : on la crée pour s'en servir.
+ * @param {string} nom
+ * @param {Array} [membres] par défaut, l'équipe fournie avec l'application
+ */
+export function creerEquipe(nom, membres) {
+  const biblio = lireBibliotheque()
+  const e = equipeValide({ nom, membres: membres || equipeParDefaut() }, biblio.equipes.length)
+  if (!e) throw new Error("Équipe invalide : l'orchestrateur est obligatoire.")
+  biblio.equipes.push(e)
+  biblio.actif = e.id
+  ecrireBibliotheque(biblio)
+  return e.id
+}
+
+/** Copie une équipe pour la faire évoluer sans toucher à l'original. */
+export function dupliquerEquipe(id, nom) {
+  const biblio = lireBibliotheque()
+  const source = biblio.equipes.find((e) => e.id === id)
+  if (!source) throw new Error('Équipe inconnue.')
+  return creerEquipe(nom || `${source.nom} (copie)`, structuredClone(source.membres))
+}
+
+export function renommerEquipe(id, nom) {
+  const biblio = lireBibliotheque()
+  const cible = biblio.equipes.find((e) => e.id === id)
+  if (!cible) throw new Error('Équipe inconnue.')
+  const propre = String(nom || '').trim().slice(0, 80)
+  if (propre) {
+    cible.nom = propre
+    cible.maj_le = maintenant()
+    ecrireBibliotheque(biblio)
+  }
+  return equipes()
+}
+
+/**
+ * Retire une équipe. La dernière ne se supprime pas — il en faut toujours une pour
+ * travailler — et supprimer celle qui est active bascule sur la suivante.
+ */
+export function supprimerEquipe(id) {
+  const biblio = lireBibliotheque()
+  if (biblio.equipes.length <= 1) throw new Error('Il faut au moins une équipe.')
+  const reste = biblio.equipes.filter((e) => e.id !== id)
+  if (reste.length === biblio.equipes.length) throw new Error('Équipe inconnue.')
+  biblio.equipes = reste
+  if (biblio.actif === id) biblio.actif = reste[0].id
+  ecrireBibliotheque(biblio)
+  return equipes()
 }
 
 // ---------------------------------------------------------------- structure
@@ -256,48 +409,6 @@ export function supprimerMembre(membres, id) {
   if (id === ORCHESTRATEUR) return membres
   const partent = sousArbre(id, membres)
   return membres.filter((m) => !partent.has(m.id))
-}
-
-// ---------------------------------------------------------------- archives
-//
-// Une composition d'équipe est un objet de travail : on en essaie une pour un type
-// de mission, on revient à la précédente ensuite. Les archiver évite de refaire
-// l'organigramme à la main.
-
-export function archives() {
-  try {
-    const liste = JSON.parse(fs.readFileSync(P.archives(), 'utf8'))
-    return Array.isArray(liste) ? liste : []
-  } catch {
-    return []
-  }
-}
-
-function ecrireArchives(liste) {
-  ensureDonnees()
-  fs.writeFileSync(P.archives(), JSON.stringify(liste, null, 2))
-  return liste
-}
-
-export function archiver(nom, membres) {
-  const propre = String(nom || '').trim().slice(0, 80) || `Composition du ${new Date().toLocaleDateString('fr-FR')}`
-  const entree = {
-    id: `a${Date.now().toString(36)}${crypto.randomBytes(2).toString('hex')}`,
-    nom: propre,
-    cree_le: new Date().toISOString(),
-    membres: structuredClone(membres),
-  }
-  return ecrireArchives([entree, ...archives()].slice(0, 40))
-}
-
-export function supprimerArchive(id) {
-  return ecrireArchives(archives().filter((a) => a.id !== id))
-}
-
-export function restaurerArchive(id) {
-  const trouvee = archives().find((a) => a.id === id)
-  if (!trouvee) throw new Error('Composition introuvable.')
-  return enregistrerEquipe(trouvee.membres)
 }
 
 /** Le résumé d'un membre pour les prompts : qui il est, qui il encadre. */

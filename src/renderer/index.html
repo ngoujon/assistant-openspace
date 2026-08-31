@@ -122,8 +122,14 @@
         </main>
 
         <footer>
+          <div id="pieces" class="pieces hidden"></div>
           <div id="composer">
-            <textarea id="input" rows="1" placeholder="Quelle mission pour l'équipe ?" autofocus></textarea>
+            <button id="btn-joindre" class="joindre" title="Joindre des fichiers (⌘⇧A)" aria-label="Joindre des fichiers">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.4 11.5l-8.1 8.1a4.6 4.6 0 0 1-6.5-6.5l8.4-8.4a3 3 0 0 1 4.3 4.3l-8.3 8.3a1.5 1.5 0 0 1-2.1-2.1l7.6-7.6" />
+              </svg>
+            </button>
+            <textarea id="input" rows="1" placeholder="Quelle mission pour l'équipe ? (glisse tes fichiers ici)" autofocus></textarea>
             <button id="btn-send" class="send" aria-label="Envoyer">
               <svg class="ic-send" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 19V5M5 12l7-7 7 7" />
@@ -133,7 +139,7 @@
               </svg>
             </button>
           </div>
-          <div class="hint"><kbd>↩</kbd> envoyer · <kbd>⇧↩</kbd> nouvelle ligne · <kbd>esc</kbd> stop — tu peux écrire pendant qu'ils travaillent</div>
+          <div class="hint"><kbd>↩</kbd> envoyer · <kbd>⇧↩</kbd> nouvelle ligne · <kbd>esc</kbd> stop — glisse fichiers, images, audio ou vidéos dans la fenêtre, colle des liens</div>
         </footer>
       </div>
 
@@ -146,13 +152,15 @@
         </div>
 
         <section id="vue-equipe" class="vue">
+          <div class="equipe-barre">
+            <select id="equipe-active" aria-label="Équipe au travail"></select>
+            <button id="btn-equipes" class="mini" title="Gérer les équipes">Gérer…</button>
+          </div>
           <div id="arbre" class="arbre"></div>
           <div class="equipe-pied">
             <button id="btn-ajouter-pole" class="lien">+ Ajouter un pôle</button>
-            <button id="btn-archiver" class="lien">Mettre de côté…</button>
-            <button id="btn-equipe-defaut" class="lien">Équipe par défaut</button>
+            <button id="btn-equipe-defaut" class="lien">Repartir de l'équipe type</button>
           </div>
-          <div id="archives" class="archives"></div>
         </section>
 
         <section id="vue-livrables" class="vue hidden">
@@ -166,6 +174,35 @@
           </div>
         </section>
       </aside>
+    </div>
+
+    <div id="depot" class="depot hidden">
+      <div class="depot-boite">
+        <div class="depot-titre">Dépose tes sources</div>
+        <div class="depot-sous">Images, PDF, audio, vidéo, tableurs, code — l'équipe les ouvrira.</div>
+      </div>
+    </div>
+
+    <div id="modale-equipes" class="modale hidden">
+      <div class="modale-fond"></div>
+      <div class="modale-boite etroite" role="dialog" aria-modal="true" aria-labelledby="equipes-titre">
+        <div class="modale-tete">
+          <div id="equipes-titre" class="modale-nom statique">Tes équipes</div>
+          <button id="equipes-fermer" class="icon-btn" aria-label="Fermer">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <div class="modale-sous">Une seule travaille à la fois. Changer d'équipe repart sur un contexte neuf ; les missions déjà écrites ne bougent pas.</div>
+        <div id="liste-equipes" class="liste-equipes"></div>
+        <div class="modale-pied">
+          <button id="equipes-nouvelle" class="lien">+ Nouvelle équipe</button>
+          <button id="equipes-copie" class="lien">Partir de l'équipe actuelle</button>
+          <span class="grandit"></span>
+          <button id="equipes-fichier" class="lien">Ouvrir le fichier</button>
+        </div>
+      </div>
     </div>
 
     <div id="modale" class="modale hidden">

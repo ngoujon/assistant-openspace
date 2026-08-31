@@ -23,6 +23,8 @@ Un clic l'ouvre, la croix la masque (elle reste dans le Dock), `⌘Q` la quitte.
 | `⌘N` | nouvelle mission |
 | `⌘L` | afficher / masquer les missions |
 | `⌘D` | afficher / masquer l'équipe et les livrables |
+| `⌘E` | gérer les équipes |
+| `⌘⇧A` | joindre des fichiers |
 | `⌘⇧O` | ouvrir le dossier des livrables |
 | `⌘0` | largeur de fenêtre par défaut |
 
@@ -58,11 +60,26 @@ le modèle finissait toujours par écrire le document tout seul en résumant ce 
    l'orchestrateur convoque **ce membre-là**, seul, et republie.
 
 Les contributions ne sont pas déclarées par le modèle : elles sont **mesurées** à la sortie
-de chaque `Task`. Le générique du livrable (« Équipe mobilisée ») ne peut donc pas mentir.
+de chaque `Agent`. Le générique du livrable (« Équipe mobilisée ») ne peut donc pas mentir.
 
-## L'équipe
+## Les équipes
 
-La colonne de droite est l'organigramme, et c'est le seul vrai réglage de l'app.
+Tu en gardes **plusieurs**, dont une seule travaille : une refonte de site et un appel
+d'offres ne se traitent pas avec les mêmes métiers. Le sélecteur en tête de la colonne de
+droite dit laquelle est au travail ; **Gérer…** (ou `⌘E`) ouvre le gestionnaire.
+
+- **Utiliser** bascule : c'est cette équipe-là que les missions suivantes feront travailler.
+- **Dupliquer** copie l'organigramme et ses âmes pour le faire évoluer sans toucher à l'original.
+- Le nom se change en place, dans la liste.
+- **+ Nouvelle équipe** repart de l'équipe type ; **Partir de l'équipe actuelle** copie celle
+  qui travaille. La dernière équipe ne se supprime pas — il en faut toujours une.
+
+Changer d'équipe **repart sur un contexte neuf** : les sous-agents sont déclarés au démarrage
+de la session. Les missions déjà écrites et leurs livrables ne bougent pas.
+
+## L'organigramme
+
+La colonne de droite est l'organigramme de l'équipe active, et c'est le seul vrai réglage de l'app.
 
 - **Clic sur un membre** : sa fiche — nom, rattachement, et son texte **âme et rôle**, celui
   qui deviendra son prompt système. `⌘↩` enregistre, `esc` ferme.
@@ -71,15 +88,34 @@ La colonne de droite est l'organigramme, et c'est le seul vrai réglage de l'app
 - **`+`** sur l'orchestrateur ajoute un pôle, sur un pôle ajoute un spécialiste.
 - **Glisser-déposer** pour rattacher ailleurs. Trois niveaux, pas quatre : un spécialiste
   n'encadre personne, et un pôle qui encadre ne peut pas devenir spécialiste.
-- **Mettre de côté…** archive la composition entière (arbre + âmes) ; « Reprendre » la
-  remet en place. Pratique pour avoir une équipe « produit » et une équipe « appel d'offres ».
 - Pendant une mission, chaque membre porte son état en direct : *au travail*, *a rendu*,
   *en échec*.
 
-Modifier l'équipe **repart sur un contexte neuf** : les sous-agents sont déclarés au
+Modifier l'organigramme **repart sur un contexte neuf** : les sous-agents sont déclarés au
 démarrage de la session, une équipe changée en cours de route laisserait des sessions
 branchées sur un organigramme qui n'existe plus. Le contexte de chaque mission, lui, est
 enregistré : rien n'est perdu.
+
+## Les sources que tu apportes
+
+Le champ de saisie prend tout ce que tu lui donnes — c'est la matière de la mission.
+
+- **Glisse tes fichiers** n'importe où dans la fenêtre, clique le trombone, ou fais `⌘⇧A` :
+  images, PDF, audio, vidéo, tableurs, code, archives. Une capture **collée** depuis le
+  presse-papiers est enregistrée comme les autres.
+- **Colle des liens** dans le texte : ils sont listés au message comme des sources à ouvrir,
+  et l'orchestrateur les lit avec `WebFetch` avant de répondre. Un lien glissé depuis le
+  navigateur atterrit dans le champ.
+- Chaque pièce est **copiée** dans les données de la mission : elle reste lisible même si tu
+  déplaces l'original, et un fil rouvert dans trois semaines retrouve ses pièces. Jusqu'à
+  512 Mo par fichier.
+- Le message emporte les **chemins absolus** : `Read` ouvre images, PDF et tout ce qui est
+  texte ; pour un audio ou une vidéo, l'agent passe par `Bash` (`ffprobe`, `ffmpeg`, `sips`).
+  Si l'outil manque sur la machine, il le dit au lieu d'inventer.
+- L'orchestrateur **transmet ces sources à l'équipe** : le chemin exact va dans le brief du
+  membre concerné, qui l'ouvre lui-même. Un directeur artistique qui doit juger une maquette
+  a besoin du fichier, pas d'une description.
+- Une pièce sans un mot vaut une demande : « regarde ça ».
 
 ## Le livrable
 
@@ -147,7 +183,8 @@ src/agent/outils.mjs      serveur MCP interne : livrables, versions, titre, orga
 src/agent/pool.mjs        deux missions de front, la file d'attente, la navigation qui n'interrompt rien
 src/agent/ame.mjs         « Proposer une âme » : un appel isolé, un tour, aucun outil
 src/agent/resume.mjs      les demandes de validation, en français lisible
-src/espace/equipe.mjs     l'organigramme et les âmes sur disque, les archives de composition
+src/espace/equipe.mjs     les équipes nommées, leurs organigrammes et leurs âmes ; celle qui est active
+src/espace/pieces.mjs     les pièces jointes : copie, reconnaissance du type, chemins passés à l'agent
 src/espace/livrables.mjs  les .md, le sommaire, le générique, les versions
 src/espace/missions.mjs   un fichier par mission : le fil rejouable et la session à reprendre
 src/espace/paths.mjs      où vivent les données et les livrables
@@ -161,18 +198,20 @@ Où vivent les choses :
 | Quoi | Où |
 |---|---|
 | Livrables | `~/OpenSpace` (et `~/OpenSpace/Versions`) |
-| Équipe, archives, missions, réglages | `~/Library/Application Support/Assistant OpenSpace` |
+| Équipes, missions, pièces jointes, réglages | `~/Library/Application Support/Assistant OpenSpace` |
 | Journal de bord | `~/Library/Application Support/Assistant OpenSpace/journal.log` |
 
-Le fichier `equipe.json` est lisible et modifiable à la main (menu **Mission → Ouvrir le
-fichier de l'équipe**) : c'est un JSON, il se sauvegarde et se copie d'une machine à l'autre.
+Le fichier `equipes.json` est lisible et modifiable à la main (menu **Mission → Ouvrir le
+fichier des équipes**) : c'est un JSON, il se sauvegarde et se copie d'une machine à l'autre.
+Une installation qui vient d'une version précédente reprend son `equipe.json` et ses
+compositions archivées : chacune devient une équipe de la bibliothèque.
 
 ## Développement
 
 ```bash
 npm install
 npm start          # lance l'app depuis les sources
-npm test           # équipe, gardes, livrables, missions — sans réseau
+npm test           # équipes, gardes, livrables, missions, pièces jointes — sans réseau
 npm run selftest   # une vraie mission de bout en bout, dans un dossier temporaire
 npm run build      # « Assistant OpenSpace.app » dans build/
 npm run install-app # reconstruit, installe dans /Applications, épingle au Dock

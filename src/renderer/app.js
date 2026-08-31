@@ -19,7 +19,11 @@ const recherche = document.getElementById('recherche')
 const listeMissions = document.getElementById('liste-missions')
 const listeLivrables = document.getElementById('liste-livrables')
 const arbreEl = document.getElementById('arbre')
-const archivesEl = document.getElementById('archives')
+const selectEquipe = document.getElementById('equipe-active')
+const listeEquipesEl = document.getElementById('liste-equipes')
+const modaleEquipes = document.getElementById('modale-equipes')
+const piecesEl = document.getElementById('pieces')
+const depotEl = document.getElementById('depot')
 
 let busy = false
 let currentText = null
@@ -31,7 +35,11 @@ let livrables = []
 let missions = []
 let missionCourante = null
 let membres = []
-let archives = []
+/** Les équipes rangées, et celle qui travaille. */
+let equipes = []
+let equipeActive = null
+/** Les pièces jointes préparées pour le prochain message. */
+let piecesEnCours = []
 let dossier = ''
 let porteeLivrables = 'mission'
 let totalLivrables = 0
@@ -97,6 +105,20 @@ function showWelcome() {
   }
   box.appendChild(chips)
   thread.appendChild(box)
+}
+
+/** Les pièces d'un message déjà parti : elles restent cliquables dans le fil. */
+function pucesPieces(pieces) {
+  const box = el('div', 'pieces-msg')
+  for (const piece of pieces) {
+    const puce = el('span', 'pj')
+    puce.appendChild(el('span', 'g', GLYPHES[piece.genre] || GLYPHES.fichier))
+    puce.appendChild(el('span', 'n', piece.nom))
+    puce.title = `${piece.libelle} · ${piece.taille}`
+    puce.addEventListener('click', () => api.pieces.ouvrir(piece.chemin))
+    box.appendChild(puce)
+  }
+  return box
 }
 
 function dropWelcome() {
@@ -189,9 +211,10 @@ function humanizeInput(value, depth = 0, lines = []) {
 
 // -------------------------------------------------------------------- rendu
 
-function pushUserMessage(text, enAttente) {
+function pushUserMessage(text, enAttente, pieces) {
   dropWelcome()
   const node = el('div', `msg user${enAttente ? ' enfile' : ''}`, text)
+  if (pieces?.length) node.appendChild(pucesPieces(pieces))
   if (enAttente) {
     node.appendChild(el('span', 'attente', 'pris en compte à la prochaine étape'))
     enFile.push(node)
@@ -557,32 +580,123 @@ function renderEquipe() {
       arbreEl.appendChild(ligneMembre(s, 2))
     }
   }
-  renderArchives()
+  renderSelecteurEquipes()
 }
 
-function renderArchives() {
-  archivesEl.replaceChildren()
-  if (!archives.length) return
-  archivesEl.appendChild(el('div', 'titre-mini', 'Compositions mises de côté'))
-  for (const a of archives) {
-    const ligne = el('div', 'archive')
-    ligne.appendChild(el('span', 'an', a.nom))
-    ligne.appendChild(el('span', 'ad', `${a.membres.length - 1} membres`))
-    const restaurer = el('button', null, 'Reprendre')
-    restaurer.addEventListener('click', async () => {
-      membres = await api.equipe.restore(a.id)
-      renderEquipe()
+// =========================================== le gestionnaire d'équipes
+//
+// Une équipe par type de mission : refonte de site, appel d'offres, note
+// juridique. Une seule travaille à la fois — c'est elle que la session branche en
+// sous-agents — et le sélecteur en tête de colonne dit laquelle.
+
+/** Reprend ce que le processus principal vient de dire de l'équipe. */
+function appliquerEtatEquipe(etat) {
+  if (!etat) return
+  if (etat.refus) addNote(etat.refus, 'err')
+  if (Array.isArray(etat.membres)) membres = etat.membres
+  if (Array.isArray(etat.equipes)) equipes = etat.equipes
+  if (etat.equipeActive) equipeActive = etat.equipeActive
+  renderEquipe()
+  if (!modaleEquipes.classList.contains('hidden')) renderListeEquipes()
+}
+
+function renderSelecteurEquipes() {
+  if (!equipes.length) return
+  selectEquipe.replaceChildren()
+  for (const e of equipes) {
+    const opt = el('option', null, `${e.nom} — ${e.membres - 1} membre${e.membres > 2 ? 's' : ''}`)
+    opt.value = e.id
+    selectEquipe.appendChild(opt)
+  }
+  selectEquipe.value = equipeActive?.id || equipes.find((e) => e.actif)?.id || ''
+}
+
+selectEquipe.addEventListener('change', async () => {
+  appliquerEtatEquipe(await api.equipe.activer(selectEquipe.value))
+})
+
+function renderListeEquipes() {
+  listeEquipesEl.replaceChildren()
+  for (const e of equipes) {
+    const ligne = el('div', `equipe-ligne${e.actif ? ' active' : ''}`)
+    const infos = el('div', 'infos')
+    const nom = document.createElement('input')
+    nom.className = 'en'
+    nom.value = e.nom
+    nom.spellcheck = false
+    nom.setAttribute('aria-label', 'Nom de l\'équipe')
+    const renommer = async () => {
+      const propre = nom.value.trim()
+      if (!propre || propre === e.nom) { nom.value = e.nom; return }
+      appliquerEtatEquipe(await api.equipe.renommer(e.id, propre))
+    }
+    nom.addEventListener('blur', renommer)
+    nom.addEventListener('keydown', (ev) => {
+      ev.stopPropagation()
+      if (ev.key === 'Enter') { ev.preventDefault(); nom.blur() }
+      if (ev.key === 'Escape') { ev.preventDefault(); nom.value = e.nom; nom.blur() }
     })
-    const oublier = el('button', null, '×')
-    oublier.title = 'Oublier cette composition'
-    oublier.addEventListener('click', async () => {
-      archives = await api.equipe.forget(a.id)
-      renderArchives()
+    infos.appendChild(nom)
+
+    const meta = el('div', 'em')
+    if (e.actif) meta.appendChild(el('span', 'badge', 'au travail'))
+    meta.appendChild(el('span', null, `${e.poles} pôle${e.poles > 1 ? 's' : ''}`))
+    meta.appendChild(el('span', null, `${e.membres - 1} membre${e.membres > 2 ? 's' : ''}`))
+    meta.appendChild(el('span', null, dateCourte(e.maj_le)))
+    infos.appendChild(meta)
+    ligne.appendChild(infos)
+
+    const actions = el('div', 'actions')
+    if (!e.actif) {
+      const utiliser = el('button', 'pt', 'Utiliser')
+      utiliser.title = 'Faire travailler cette équipe'
+      utiliser.addEventListener('click', async () => {
+        appliquerEtatEquipe(await api.equipe.activer(e.id))
+      })
+      actions.appendChild(utiliser)
+    }
+    const dupliquer = el('button', 'pt', 'Dupliquer')
+    dupliquer.title = 'En faire une copie pour la modifier sans toucher à celle-ci'
+    dupliquer.addEventListener('click', async () => {
+      appliquerEtatEquipe(await api.equipe.dupliquer(e.id))
     })
-    ligne.append(restaurer, oublier)
-    archivesEl.appendChild(ligne)
+    actions.appendChild(dupliquer)
+    if (equipes.length > 1) {
+      const sup = el('button', 'pt danger', 'Supprimer')
+      sup.addEventListener('click', async () => {
+        appliquerEtatEquipe(await api.equipe.supprimer(e.id))
+      })
+      actions.appendChild(sup)
+    }
+    ligne.appendChild(actions)
+    listeEquipesEl.appendChild(ligne)
   }
 }
+
+function ouvrirModaleEquipes() {
+  renderListeEquipes()
+  modaleEquipes.classList.remove('hidden')
+  listeEquipesEl.querySelector('.en')?.focus()
+}
+
+function fermerModaleEquipes() {
+  modaleEquipes.classList.add('hidden')
+}
+
+document.getElementById('btn-equipes').addEventListener('click', ouvrirModaleEquipes)
+document.getElementById('equipes-fermer').addEventListener('click', fermerModaleEquipes)
+modaleEquipes.querySelector('.modale-fond').addEventListener('click', fermerModaleEquipes)
+document.getElementById('equipes-fichier').addEventListener('click', () => api.equipe.openFile())
+document.getElementById('equipes-nouvelle').addEventListener('click', async () => {
+  appliquerEtatEquipe(await api.equipe.creer(`Équipe ${equipes.length + 1}`, 'defaut'))
+})
+document.getElementById('equipes-copie').addEventListener('click', async () => {
+  appliquerEtatEquipe(await api.equipe.creer(`${equipeActive?.nom || 'Équipe'} (copie)`, 'actuelle'))
+})
+modaleEquipes.addEventListener('keydown', (e) => {
+  e.stopPropagation()
+  if (e.key === 'Escape') { e.preventDefault(); fermerModaleEquipes() }
+})
 
 // ------------------------------------------------------------- modale âme
 
@@ -705,15 +819,134 @@ document.getElementById('btn-ajouter-pole').addEventListener('click', async () =
   if (cree) ouvrirModale(cree.id)
 })
 
-document.getElementById('btn-archiver').addEventListener('click', async () => {
-  const nom = `Composition du ${new Date().toLocaleDateString('fr-FR')}`
-  archives = await api.equipe.archive(nom)
-  renderArchives()
-})
-
 document.getElementById('btn-equipe-defaut').addEventListener('click', async () => {
   membres = await api.equipe.reset()
   renderEquipe()
+})
+
+// ====================================================== les pièces jointes
+//
+// Tout ce que l'utilisateur dépose devient une source que l'équipe ouvrira : image, PDF,
+// enregistrement, export de tableur, dossier de code. On ne lit rien ici — on
+// prépare la liste, et le message emporte les chemins.
+
+const GLYPHES = {
+  image: '🖼', video: '🎬', audio: '🎧', document: '📄',
+  tableur: '📊', texte: '📝', code: '💻', archive: '🗜', fichier: '📎',
+}
+
+function renderPieces() {
+  piecesEl.replaceChildren()
+  piecesEl.classList.toggle('hidden', !piecesEnCours.length)
+  for (const piece of piecesEnCours) {
+    const puce = el('div', 'piece')
+    puce.appendChild(el('span', 'g', GLYPHES[piece.genre] || GLYPHES.fichier))
+    const nom = el('span', 'n', piece.nom)
+    nom.title = `${piece.libelle} · ${piece.taille}\n${piece.chemin}`
+    nom.addEventListener('click', () => api.pieces.ouvrir(piece.chemin))
+    puce.appendChild(nom)
+    puce.appendChild(el('span', 'm', piece.taille))
+    const retirer = el('button', 'x', '×')
+    retirer.title = 'Retirer cette pièce'
+    retirer.addEventListener('click', () => {
+      piecesEnCours = piecesEnCours.filter((x) => x.chemin !== piece.chemin)
+      api.pieces.oublier(piece.chemin)
+      renderPieces()
+      majBouton()
+    })
+    puce.appendChild(retirer)
+    piecesEl.appendChild(puce)
+  }
+  majBouton()
+}
+
+/** Le retour du processus principal : ce qui a été joint, et ce qui a été refusé. */
+function accuserPieces(resultat) {
+  for (const piece of resultat?.pieces || []) {
+    if (!piecesEnCours.some((x) => x.chemin === piece.chemin)) piecesEnCours.push(piece)
+  }
+  for (const refus of resultat?.refus || []) addNote(refus, 'err')
+  renderPieces()
+  input.focus()
+}
+
+/** Un fichier sans chemin sur le disque (collé, ou glissé depuis une page web). */
+function lireEnBase64(file) {
+  return new Promise((resolve, reject) => {
+    const lecteur = new FileReader()
+    lecteur.onerror = () => reject(new Error(`Impossible de lire « ${file.name} ».`))
+    lecteur.onload = () => resolve(String(lecteur.result).split(',')[1] || '')
+    lecteur.readAsDataURL(file)
+  })
+}
+
+async function joindreFichiers(fichiers) {
+  const chemins = []
+  const sansChemin = []
+  for (const file of fichiers) {
+    const chemin = api.pieces.cheminDe(file)
+    if (chemin) chemins.push(chemin)
+    else sansChemin.push(file)
+  }
+  if (chemins.length) accuserPieces(await api.pieces.deposer(chemins))
+  for (const file of sansChemin) {
+    try {
+      const base64 = await lireEnBase64(file)
+      accuserPieces(await api.pieces.coller(file.name, base64))
+    } catch (err) {
+      addNote(String(err?.message || err), 'err')
+    }
+  }
+}
+
+document.getElementById('btn-joindre').addEventListener('click', async () => {
+  accuserPieces(await api.pieces.choisir())
+})
+
+// Glisser-déposer sur toute la fenêtre : c'est le geste naturel, et viser le champ
+// de saisie au pixel près ne l'est pas.
+const porteFichiers = (e) => [...(e.dataTransfer?.types || [])].includes('Files')
+let profondeurGlisse = 0
+
+window.addEventListener('dragenter', (e) => {
+  if (!porteFichiers(e)) return
+  profondeurGlisse += 1
+  depotEl.classList.remove('hidden')
+})
+window.addEventListener('dragover', (e) => {
+  if (!porteFichiers(e)) return
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'copy'
+})
+window.addEventListener('dragleave', () => {
+  profondeurGlisse = Math.max(0, profondeurGlisse - 1)
+  if (!profondeurGlisse) depotEl.classList.add('hidden')
+})
+window.addEventListener('drop', async (e) => {
+  profondeurGlisse = 0
+  depotEl.classList.add('hidden')
+  const fichiers = [...(e.dataTransfer?.files || [])]
+  // Un lien glissé depuis le navigateur n'est pas un fichier : il rejoint le texte,
+  // où il sera lu comme une source.
+  const lien = e.dataTransfer?.getData('text/uri-list') || e.dataTransfer?.getData('text/plain')
+  if (!fichiers.length && !/^https?:\/\//i.test(lien || '')) return
+  e.preventDefault()
+  if (fichiers.length) {
+    await joindreFichiers(fichiers)
+    return
+  }
+  input.value = input.value ? `${input.value.trimEnd()}\n${lien}` : lien
+  autoGrow()
+  majBouton()
+  input.focus()
+})
+
+// Coller une capture d'écran : elle n'a pas de fichier d'origine, on l'enregistre.
+input.addEventListener('paste', async (e) => {
+  const fichiers = [...(e.clipboardData?.files || [])]
+  if (!fichiers.length) return
+  e.preventDefault()
+  await joindreFichiers(fichiers)
 })
 
 // ---------------------------------------------------- colonne des livrables
@@ -923,7 +1156,7 @@ function refreshActivePerm() {
 function setBusy(v) {
   busy = v
   document.body.classList.toggle('busy', v)
-  sendBtn.disabled = !v && !input.value.trim()
+  sendBtn.disabled = !v && !input.value.trim() && !piecesEnCours.length
   if (!v) {
     // Personne ne travaille plus : les fanions « au travail » restés allumés
     // mentiraient sur l'état de l'équipe.
@@ -951,18 +1184,24 @@ function statutEquipe() {
  */
 function submit(forced) {
   const text = (forced ?? input.value).trim()
-  if (!text) return
-  pushUserMessage(text, busy)
-  api.send(text)
+  const pieces = piecesEnCours
+  // Des pièces sans un mot valent une demande : « regarde ça ».
+  if (!text && !pieces.length) return
+  pushUserMessage(text || 'Analyse la ou les pièces jointes.', busy, pieces)
+  api.send(text, pieces)
+  piecesEnCours = []
+  renderPieces()
   input.value = ''
   autoGrow()
   setBusy(true)
   majBouton()
 }
 
-/** Le bouton envoie tant qu'il y a du texte ; il n'arrête l'équipe que sur un champ vide. */
+/** Le bouton envoie tant qu'il y a de quoi ; il n'arrête l'équipe que sur un champ vide. */
 function majBouton() {
-  document.body.classList.toggle('peut-envoyer', !!input.value.trim())
+  const aQuoiEnvoyer = !!input.value.trim() || piecesEnCours.length > 0
+  document.body.classList.toggle('peut-envoyer', aQuoiEnvoyer)
+  if (!busy) sendBtn.disabled = !aQuoiEnvoyer
 }
 
 function autoGrow() {
@@ -973,7 +1212,6 @@ function autoGrow() {
 input.addEventListener('input', () => {
   autoGrow()
   majBouton()
-  sendBtn.disabled = busy ? false : !input.value.trim()
 })
 
 input.addEventListener('keydown', (e) => {
@@ -981,7 +1219,7 @@ input.addEventListener('keydown', (e) => {
 })
 
 document.addEventListener('keydown', (e) => {
-  if (!modale.classList.contains('hidden')) return
+  if (!modale.classList.contains('hidden') || !modaleEquipes.classList.contains('hidden')) return
   const pending = permsEnAttente[0]
   if (pending) {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !input.value.trim()) {
@@ -991,10 +1229,14 @@ document.addEventListener('keydown', (e) => {
     return
   }
   if (e.key === 'Escape' && busy) { e.preventDefault(); api.interrupt() }
+  if (e.key.toLowerCase() === 'a' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault()
+    api.pieces.choisir().then(accuserPieces)
+  }
 }, true)
 
 sendBtn.addEventListener('click', () => {
-  if (input.value.trim()) submit()
+  if (input.value.trim() || piecesEnCours.length) submit()
   else if (busy) api.interrupt()
 })
 
@@ -1053,9 +1295,12 @@ function restaurer(evenements) {
 
   for (const e of evenements) {
     switch (e.k) {
-      case 'user':
-        thread.appendChild(el('div', 'msg user', e.texte))
+      case 'user': {
+        const bulle = el('div', 'msg user', e.texte)
+        if (e.pieces?.length) bulle.appendChild(pucesPieces(e.pieces))
+        thread.appendChild(bulle)
         break
+      }
       case 'texte': {
         const n = el('div', 'msg assistant md')
         n.innerHTML = renderMarkdown(e.texte)
@@ -1223,9 +1468,7 @@ api.onEvent((evt) => {
       else setStatus(`Outils OpenSpace : ${evt.outils}`, 'err')
       break
     case 'equipe':
-      membres = evt.membres || membres
-      archives = evt.archives || archives
-      renderEquipe()
+      appliquerEtatEquipe(evt)
       statutEquipe()
       break
     case 'livrables':
@@ -1292,6 +1535,11 @@ api.onEvent((evt) => {
     case 'basculer-panneau':
       panneauVisible(document.body.classList.contains('panneau-cache'))
       break
+    case 'ouvrir-equipes':
+      panneauVisible(true)
+      changerOnglet('equipe')
+      ouvrirModaleEquipes()
+      break
     case 'error':
       finishText(); finishThinking()
       addNote(evt.message, 'err')
@@ -1314,7 +1562,8 @@ livrables = state.livrables || []
 totalLivrables = state.totalLivrables || 0
 missions = state.missions || []
 membres = state.membres || []
-archives = state.archives || []
+equipes = state.equipes || []
+equipeActive = state.equipeActive || null
 document.body.classList.toggle('barre-cachee', state.config.barreVisible === false)
 document.body.classList.toggle('panneau-cache', state.config.panneauVisible === false)
 appliquerLargeur(barre, state.config.largeurBarre)
@@ -1324,6 +1573,7 @@ document.getElementById('portee-tous').classList.toggle('actif', porteeLivrables
 document.getElementById('portee-mission').classList.toggle('actif', porteeLivrables !== 'tous')
 changerOnglet(state.config.onglet || 'equipe')
 renderEquipe()
+renderPieces()
 renderLivrables()
 renderMissions()
 statutEquipe()
