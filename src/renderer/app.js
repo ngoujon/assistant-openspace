@@ -502,7 +502,8 @@ function ligneMembre(m, rang) {
 
   ligne.appendChild(el('div', 'pastille', initiales(m.label)))
   const infos = el('div', 'infos')
-  infos.appendChild(el('div', 't', m.label))
+  const titre = el('div', 't', m.label)
+  infos.appendChild(titre)
   const sousTitre = m.ame?.trim()
     ? premiereLigneUtile(m.ame)
     : 'âme à écrire'
@@ -510,27 +511,53 @@ function ligneMembre(m, rang) {
   ligne.appendChild(infos)
   ligne.appendChild(el('span', 'fanion', FANIONS[etat] || ''))
 
+  // Le nom se tape sur la carte, sans ouvrir la fiche : créer un membre doit aller
+  // vite. La fiche, elle, s'ouvre quand on veut écrire son âme.
+  const finEdition = async (garder) => {
+    if (!titre.isContentEditable) return
+    const valeur = titre.textContent.replace(/\s+/g, ' ').trim()
+    titre.contentEditable = 'false'
+    titre.classList.remove('edition')
+    if (garder && valeur && valeur !== m.label) {
+      membres = await api.equipe.rename(m.id, valeur)
+      renderEquipe()
+      return
+    }
+    titre.textContent = m.label
+  }
+  titre.addEventListener('blur', () => finEdition(true))
+  titre.addEventListener('keydown', (e) => {
+    e.stopPropagation()
+    if (e.key === 'Enter') { e.preventDefault(); finEdition(true) }
+    if (e.key === 'Escape') { e.preventDefault(); finEdition(false) }
+  })
+  titre.addEventListener('dblclick', (e) => {
+    e.stopPropagation()
+    editerLigne(ligne)
+  })
+
   // Ajouter sous ce membre : un pôle sous l'orchestrateur, un spécialiste sous un pôle.
   if (rang < 2) {
     const plus = el('button', 'plus', '+')
     plus.title = rang === 0 ? 'Ajouter un pôle' : 'Ajouter un spécialiste'
     plus.addEventListener('click', async (e) => {
       e.stopPropagation()
-      const label = rang === 0 ? 'Nouveau pôle' : 'Nouveau spécialiste'
-      membres = await api.equipe.add(m.id, label)
-      renderEquipe()
-      const cree = [...membres].reverse().find((x) => x.parentId === m.id)
-      if (cree) ouvrirModale(cree.id)
+      await ajouterMembre(m.id, rang === 0 ? 'Nouveau pôle' : 'Nouveau spécialiste')
     })
     ligne.appendChild(plus)
   }
 
-  ligne.addEventListener('click', () => ouvrirModale(m.id))
+  ligne.addEventListener('click', () => {
+    if (titre.isContentEditable) return
+    ouvrirModale(m.id)
+  })
 
   // Glisser-déposer : c'est la façon naturelle de réorganiser un organigramme.
   if (rang > 0) {
     ligne.draggable = true
     ligne.addEventListener('dragstart', (e) => {
+      // Un nom en cours de saisie se sélectionne à la souris : ce n'est pas un glisser.
+      if (titre.isContentEditable) { e.preventDefault(); return }
       e.dataTransfer.setData('text/plain', m.id)
       e.dataTransfer.effectAllowed = 'move'
       ligne.classList.add('glisse')
@@ -567,6 +594,28 @@ function premiereLigneUtile(ame) {
   const ligne = String(ame).split('\n').map((l) => l.trim())
     .find((l) => l && !/^tu es\b/i.test(l))
   return (ligne || String(ame).trim().split('\n')[0] || '').replace(/^(Rôle|Âme)\s*:\s*/i, '').slice(0, 90)
+}
+
+/** Passe le nom d'une carte en saisie, tout sélectionné : on tape par-dessus. */
+function editerLigne(ligne) {
+  const titre = ligne?.querySelector('.t')
+  if (!titre) return
+  ligne.scrollIntoView({ block: 'nearest' })
+  titre.contentEditable = 'plaintext-only'
+  titre.classList.add('edition')
+  titre.focus()
+  document.getSelection()?.selectAllChildren(titre)
+}
+
+/**
+ * Crée un membre et laisse le curseur dans son nom. Pas de fiche qui s'ouvre : on
+ * tape, on valide, on enchaîne. L'âme s'écrit plus tard, en cliquant sur la carte.
+ */
+async function ajouterMembre(parentId, label) {
+  membres = await api.equipe.add(parentId, label)
+  const cree = [...membres].reverse().find((x) => x.parentId === parentId)
+  renderEquipe()
+  if (cree) editerLigne(arbreEl.querySelector(`[data-membre="${CSS.escape(cree.id)}"]`))
 }
 
 function renderEquipe() {
@@ -766,13 +815,15 @@ async function enregistrerModale() {
   const ame = modaleAme.value
   btnEnregistrer.disabled = true
   try {
-    if (label && label !== m.label) membres = await api.equipe.rename(id, label)
+    // Le renommage passe en dernier : il peut changer l'identifiant du sous-agent
+    // (voir renommerMembre), et les appels suivants viseraient un membre disparu.
     if (ame !== (m.ame || '')) membres = await api.equipe.setAme(id, ame)
     if (modaleParent.value && modaleParent.value !== m.parentId) {
       const res = await api.equipe.reparent(id, modaleParent.value)
       if (res?.refus) addNote(res.refus, 'err')
       membres = res?.refus ? res.membres : res
     }
+    if (label && label !== m.label) membres = await api.equipe.rename(id, label)
   } finally {
     btnEnregistrer.disabled = false
   }
@@ -812,12 +863,9 @@ modale.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); enregistrerModale() }
 })
 
-document.getElementById('btn-ajouter-pole').addEventListener('click', async () => {
-  membres = await api.equipe.add('orchestrateur', 'Nouveau pôle')
-  renderEquipe()
-  const cree = [...membres].reverse().find((x) => x.parentId === 'orchestrateur')
-  if (cree) ouvrirModale(cree.id)
-})
+document.getElementById('btn-ajouter-pole').addEventListener('click', () => (
+  ajouterMembre('orchestrateur', 'Nouveau pôle')
+))
 
 document.getElementById('btn-equipe-defaut').addEventListener('click', async () => {
   membres = await api.equipe.reset()

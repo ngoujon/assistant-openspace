@@ -864,6 +864,15 @@ body.panneau-cache .panneau-droite {
   white-space: nowrap;
 }
 .membre .m.sans-ame { color: var(--warn); }
+/* Le nom en cours de saisie, directement sur la carte. */
+.membre .t.edition {
+  white-space: normal;
+  overflow: visible;
+  outline: 0;
+  user-select: text;
+  cursor: text;
+  border-bottom: 1px solid var(--accent);
+}
 .membre .plus {
   flex: 0 0 auto;
   border: 0; background: none; color: var(--text-faint);

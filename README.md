@@ -81,11 +81,16 @@ de la session. Les missions déjà écrites et leurs livrables ne bougent pas.
 
 La colonne de droite est l'organigramme de l'équipe active, et c'est le seul vrai réglage de l'app.
 
+- **`+`** sur l'orchestrateur ajoute un pôle, sur un pôle ajoute un spécialiste. Le nom se
+  tape **directement sur la carte**, `↩` valide, `esc` annule : aucune fenêtre ne s'ouvre,
+  on enchaîne. Double-clic sur un nom pour le corriger de la même façon.
 - **Clic sur un membre** : sa fiche — nom, rattachement, et son texte **âme et rôle**, celui
   qui deviendra son prompt système. `⌘↩` enregistre, `esc` ferme.
 - **Proposer une âme** : un appel court et isolé (un tour, aucun outil) écrit la fiche à ta
   place, en tenant compte de qui l'entoure dans l'équipe. Tu relis, tu corriges.
-- **`+`** sur l'orchestrateur ajoute un pôle, sur un pôle ajoute un spécialiste.
+- Un membre qu'on vient de créer prend l'**identifiant de son vrai nom** dès qu'on le
+  renomme (« Direction financière » → `direction-financiere`) : c'est ce que l'orchestrateur
+  emploie pour le convoquer. Dès qu'il a une âme, l'identifiant se fige.
 - **Glisser-déposer** pour rattacher ailleurs. Trois niveaux, pas quatre : un spécialiste
   n'encadre personne, et un pôle qui encadre ne peut pas devenir spécialiste.
 - Pendant une mission, chaque membre porte son état en direct : *au travail*, *a rendu*,

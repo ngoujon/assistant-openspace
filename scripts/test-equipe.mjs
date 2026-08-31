@@ -37,6 +37,28 @@ membres = E.ajouterMembre(membres, E.ORCHESTRATEUR, 'Directeur financier')
 assert.equal(membres.at(-1).id, 'directeur-financier-2')
 membres = E.supprimerMembre(membres, 'directeur-financier-2')
 
+// 4 bis. Un membre qu'on vient de créer prend l'identifiant de son vrai nom : c'est
+//        celui que l'orchestrateur emploiera pour le convoquer.
+let neufs = E.ajouterMembre(membres, E.ORCHESTRATEUR, 'Nouveau pôle')
+assert.equal(neufs.at(-1).id, 'nouveau-pole')
+neufs = E.ajouterMembre(neufs, 'nouveau-pole', 'Nouveau spécialiste')
+neufs = E.renommerMembre(neufs, 'nouveau-pole', 'Direction financière')
+assert.equal(E.membre('nouveau-pole', neufs), null, "l'identifiant provisoire ne reste pas")
+assert.equal(E.membre('direction-financiere', neufs).label, 'Direction financière')
+assert.equal(neufs.find((m) => m.id === 'nouveau-specialiste').parentId, 'direction-financiere',
+  'ses spécialistes suivent leur pôle')
+
+// Un membre en service, lui, garde son identifiant : une mission le convoque peut-être.
+const enService = E.renommerMembre(neufs, 'cto', 'Directrice technique')
+assert.equal(E.membre('cto', enService).label, 'Directrice technique')
+const avecAme = E.renommerMembre(
+  E.definirAme(neufs, 'nouveau-specialiste', 'Tu es le contrôleur de gestion.'),
+  'nouveau-specialiste',
+  'Contrôleur de gestion',
+)
+assert.equal(E.membre('nouveau-specialiste', avecAme).label, 'Contrôleur de gestion',
+  "une âme écrite fige l'identifiant")
+
 // 5. Rattachement : sous l'orchestrateur ou sous un pôle, jamais sous un spécialiste,
 //    et jamais dans son propre sous-arbre.
 assert.equal(E.peutRattacher(controleur.id, 'cto', membres), true)

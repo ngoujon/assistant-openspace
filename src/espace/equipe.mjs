@@ -396,9 +396,32 @@ export function ajouterMembre(membres, parentId, label = 'Nouveau membre') {
   return [...membres, { id, label: String(label).trim() || 'Nouveau membre', parentId, order: ordreMax + 1, ame: '' }]
 }
 
+/** Les identifiants posés par défaut à la création, avant que le membre ait un nom. */
+const ID_PROVISOIRE = /^nouveau-(pole|specialiste)(-\d+)?$/
+
+/**
+ * Renomme un membre — et, s'il vient d'être créé, renomme aussi son identifiant.
+ *
+ * Cet identifiant est le `subagent_type` que l'orchestrateur emploie pour convoquer :
+ * laisser « nouveau-pole » sur le directeur financier rendrait ses briefs illisibles.
+ * On ne le change que tant que le membre n'a pas d'âme — après, il est en service, et
+ * un identifiant en service ne bouge plus sous les pieds d'une mission.
+ */
 export function renommerMembre(membres, id, label) {
   const propre = String(label || '').trim().slice(0, 60)
-  return membres.map((m) => (m.id === id ? { ...m, label: propre || m.label } : m))
+  const cible = membre(id, membres)
+  if (!cible || !propre) return membres
+
+  const provisoire = id !== ORCHESTRATEUR && ID_PROVISOIRE.test(id) && !cible.ame.trim()
+  const nouvelId = provisoire
+    ? identifiant(propre, membres.filter((m) => m.id !== id))
+    : id
+
+  return membres.map((m) => {
+    if (m.id === id) return { ...m, id: nouvelId, label: propre }
+    if (m.parentId === id) return { ...m, parentId: nouvelId }
+    return m
+  })
 }
 
 export function definirAme(membres, id, ame) {
