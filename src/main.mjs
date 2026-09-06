@@ -39,6 +39,8 @@ const CONFIG_DEFAUT = {
   // « mission » : seuls les livrables du fil ouvert. « tous » : tout le dossier.
   porteeLivrables: 'mission',
   bounds: null,
+  // Grossissement de l'interface, en crans (⌘+ / ⌘−). 0 = taille réelle.
+  zoom: 0,
   mission: null,
   promptVersion: 0,
 }
@@ -144,6 +146,8 @@ function createWindow() {
   })
 
   win.webContents.on('did-start-loading', () => { rendererPret = false })
+  // Un changement de page remet le zoom à zéro : on le repose à chaque chargement.
+  win.webContents.on('did-finish-load', () => win.webContents.setZoomLevel(config.zoom || 0))
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'))
   win.once('ready-to-show', () => win.show())
 
@@ -162,6 +166,24 @@ function createWindow() {
     shell.openExternal(url)
     return { action: 'deny' }
   })
+}
+
+// ------------------------------------------------------------------- zoom
+
+// Le zoom d'Electron est logarithmique : un cran vaut 20 % de plus. On borne
+// pour que l'interface reste utilisable, et on garde le réglage d'une fois sur l'autre.
+const ZOOM_MIN = -4
+const ZOOM_MAX = 6
+
+function appliquerZoom(crans) {
+  const n = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(crans)))
+  config.zoom = n
+  if (win && !win.isDestroyed()) win.webContents.setZoomLevel(n)
+  saveConfig()
+}
+
+function zoomer(delta) {
+  appliquerZoom((config.zoom || 0) + delta)
 }
 
 // Le renderer n'écoute qu'après son chargement : on met les événements de démarrage
@@ -779,6 +801,11 @@ function wireIpc() {
     return { dossier: P.livrables(), livrables: listerLivrables() }
   })
 
+  ipcMain.on('app:zoom', (_e, delta) => {
+    if (delta === 0) appliquerZoom(0)
+    else zoomer(delta > 0 ? +1 : -1)
+  })
+
   ipcMain.on('app:open-dossier', () => shell.openPath(P.livrables()))
   ipcMain.on('app:open-external', (_e, url) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url)
@@ -823,7 +850,7 @@ function buildMenu() {
         },
         {
           label: 'Largeur optimale',
-          accelerator: 'CmdOrCtrl+0',
+          accelerator: 'CmdOrCtrl+Alt+0',
           click: () => {
             if (!win || win.isDestroyed()) return
             const { width, height } = boundsParDefaut()
@@ -840,6 +867,16 @@ function buildMenu() {
       ],
     },
     { role: 'editMenu', label: 'Édition' },
+    {
+      label: 'Affichage',
+      submenu: [
+        // ⌘= et le pavé numérique passent par l'interface (voir renderer/app.js) :
+        // un menu ne porte qu'un raccourci, et « + » demande Maj sur un clavier français.
+        { label: 'Agrandir', accelerator: 'CmdOrCtrl+Plus', click: () => zoomer(+1) },
+        { label: 'Réduire', accelerator: 'CmdOrCtrl+-', click: () => zoomer(-1) },
+        { label: 'Taille réelle', accelerator: 'CmdOrCtrl+0', click: () => appliquerZoom(0) },
+      ],
+    },
     {
       label: 'Fenêtre',
       submenu: [

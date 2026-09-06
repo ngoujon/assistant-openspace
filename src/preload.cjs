@@ -66,6 +66,9 @@ contextBridge.exposeInMainWorld('openspace', {
     export: (nom, numero) => ipcRenderer.invoke('livrables:export', { nom, numero }),
   },
 
+  // Les variantes de ⌘+ / ⌘− que le menu ne peut pas porter (⌘=, pavé numérique).
+  zoom: (delta) => ipcRenderer.send('app:zoom', delta),
+
   choisirDossier: () => ipcRenderer.invoke('app:choisir-dossier'),
   openDossier: () => ipcRenderer.send('app:open-dossier'),
   openExternal: (url) => ipcRenderer.send('app:open-external', url),

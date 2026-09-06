@@ -1266,6 +1266,17 @@ input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit() }
 })
 
+// Le zoom. Le menu Affichage porte ⌘+, ⌘− et ⌘0 ; on rattrape ici les touches
+// qu'il ne voit pas — ⌘= (le « + » d'un clavier français demande Maj) et le pavé
+// numérique. Avant tout le reste : le zoom marche même une carte ouverte.
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey) return
+  const t = e.key === 'Add' ? '+' : e.key
+  if (t === '+' || t === '=') { e.preventDefault(); api.zoom(+1) }
+  else if (t === '-' || t === '_' || t === 'Subtract') { e.preventDefault(); api.zoom(-1) }
+  else if (t === '0') { e.preventDefault(); api.zoom(0) }
+}, true)
+
 document.addEventListener('keydown', (e) => {
   if (!modale.classList.contains('hidden') || !modaleEquipes.classList.contains('hidden')) return
   const pending = permsEnAttente[0]

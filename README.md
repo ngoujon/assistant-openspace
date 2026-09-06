@@ -26,7 +26,9 @@ Un clic l'ouvre, la croix la masque (elle reste dans le Dock), `⌘Q` la quitte.
 | `⌘E` | gérer les équipes |
 | `⌘⇧A` | joindre des fichiers |
 | `⌘⇧O` | ouvrir le dossier des livrables |
-| `⌘0` | largeur de fenêtre par défaut |
+| `⌘+` / `⌘-` | grossir / réduire l'affichage |
+| `⌘0` | affichage à sa taille réelle |
+| `⌥⌘0` | largeur de fenêtre par défaut |
 
 À l'ouverture, l'app **reprend la mission précédente** : elle se souvient de ce que vous
 vous êtes dit ce matin. Le bouton `+` repart de zéro.
