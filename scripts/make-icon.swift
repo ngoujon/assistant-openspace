@@ -1,4 +1,4 @@
-// Génère assets/icon-1024.png : squircle turquoise + organigramme à trois nœuds
+// Génère assets/icon-1024.png : squircle terracotta + organigramme à trois nœuds
 // + étincelle IA. Usage : swift scripts/make-icon.swift <chemin de sortie>
 
 import AppKit
@@ -32,11 +32,13 @@ let squircle = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radi
 ctx.saveGState()
 ctx.addPath(squircle)
 ctx.clip()
-// Turquoise : lumière en haut à gauche, profondeur en bas à droite.
+// Terracotta, les teintes de l'app : l'accent du thème sombre (#d99b80) en
+// haut à gauche, celui du thème clair (#a85f47) au milieu, puis un brun profond
+// en bas à droite.
 let colors = [
-  CGColor(red: 0.298, green: 0.816, blue: 0.741, alpha: 1),
-  CGColor(red: 0.059, green: 0.580, blue: 0.533, alpha: 1),
-  CGColor(red: 0.020, green: 0.243, blue: 0.243, alpha: 1),
+  CGColor(red: 0.851, green: 0.608, blue: 0.502, alpha: 1),
+  CGColor(red: 0.659, green: 0.373, blue: 0.278, alpha: 1),
+  CGColor(red: 0.216, green: 0.114, blue: 0.082, alpha: 1),
 ] as CFArray
 let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
                           colors: colors, locations: [0, 0.48, 1])!
@@ -67,7 +69,7 @@ let trait = size * 0.050
 
 ctx.saveGState()
 ctx.setShadow(offset: CGSize(width: 0, height: -size * 0.012), blur: size * 0.036,
-              color: CGColor(red: 0.01, green: 0.13, blue: 0.13, alpha: 0.32))
+              color: CGColor(red: 0.13, green: 0.06, blue: 0.04, alpha: 0.32))
 ctx.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
 ctx.setLineWidth(trait)
 ctx.setLineCap(.round)
