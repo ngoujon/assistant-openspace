@@ -103,7 +103,10 @@ function blocAPropos(meta) {
   if (meta.equipe?.length) {
     lignes.push(`- Équipe mobilisée : ${meta.equipe.join(', ')}`)
   }
-  lignes.push(`- Produit par l'Assistant OpenSpace${meta.modele ? ` (${meta.modele})` : ''}`)
+  // Le moteur qui a écrit : le modèle et l'effort demandé. Trois semaines plus tard,
+  // c'est ce qui explique pourquoi deux versions du même document ne se valent pas.
+  const moteur = [meta.modele, meta.effort && `effort ${meta.effort}`].filter(Boolean).join(', ')
+  lignes.push(`- Produit par l'Assistant OpenSpace${moteur ? ` (${moteur})` : ''}`)
   lignes.push('', `<!-- ${MARQUEUR} ${JSON.stringify(meta)} -->`, '')
   return lignes.join('\n')
 }
@@ -195,7 +198,7 @@ function avecSommaire(corps) {
  * Enregistre un livrable. Le corps vient de l'orchestrateur ; le sommaire et le
  * générique sont composés ici.
  */
-export function ecrireLivrable({ titre, mission, markdown, equipe = [], nom, modele }) {
+export function ecrireLivrable({ titre, mission, markdown, equipe = [], nom, modele, effort }) {
   ensureDirs()
   if (!titre?.trim()) throw new Error('Un livrable a besoin d\'un titre.')
   if (!markdown?.trim()) throw new Error('Le livrable est vide.')
@@ -221,6 +224,7 @@ export function ecrireLivrable({ titre, mission, markdown, equipe = [], nom, mod
     equipe: equipe.length ? [...new Set(equipe)] : (ancien.equipe || []),
     mots: compterMots(corps),
     modele: modele || undefined,
+    effort: effort || undefined,
   }
 
   fs.writeFileSync(chemin, `${avecSommaire(corps)}\n\n---\n\n${blocAPropos(meta)}`)

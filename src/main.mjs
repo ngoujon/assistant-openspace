@@ -3,7 +3,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { setDataRoot, setLivrables, livrablesParDefaut, P } from './espace/paths.mjs'
-import { AgentSession } from './agent/session.mjs'
+import { AgentSession, EFFORT } from './agent/session.mjs'
 import { Pool, MAX_EN_PARALLELE } from './agent/pool.mjs'
 import { PROMPT_VERSION } from './agent/prompt.mjs'
 import { proposerAme } from './agent/ame.mjs'
@@ -14,11 +14,15 @@ import * as Equipe from './espace/equipe.mjs'
 import * as Missions from './espace/missions.mjs'
 import * as Pieces from './espace/pieces.mjs'
 import { tracer, cheminJournal } from './espace/journal.mjs'
+import { ouvrirPont, fermerPont } from './local/pont.mjs'
+import { adresseMoteur, modelesDisponibles, libelleModele, contexteDuModele, CONTEXTE_MINIMUM } from './local/moteur.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const CONFIG_DEFAUT = {
-  model: 'claude-opus-5',
+  // Le modèle est celui que sert le serveur local : on ne peut pas le connaître
+  // avant de lui avoir demandé. Vide, il est choisi au démarrage (voir `choisirModele`).
+  model: '',
   // Le modèle des sous-agents. « inherit » : la même finesse pour toute l'équipe.
   modeleEquipe: 'inherit',
   // Longueur visée du livrable. Voir agent/equipe.mjs.
@@ -55,6 +59,10 @@ let quitting = false
 let courante = null
 /** Les règles ont changé : on n'essaie pas de reprendre les fils d'avant. */
 let resumeInterdit = false
+/** Ce que le serveur local sait faire tourner, tel qu'il l'a annoncé au démarrage. */
+let modeles = []
+/** Ce qui cloche côté serveur, à dire dans le fil dès qu'une mission est ouverte. */
+let avertissementMoteur = ''
 
 const permissionsEnAttente = new Map()
 let seqPermission = 0
@@ -521,6 +529,49 @@ function equipeChangee(note) {
   return etatEquipe()
 }
 
+/**
+ * Demande au serveur local la liste de ses modèles et retient celui qui travaillera.
+ *
+ * Le modèle coché dans les réglages est gardé s'il est toujours servi ; sinon on
+ * prend le premier de la liste, parce qu'une application qui refuse de démarrer
+ * parce qu'un modèle a été déchargé ne rend service à personne. Si le serveur ne
+ * répond pas du tout, on garde ce qu'on avait : le message d'erreur arrivera au
+ * premier envoi, à un moment où l'utilisateur regarde la fenêtre.
+ */
+async function choisirModele() {
+  try {
+    modeles = await modelesDisponibles()
+  } catch (err) {
+    tracer('moteur injoignable', adresseMoteur(), String(err?.message || err).slice(0, 200))
+    modeles = []
+    return
+  }
+  const ids = modeles.map((m) => m.id)
+  tracer('moteur', adresseMoteur(), '| modèles', ids.join(', ') || 'aucun')
+  if (!ids.length) return
+  if (!ids.includes(config.model)) {
+    config.model = ids[0]
+    saveConfig()
+    tracer('modèle retenu', config.model)
+  }
+  // Un modèle d'équipe qui n'existe plus retombe sur celui de l'orchestrateur.
+  if (config.modeleEquipe && config.modeleEquipe !== 'inherit' && !ids.includes(config.modeleEquipe)) {
+    config.modeleEquipe = 'inherit'
+    saveConfig()
+  }
+
+  // La fenêtre de contexte allouée au modèle décide de ce que l'application peut
+  // faire. Trop courte, la mission part et meurt au milieu, sans que rien n'ait
+  // prévenu : mieux vaut le dire avant le premier message.
+  const ctx = await contexteDuModele(config.model)
+  if (ctx) tracer('contexte', String(ctx.charge), '/', String(ctx.max))
+  if (ctx && ctx.charge < CONTEXTE_MINIMUM) {
+    avertissementMoteur = `Le modèle ${libelleModele(config.model)} est chargé avec ${ctx.charge} jetons de contexte. `
+      + `C'est trop court : démarrer une mission en consomme déjà une dizaine de milliers. Recharge-le dans LM Studio `
+      + `avec au moins ${CONTEXTE_MINIMUM} jetons de « Context Length » (ce modèle monte à ${ctx.max}).`
+  }
+}
+
 // ---------------------------------------------------------------------- IPC
 
 function ouvrirFichier(chemin) {
@@ -535,6 +586,8 @@ function wireIpc() {
       config: {
         model: config.model,
         modeleEquipe: config.modeleEquipe || 'inherit',
+        // L'effort n'est pas réglable : la fenêtre l'affiche, elle ne le choisit pas.
+        effort: EFFORT,
         ampleur: config.ampleur,
         langue: config.langue,
         autonomie: config.autonomie || 'auto',
@@ -546,6 +599,8 @@ function wireIpc() {
         porteeLivrables: config.porteeLivrables || 'mission',
       },
       dossier: P.livrables(),
+      // De quoi remplir les deux menus de modèles sans rien coder en dur.
+      moteur: { adresse: adresseMoteur(), modeles: modeles.map((m) => ({ id: m.id, nom: libelleModele(m.id) })) },
       livrables: livrablesAffiches(),
       totalLivrables: listerLivrables().length,
       missions: listeMissions(),
@@ -896,11 +951,15 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', () => { if (win) { win.show(); win.focus() } })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     nativeTheme.themeSource = 'system'
     setDataRoot(app.getPath('userData'))
     loadConfig()
     tracer('--- démarrage', app.getVersion(), '| données', app.getPath('userData'))
+    // Le pont d'abord : c'est lui que Claude Code interrogera à la place d'Anthropic,
+    // et son adresse doit être connue avant qu'une session ne parte.
+    await ouvrirPont()
+    await choisirModele()
     createWindow()
     buildMenu()
     wireIpc()
@@ -951,6 +1010,16 @@ if (!app.requestSingleInstanceLock()) {
       }
       ouvrirMission(config.mission)
       tracer('mission ouverte', courante?.id, '| livrables', P.livrables())
+
+      if (!modeles.length) {
+        emit({
+          k: 'error',
+          message: `Le serveur de modèles (${adresseMoteur()}) ne répond pas. Lance-le, charge un modèle, `
+            + "puis rouvre l'application.",
+        })
+      } else if (avertissementMoteur) {
+        emit({ k: 'note', text: avertissementMoteur })
+      }
     })
 
     app.on('activate', () => {
@@ -960,6 +1029,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     quitting = true
+    fermerPont()
     refuserToutes("Fermeture de l'application.")
     for (const id of [...tampons.keys()]) viderTampon(id)
     pool?.toutArreter()

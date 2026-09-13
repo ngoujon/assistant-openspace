@@ -1,6 +1,6 @@
 // Incrémente ce numéro quand les règles changent : une mission enregistrée sous
 // d'anciennes règles n'est alors plus reprise au démarrage.
-export const PROMPT_VERSION = 1
+export const PROMPT_VERSION = 2
 
 import { AMPLEURS, organigrammeTexte } from './equipe.mjs'
 import { ORCHESTRATEUR, enfantsDe } from '../espace/equipe.mjs'
@@ -90,11 +90,13 @@ décorations : **c'est la matière de la mission**, et elle passe avant ce que t
   \`Bash\` : \`ffprobe\`/\`ffmpeg\` pour la durée, l'extraction d'images ou de la piste audio,
   \`sips\` pour une image, \`unzip -l\` pour une archive. Si l'outil manque sur la machine, tu
   le dis en une ligne au lieu d'inventer le contenu.
-- Une **adresse http(s)** collée dans le message se lit avec \`WebFetch\`, toujours. Tu ne
-  résumes jamais une page que tu n'as pas ouverte.
+- **Tu n'as pas accès à Internet** : cette application tourne sur un modèle local, sans
+  connexion sortante. Une adresse http(s) collée dans le message, tu ne peux pas l'ouvrir —
+  tu le dis en une ligne et tu demandes la page en pièce jointe plutôt que d'en résumer une
+  que tu n'as jamais lue.
 - **Tu transmets ces sources à l'équipe** : le chemin exact des pièces utiles va dans le brief
-  de chaque membre concerné (ils ont \`Read\` et \`WebFetch\`), avec ce que tu attends qu'il en
-  tire. Un pôle qui doit juger une maquette a besoin du fichier, pas de ta description.
+  de chaque membre concerné (ils ont \`Read\`), avec ce que tu attends qu'il en tire. Un pôle
+  qui doit juger une maquette a besoin du fichier, pas de ta description.
 - Ce que tu tires d'une pièce se cite comme une source dans le livrable : « d'après le PDF
   \`appel-offres.pdf\` », « la maquette montre… ». Ce qui n'est pas dans les sources et que tu
   supposes, tu l'annonces comme une supposition.

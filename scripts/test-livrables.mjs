@@ -45,6 +45,7 @@ const info = L.ecrireLivrable({
   markdown: corps,
   equipe: ['CTO', 'Directeur juridique'],
   modele: 'claude-opus-5',
+  effort: 'high',
 })
 assert.equal(info.version, 1)
 assert.equal(info.remplace, false)
@@ -56,6 +57,9 @@ assert.ok(brut.includes('- [En bref](#en-bref)'))
 assert.ok(brut.includes('  - [Dette](#dette)'), 'les sous-titres sont indentés')
 assert.ok(brut.includes('## À propos de ce livrable'))
 assert.ok(brut.includes('Équipe mobilisée : CTO, Directeur juridique'))
+// Le générique dit avec quoi le document a été écrit : le modèle et l'effort demandé.
+assert.ok(brut.includes("Produit par l'Assistant OpenSpace (claude-opus-5, effort high)"))
+assert.equal(L.lireLivrable(info.nom).entete.effort, 'high')
 assert.ok(brut.indexOf('## Sommaire') < brut.indexOf('## Ce que dit la technique'), 'le sommaire précède le fond')
 
 // 2. Relire : le corps revient sans le générique ni le sommaire de l'app.

@@ -7,6 +7,7 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { ORCHESTRATEUR, enfantsDe, membre } from '../espace/equipe.mjs'
 import { tracer } from '../espace/journal.mjs'
+import { envPont } from '../local/pont.mjs'
 
 const SYSTEME = `Tu écris la fiche d'un membre d'une équipe virtuelle, telle qu'elle sera donnée au modèle
 qui jouera ce rôle. Elle tient en trois paragraphes courts, en français, au tutoiement :
@@ -27,7 +28,7 @@ regarde dans cette équipe-là.`
  * @param {{id: string, label: string, membres: Array, model?: string}} demande
  * @returns {Promise<string>}
  */
-export async function proposerAme({ id, label, membres, model = 'claude-sonnet-5' }) {
+export async function proposerAme({ id, label, membres, model }) {
   const m = membre(id, membres)
   const nom = String(label || m?.label || '').trim()
   if (!nom) throw new Error('Ce membre n\'a pas encore de nom.')
@@ -54,6 +55,8 @@ export async function proposerAme({ id, label, membres, model = 'claude-sonnet-5
     prompt,
     options: {
       model,
+      // Même moteur que le reste : le serveur du réseau local, par le pont.
+      env: { ...process.env, ...envPont(model) },
       systemPrompt: SYSTEME,
       tools: [],
       settingSources: [],

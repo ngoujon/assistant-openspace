@@ -12,9 +12,17 @@ import { chargerEquipe, membre, ORCHESTRATEUR } from '../espace/equipe.mjs'
 import { listerLivrables } from '../espace/livrables.mjs'
 import { P } from '../espace/paths.mjs'
 import { tracer } from '../espace/journal.mjs'
+import { envPont } from '../local/pont.mjs'
+import { adresseMoteur } from '../local/moteur.mjs'
 
 const HOME = os.homedir()
 const require = createRequire(import.meta.url)
+
+// Le modèle ne vient ni d'Internet ni d'Anthropic : il tourne sur le serveur du
+// réseau local (voir `local/moteur.mjs`). Claude Code reste le moteur d'agent —
+// c'est lui qui tient les outils, les sous-agents et la reprise de session — mais
+// toutes ses requêtes passent par le pont local, qui les traduit et les envoie au
+// serveur de l'utilisateur. Aucune ne sort du réseau.
 
 /** Une app lancée depuis le Dock n'hérite pas du PATH du shell. */
 const PATH_SUP = [
@@ -38,13 +46,20 @@ function claudeExecutable() {
 const PREFIXE = 'mcp__openspace__'
 
 /**
+ * L'effort de réflexion demandé à Claude. Une seule source pour toute l'app : c'est
+ * cette valeur qui part au SDK, qui s'affiche sous le titre et qui se retrouve au
+ * générique du livrable. Niveaux possibles : low, medium, high, xhigh, max.
+ */
+export const EFFORT = 'high'
+
+/**
  * Les outils OpenSpace portent eux-mêmes leur politique de validation (voir
  * outils.mjs) : ils savent quel livrable est en jeu et n'interrompent l'utilisateur que
  * pour une suppression. On ne les double pas d'une confirmation générique —
  * publier un livrable, c'est exactement ce qu'on leur demande.
  */
 const BUILTIN_SUR = new Set([
-  'Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite',
+  'Read', 'Glob', 'Grep', 'TodoWrite',
   'ToolSearch', 'ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool',
   'Skill', 'AskUserQuestion', 'TaskOutput',
 ])
@@ -109,7 +124,7 @@ export class AgentSession {
       cwd: P.livrables(),
       additionalDirectories: [HOME],
       model: cfg.model,
-      effort: 'high',
+      effort: EFFORT,
       thinking: { type: 'adaptive', display: 'summarized' },
       systemPrompt: {
         type: 'preset',
@@ -124,7 +139,10 @@ export class AgentSession {
           ame: orchestrateur?.ame || '',
         }),
       },
-      tools: ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Agent'],
+      // Pas de `WebSearch` ni de `WebFetch` : ces deux outils-là sortent sur
+      // Internet, et l'application n'y va plus. Les sources se déposent en pièces
+      // jointes, l'équipe les lit avec `Read`.
+      tools: ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'TodoWrite', 'Agent'],
       // L'organigramme devient l'équipe : un sous-agent par membre, son âme pour prompt.
       agents: definitionsAgents(this.membres, {
         ampleur: cfg.ampleur,
@@ -145,6 +163,7 @@ export class AgentSession {
           titrer: (titre) => this.emit({ k: 'titre', titre }),
           corbeille: (chemin) => this.envoyerCorbeille(chemin),
           modele: () => this.getConfig()?.model,
+          effort: () => EFFORT,
           contributeurs: () => [...this.garde.contributions.values()].map((c) => c.label),
         }),
       },
@@ -161,6 +180,9 @@ export class AgentSession {
         ...process.env,
         PATH: [...new Set([...PATH_SUP, ...(process.env.PATH || '').split(':')])].filter(Boolean).join(':'),
         CLAUDE_AGENT_SDK_CLIENT_APP: 'assistant-openspace/2.0.0',
+        // Le détournement vers le serveur local, et la fermeture de tout ce qui
+        // pourrait encore sortir : télémétrie, rapports d'erreur, mise à jour.
+        ...envPont(cfg.model),
       },
       ...(bin ? { pathToClaudeCodeExecutable: bin } : {}),
       // La sortie d'erreur de Claude Code va au journal : c'est là qu'on lit pourquoi
@@ -186,7 +208,7 @@ export class AgentSession {
     this.membres = chargerEquipe()
     this.garde = new GardeEquipe(this.membres)
     const options = this.buildOptions(resume)
-    tracer('session start | cwd', options.cwd, '| modèle', options.model,
+    tracer('session start | cwd', options.cwd, '| moteur', adresseMoteur(), '| modèle', options.model, '| effort', options.effort,
       '| équipe', String(Object.keys(options.agents || {}).length), '| reprise', resume || 'non',
       '| binaire', options.pathToClaudeCodeExecutable || 'embarqué')
     this.q = query({ prompt: this.queue, options })
@@ -236,22 +258,21 @@ export class AgentSession {
   }
 
   /**
-   * Claude Code lit ses identifiants dans le trousseau macOS. À la première ouverture
-   * d'une nouvelle version signée, le système pose une question — et tant qu'on ne
-   * répond pas, rien n'arrive. La boîte de dialogue passe souvent derrière la
-   * fenêtre : mieux vaut le dire que laisser tourner « Connexion… ».
+   * Une session qui ne démarre pas, c'est presque toujours le serveur de modèles :
+   * éteint, occupé à charger le modèle en mémoire, ou plus joignable sur le réseau.
+   * Mieux vaut nommer le coupable que laisser tourner « Connexion… ».
    */
   armerAttente() {
     if (this.sessionId) return
     clearTimeout(this.minuteurConnexion)
     this.minuteurConnexion = setTimeout(() => {
       if (this.sessionId) return
-      tracer('connexion sans réponse après 30 s')
+      tracer('connexion sans réponse après 30 s | moteur', adresseMoteur())
       this.emit({
         k: 'note',
-        text: "Toujours en connexion… macOS demande peut-être l'autorisation d'accéder au trousseau "
-          + '(identifiants Claude Code). Cherche la boîte de dialogue derrière la fenêtre et choisis '
-          + '« Toujours autoriser ».',
+        text: `Toujours en connexion… Le serveur de modèles (${adresseMoteur()}) ne répond pas encore. `
+          + "Vérifie qu'il tourne et qu'un modèle y est chargé — le premier chargement en mémoire "
+          + 'peut prendre une bonne minute.',
       })
     }, 30000)
   }
@@ -314,10 +335,15 @@ export class AgentSession {
           clearTimeout(this.minuteurConnexion)
           this.sessionId = msg.session_id
           const srv = (msg.mcp_servers || []).find((s) => s.name === 'openspace')
+          const cfg = this.getConfig()
           this.emit({
             k: 'ready',
             sessionId: msg.session_id,
-            model: msg.model,
+            // Le modèle annoncé par le SDK, pas celui coché dans les réglages : tant
+            // que la session n'a pas redémarré, les deux peuvent différer.
+            model: msg.model || cfg?.model,
+            effort: EFFORT,
+            modeleEquipe: cfg?.modeleEquipe || 'inherit',
             outils: srv?.status || 'absent',
             equipe: this.membres.length - 1,
           })

@@ -13,6 +13,7 @@ const ampleurSelect = document.getElementById('ampleur')
 const langueSelect = document.getElementById('langue')
 const autonomieSelect = document.getElementById('autonomie')
 const cheminDossier = document.getElementById('chemin-dossier')
+const moteurEl = document.getElementById('moteur')
 const barre = document.getElementById('barre')
 const panneau = document.getElementById('panneau')
 const recherche = document.getElementById('recherche')
@@ -43,6 +44,10 @@ let piecesEnCours = []
 let dossier = ''
 let porteeLivrables = 'mission'
 let totalLivrables = 0
+/** Le modèle et l'effort de la session en cours, tels que le SDK les annonce. */
+let moteur = null
+/** L'effort que l'app demandera : constant, décidé dans agent/session.mjs. */
+let effortPrevu = 'high'
 /** L'état vivant de chaque membre pendant une mission : travaille, livre, echec. */
 const etatsMembres = new Map()
 const permsEnAttente = []
@@ -1218,9 +1223,93 @@ function setStatus(text, kind) {
 
 function statutEquipe() {
   const n = Math.max(0, membres.length - 1)
-  setStatus(totalLivrables
+  const socle = totalLivrables
     ? `${n} membre${n > 1 ? 's' : ''} · ${totalLivrables} livrable${totalLivrables > 1 ? 's' : ''}`
-    : `${n} membre${n > 1 ? 's' : ''} dans l'équipe`, 'ok')
+    : `${n} membre${n > 1 ? 's' : ''} dans l'équipe`
+  const bref = afficherMoteur()
+  setStatus(bref ? `${socle} · ${bref}` : socle, 'ok')
+  // La ligne est tronquée dans une fenêtre étroite : la phrase entière reste en bulle.
+  statusLine.title = moteurEl.textContent
+}
+
+// ------------------------------------------------------ le moteur du moment
+
+/**
+ * Les modèles servis par la machine du réseau local, tels qu'ils s'écrivent dans la
+ * fenêtre : `qwen/qwen3.8-27b` devient `qwen3.8-27b`. Rempli au démarrage — rien
+ * n'est codé en dur, la liste est celle que le serveur annonce.
+ */
+const NOMS_MODELES = {}
+/** L'adresse du serveur qui fait tourner le modèle, pour la ligne sous les menus. */
+let moteurAdresse = ''
+
+/** Remplit les deux menus de modèles avec ce que sert le serveur local. */
+function peuplerModeles(moteurInfo, choisi, choisiEquipe) {
+  const dispo = moteurInfo?.modeles || []
+  for (const m of dispo) NOMS_MODELES[m.id] = m.nom
+
+  modelSelect.innerHTML = ''
+  if (!dispo.length) {
+    const o = document.createElement('option')
+    o.value = choisi || ''
+    o.textContent = choisi || 'aucun modèle — serveur injoignable'
+    modelSelect.append(o)
+  }
+  for (const m of dispo) {
+    const o = document.createElement('option')
+    o.value = m.id
+    o.textContent = m.nom
+    modelSelect.append(o)
+  }
+
+  // Le menu de l'équipe garde son « le même que lui » en tête de liste.
+  modeleEquipeSelect.innerHTML = ''
+  const herite = document.createElement('option')
+  herite.value = 'inherit'
+  herite.textContent = 'Le même modèle que lui'
+  modeleEquipeSelect.append(herite)
+  for (const m of dispo) {
+    const o = document.createElement('option')
+    o.value = m.id
+    o.textContent = m.nom
+    modeleEquipeSelect.append(o)
+  }
+
+  modelSelect.value = choisi || (dispo[0]?.id ?? '')
+  modeleEquipeSelect.value = choisiEquipe || 'inherit'
+  moteurAdresse = moteurInfo?.adresse || ''
+  modelSelect.title = moteurAdresse ? `Servi par ${moteurAdresse}` : ''
+}
+const NOMS_EFFORT = {
+  low: 'faible', medium: 'moyen', high: 'élevé', xhigh: 'très élevé', max: 'maximal',
+}
+const nomModele = (id) => NOMS_MODELES[id] || id || 'modèle inconnu'
+const nomEffort = (e) => NOMS_EFFORT[e] || e || 'inconnu'
+
+/**
+ * Écrit dans les réglages ce qui tourne vraiment — pas ce qui est coché dans les deux
+ * menus au-dessus : le modèle vient de ce que le SDK annonce au démarrage de la
+ * session, et les deux diffèrent tant qu'elle n'a pas redémarré. Renvoie la version
+ * courte, pour la ligne sous le titre.
+ */
+function afficherMoteur() {
+  // Avant le premier message, aucune session n'est ouverte et le SDK n'a rien annoncé :
+  // on montre alors ce qui partira, tel qu'il est coché juste au-dessus.
+  const vif = Boolean(moteur)
+  const modele = vif ? moteur.model : modelSelect.value
+  const effort = vif ? moteur.effort : effortPrevu
+  const eq = (vif ? moteur.modeleEquipe : modeleEquipeSelect.value) || 'inherit'
+
+  const m = nomModele(modele)
+  const e = nomEffort(effort)
+  const equipe = eq === 'inherit'
+    ? "L'équipe travaille avec le même modèle."
+    : `L'équipe travaille avec ${nomModele(eq)}.`
+  // L'adresse du serveur a sa place ici : c'est la seule chose qui rappelle que rien
+  // ne sort de la maison, et le premier endroit où regarder quand plus rien ne répond.
+  const ou = moteurAdresse ? ` Le modèle tourne sur ${moteurAdresse} — aucune sortie sur Internet.` : ''
+  moteurEl.textContent = `${vif ? 'En ce moment' : 'Au prochain message'} : ${m}, effort ${e}. ${equipe}${ou}`
+  return `${m} · effort ${e}`
 }
 
 // -------------------------------------------------------------------- envoi
@@ -1315,8 +1404,19 @@ document.getElementById('btn-choisir').addEventListener('click', async () => {
   statutEquipe()
 })
 
-modelSelect.addEventListener('change', () => api.setConfig({ model: modelSelect.value }))
-modeleEquipeSelect.addEventListener('change', () => api.setConfig({ modeleEquipe: modeleEquipeSelect.value }))
+modelSelect.addEventListener('change', () => {
+  api.setConfig({ model: modelSelect.value })
+  // L'orchestrateur change de modèle à chaud, sans redémarrer la session : il n'y aura
+  // pas de nouvel « init » à attendre pour rafraîchir l'affichage.
+  if (moteur) { moteur.model = modelSelect.value; statutEquipe() }
+})
+modeleEquipeSelect.addEventListener('change', () => {
+  api.setConfig({ modeleEquipe: modeleEquipeSelect.value })
+  // Changer le modèle de l'équipe repart sur des sessions neuves : plus rien de vivant
+  // à annoncer, on retombe sur ce qui est coché.
+  moteur = null
+  statutEquipe()
+})
 ampleurSelect.addEventListener('change', () => api.setConfig({ ampleur: ampleurSelect.value }))
 langueSelect.addEventListener('change', () => api.setConfig({ langue: langueSelect.value }))
 autonomieSelect.addEventListener('change', () => api.setConfig({ autonomie: autonomieSelect.value }))
@@ -1523,6 +1623,8 @@ document.getElementById('btn-barre').addEventListener('click', () => {
 api.onEvent((evt) => {
   switch (evt.k) {
     case 'ready':
+      moteur = { model: evt.model, effort: evt.effort, modeleEquipe: evt.modeleEquipe }
+      afficherMoteur()
       if (evt.outils === 'connected') statutEquipe()
       else setStatus(`Outils OpenSpace : ${evt.outils}`, 'err')
       break
@@ -1617,8 +1719,8 @@ api.onEvent((evt) => {
 // ---------------------------------------------------------------- démarrage
 
 const state = await api.init()
-modelSelect.value = state.config.model
-modeleEquipeSelect.value = state.config.modeleEquipe || 'inherit'
+peuplerModeles(state.moteur, state.config.model, state.config.modeleEquipe)
+effortPrevu = state.config.effort || effortPrevu
 ampleurSelect.value = state.config.ampleur || 'document'
 langueSelect.value = state.config.langue || 'français'
 autonomieSelect.value = state.config.autonomie || 'auto'

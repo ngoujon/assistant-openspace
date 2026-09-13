@@ -38,6 +38,7 @@ export function serveurOpenspace(contexte = {}) {
   const corbeille = contexte.corbeille || (async () => false)
   const titrer = contexte.titrer || (() => {})
   const modele = contexte.modele || (() => null)
+  const effort = contexte.effort || (() => null)
   /** Qui a réellement travaillé sur cette mission — mesuré, pas déclaré. */
   const contributeurs = contexte.contributeurs || (() => [])
 
@@ -102,7 +103,8 @@ export function serveurOpenspace(contexte = {}) {
       sur(async ({ titre, markdown, mission, nom }) => {
         const cible = nom || nomFichier(titre)
         const info = ecrireLivrable({
-          titre, mission, markdown, nom: cible, equipe: contributeurs(), modele: modele(),
+          titre, mission, markdown, nom: cible, equipe: contributeurs(),
+          modele: modele(), effort: effort(),
         })
         signaler({ k: 'livrable', livrable: info })
         // On n'ouvre jamais le fichier de soi-même : l'utilisateur le lit quand il décide
