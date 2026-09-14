@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Une équipe virtuelle — orchestrateur, directeurs, spécialistes — qui produit un livrable Markdown, sur un modèle du réseau local (Claude Agent SDK)",
+  "description": "Une équipe virtuelle — orchestrateur, directeurs, spécialistes — qui produit un livrable Markdown (Claude Agent SDK)",
   "author": "",
   "main": "src/main.mjs",
   "scripts": {

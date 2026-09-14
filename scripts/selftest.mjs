@@ -9,24 +9,6 @@ const bac = fs.mkdtempSync(path.join(os.tmpdir(), 'openspace-selftest-'))
 process.env.OPENSPACE_DATA_DIR = path.join(bac, 'donnees')
 process.env.OPENSPACE_LIVRABLES = path.join(bac, 'livrables')
 
-const { ouvrirPont, fermerPont } = await import('../src/local/pont.mjs')
-const { adresseMoteur, modelesDisponibles } = await import('../src/local/moteur.mjs')
-
-// Le pont d'abord : sans lui, la session n'a personne à qui parler.
-await ouvrirPont()
-let MODELE = ''
-try {
-  MODELE = (await modelesDisponibles())[0]?.id || ''
-} catch (err) {
-  console.log(`SELFTEST IMPOSSIBLE — le serveur de modèles (${adresseMoteur()}) ne répond pas : ${err?.message || err}`)
-  process.exit(1)
-}
-if (!MODELE) {
-  console.log(`SELFTEST IMPOSSIBLE — aucun modèle chargé sur ${adresseMoteur()}.`)
-  process.exit(1)
-}
-console.log('moteur :', adresseMoteur(), '| modèle :', MODELE)
-
 const E = await import('../src/espace/equipe.mjs')
 const { AgentSession } = await import('../src/agent/session.mjs')
 const { listerLivrables, lireLivrable } = await import('../src/espace/livrables.mjs')
@@ -76,14 +58,15 @@ const session = new AgentSession({
     console.log('VALID. demandée pour', req.toolName, '->', req.title || '')
     return { behavior: 'deny', message: 'test automatique' }
   },
-  getConfig: () => ({ model: MODELE, ampleur: 'note', langue: 'français', autonomie: 'auto' }),
+  getConfig: () => ({ model: 'claude-sonnet-5', ampleur: 'note', langue: 'français', autonomie: 'auto' }),
   ouvrirFichier: () => {},
 })
 
 session.start({})
 session.send(
   "Mission courte : une note d'une page sur le choix du bois pour un plan de travail de cuisine "
-  + '(chêne ou hêtre). Fais travailler ton équipe sur ce qu\'elle sait, puis publie le livrable.',
+  + '(chêne ou hêtre). Ne cherche rien sur le web : fais travailler ton équipe sur ce qu\'elle sait, '
+  + 'puis publie le livrable.',
 )
 
 const debut = Date.now()
@@ -109,10 +92,9 @@ const ok = vu.ready?.outils === 'connected'
   && docs.length === 1
   && docs[0].equipe.length >= 1
   && lireLivrable(docs[0].nom).markdown.length > 400
-  && entete.modele === MODELE
+  && entete.modele === 'claude-sonnet-5'
   && entete.effort === 'high'
 
-fermerPont()
 console.log('\ndossier de test :', bac)
 console.log(ok ? 'SELFTEST OK' : 'SELFTEST ÉCHEC')
 if (ok) fs.rmSync(bac, { recursive: true, force: true })

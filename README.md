@@ -9,11 +9,6 @@ est un **sous-agent** du Claude Agent SDK, et son texte « âme et rôle » est 
 système. Tu écris la mission, l'équipe passe, tu récupères le document — puis tu discutes
 avec eux pour le retoucher, version après version.
 
-**Le modèle tourne à la maison.** L'application n'appelle ni Anthropic ni aucun service en
-ligne : elle parle à un serveur du réseau local — LM Studio, par défaut sur
-`http://127.0.0.1:1234/v1`. Rien de ce que tu écris, ni des fichiers que tu déposes, ne
-quitte le réseau. Voir [Le moteur local](#le-moteur-local).
-
 ## Utilisation
 
 L'app est installée dans `/Applications/Assistant OpenSpace.app` et épinglée au Dock.
@@ -115,8 +110,9 @@ Le champ de saisie prend tout ce que tu lui donnes — c'est la matière de la m
 - **Glisse tes fichiers** n'importe où dans la fenêtre, clique le trombone, ou fais `⌘⇧A` :
   images, PDF, audio, vidéo, tableurs, code, archives. Une capture **collée** depuis le
   presse-papiers est enregistrée comme les autres.
-- **Les liens ne s'ouvrent pas.** L'application n'a pas d'accès à Internet : un lien collé
-  est une note, pas une source. Enregistre la page (`⌘S`, ou en PDF) et dépose le fichier.
+- **Colle des liens** dans le texte : ils sont listés au message comme des sources à ouvrir,
+  et l'orchestrateur les lit avec `WebFetch` avant de répondre. Un lien glissé depuis le
+  navigateur atterrit dans le champ.
 - Chaque pièce est **copiée** dans les données de la mission : elle reste lisible même si tu
   déplaces l'original, et un fil rouvert dans trois semaines retrouve ses pièces. Jusqu'à
   512 Mo par fichier.
@@ -172,8 +168,8 @@ troisième demande attend son tour, et part dès qu'une place se libère.
 
 | Réglage | Effet |
 |---|---|
-| **Orchestrateur** | le modèle de la session principale — la liste est celle que sert le serveur local |
-| **L'équipe travaille avec** | le modèle des sous-agents : le même, ou un autre de la même liste |
+| **Orchestrateur** | le modèle de la session principale (Opus 5 par défaut) |
+| **L'équipe travaille avec** | le modèle des sous-agents : le même, ou plus rapide pour une mission large |
 | **Ampleur du livrable** | note (~1 200 mots) · document (~3 000) · dossier (~7 500) — cale aussi ce qu'on attend de chaque membre |
 | **Langue de rédaction** | français par défaut |
 | **Autonomie** | seul, ou avec des cartes avant les actions sensibles |
@@ -185,68 +181,19 @@ neuve : ces règles vivent dans les consignes du système.
 ### Ce qui tourne vraiment
 
 Les deux menus du haut disent ce qu'on **demande** ; la ligne juste en dessous dit ce qui
-**sert** : `En ce moment : qwen3.8-27b, effort élevé. L'équipe travaille avec le même
-modèle. Le modèle tourne sur http://127.0.0.1:1234/v1 — aucune sortie sur Internet.`
+**sert** : `En ce moment : Opus 5, effort élevé. L'équipe travaille avec le même modèle.`
 Le modèle y vient de ce que le SDK annonce au démarrage de la session, pas du menu — tant
 qu'une session n'a pas redémarré, les deux peuvent différer. Avant le premier message
 d'une mission, la phrase s'ouvre sur *Au prochain message*.
 
-La version courte (`qwen3.8-27b · effort élevé`) tient aussi sous le titre de la fenêtre, et
-le générique de chaque livrable la garde par écrit : *Produit par l'Assistant OpenSpace
-(qwen/qwen3.8-27b, effort high)*. C'est ce qui explique, trois semaines plus tard, pourquoi
+La version courte (`Opus 5 · effort élevé`) tient aussi sous le titre de la fenêtre, et le
+générique de chaque livrable la garde par écrit : *Produit par l'Assistant OpenSpace
+(claude-opus-5, effort high)*. C'est ce qui explique, trois semaines plus tard, pourquoi
 deux versions du même document ne se valent pas.
 
 L'**effort** (`high`) n'est pas réglable depuis la fenêtre : c'est une constante unique,
 `EFFORT` dans `src/agent/session.mjs`, d'où partent à la fois l'appel au SDK, l'affichage
 et le générique.
-
-## Le moteur local
-
-Le modèle ne vient pas d'Internet : il tourne sur une machine du réseau, servie par
-LM Studio. L'application ne connaît que cette adresse.
-
-| Quoi | Valeur |
-|---|---|
-| Adresse par défaut | `http://127.0.0.1:1234/v1` |
-| Pour en changer | `OPENSPACE_MOTEUR=http://autre-machine:1234/v1 npm start` |
-| Modèle | celui que le serveur annonce — le premier de la liste si celui des réglages a été déchargé |
-
-### Le pont
-
-Claude Code — le moteur d'agent qui tient les outils, les sous-agents et la reprise de
-session — ne sait parler qu'à l'API Messages d'Anthropic. LM Studio, comme tous les
-serveurs locaux, parle le dialecte OpenAI. `src/local/pont.mjs` ouvre donc un petit serveur
-sur `127.0.0.1` qui se fait passer pour Anthropic : il traduit les requêtes à l'aller, la
-réponse et son flux mot à mot au retour, y compris les appels d'outils et la pensée du
-modèle. Claude Code n'y voit que du feu, et `ANTHROPIC_BASE_URL` pointe sur la boucle
-locale au lieu d'`api.anthropic.com`.
-
-Au passage, tout ce qui pourrait encore sortir est coupé : télémétrie, rapports d'erreur,
-mise à jour automatique, appels accessoires. Les outils `WebSearch` et `WebFetch` ont été
-retirés de la panoplie — ils n'ont plus de sens sans connexion.
-
-### La fenêtre de contexte — le réglage qui décide de tout
-
-Démarrer une mission coûte déjà **~10 000 jetons** avant le premier mot : le mode d'emploi
-de Claude Code, les six règles de l'orchestrateur, et la description des dix-sept outils.
-Il faut ensuite de la place pour faire travailler l'équipe, lire les pièces jointes et
-écrire le livrable.
-
-> Charge le modèle dans LM Studio avec une **longueur de contexte d'au moins 32 768 jetons**
-> — 65 536 si la machine suit. En dessous, la mission part puis meurt en route sur
-> « Context size has been exceeded ».
-
-Ce n'est pas un réglage de l'application : il se choisit au chargement du modèle, dans
-LM Studio (*Context Length*). L'application le lit au démarrage et le dit dans le fil quand
-il est trop court.
-
-Deux soupapes, pour les fenêtres serrées :
-
-```bash
-OPENSPACE_SANS_PENSEE=1 npm start   # demande au modèle de ne pas réfléchir à voix haute
-OPENSPACE_MAX_TOKENS=2000 npm start # plafonne la longueur d'une réponse
-OPENSPACE_PONT_DEBUG=1 npm start    # écrit au journal ce qui traverse le pont
-```
 
 ## Architecture
 
@@ -267,8 +214,6 @@ src/espace/livrables.mjs  les .md, le sommaire, le générique, les versions
 src/espace/missions.mjs   un fichier par mission : le fil rejouable et la session à reprendre
 src/espace/paths.mjs      où vivent les données et les livrables
 src/espace/journal.mjs    journal technique (l'app lancée depuis le Dock n'a pas de terminal)
-src/local/moteur.mjs      l'adresse du serveur local, ses modèles, sa fenêtre de contexte
-src/local/pont.mjs        le traducteur Anthropic ↔ OpenAI : requêtes, flux, outils, pensée
 src/renderer/             la fenêtre : index.html, app.js, style.css, markdown.js
 scripts/                  icône, build, installation, tests
 ```
@@ -291,8 +236,8 @@ compositions archivées : chacune devient une équipe de la bibliothèque.
 ```bash
 npm install
 npm start          # lance l'app depuis les sources
-npm test           # équipes, gardes, livrables, missions, pièces jointes — hors ligne
-npm run selftest   # une vraie mission de bout en bout (serveur local requis)
+npm test           # équipes, gardes, livrables, missions, pièces jointes — sans réseau
+npm run selftest   # une vraie mission de bout en bout, dans un dossier temporaire
 npm run build      # « Assistant OpenSpace.app » dans build/
 npm run install-app # reconstruit, installe dans /Applications, épingle au Dock
 npm run icon       # régénère assets/icon.icns (rendu CoreGraphics, scripts/make-icon.swift)
@@ -301,8 +246,7 @@ npm run icon       # régénère assets/icon.icns (rendu CoreGraphics, scripts/m
 `npm test` ne touche ni au réseau ni à tes données : chaque script travaille dans un dossier
 temporaire (`OPENSPACE_DATA_DIR`, `OPENSPACE_LIVRABLES`). `npm run selftest` démarre une
 vraie session avec une équipe réduite à deux membres et vérifie l'ordre de passage complet —
-spécialiste, puis directeur, puis livrable ; il lui faut le serveur local allumé, un modèle
-chargé, et la fenêtre de contexte ci-dessus.
+spécialiste, puis directeur, puis livrable.
 
 `OPENSPACE_DEBUG=1 npm start` renvoie la sortie d'erreur de Claude Code dans le terminal.
 

@@ -21,12 +21,8 @@ export const AMPLEURS = {
   dossier: { livrable: '6 000 à 9 000 mots', membre: '900 à 1 600 mots', note: 'Un dossier : contexte, options, chiffres, risques, plan.' },
 }
 
-/**
- * Outils laissés à l'équipe : de quoi se renseigner, rien pour publier.
- * Rien pour sortir non plus — l'application ne va plus sur Internet, les sources
- * arrivent en pièces jointes et se lisent avec `Read`.
- */
-const OUTILS_MEMBRE = ['Read', 'Glob', 'Grep', 'TodoWrite']
+/** Outils laissés à l'équipe : de quoi se renseigner, rien pour publier. */
+const OUTILS_MEMBRE = ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite']
 
 const CONSIGNES_COMMUNES = (a, langue) => `
 
@@ -44,10 +40,8 @@ c'est **de la matière** que l'orchestrateur assemblera dans un livrable unique.
   (page lue, fichier ouvert), tu le dis et tu donnes la source.
 - Tu finis par \`## Points ouverts\` : ce qui manque, ce qui reste à décider, ce qui dépend
   d'un autre pôle. Cette section n'est jamais vide et elle n'est pas décorative.
-- Si le brief te donne des **chemins de fichiers**, ce sont les sources de l'utilisateur : tu les
-  ouvres (\`Read\`) avant d'écrire, et tu dis ce que tu en tires.
-- Tu n'as pas accès à Internet. Ce que tu ne peux pas vérifier dans les sources fournies,
-  tu l'annonces comme une supposition — tu n'inventes ni chiffre ni citation.
+- Si le brief te donne des **chemins de fichiers** ou des **adresses**, ce sont les sources de
+  l'utilisateur : tu les ouvres (\`Read\`, \`WebFetch\`) avant d'écrire, et tu dis ce que tu en tires.
 - Tu ne rédiges **jamais** le document final et tu ne parles pas à la place des autres pôles.`
 
 const CONSIGNES_POLE = (enfants) => `

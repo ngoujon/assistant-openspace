@@ -1234,51 +1234,11 @@ function statutEquipe() {
 
 // ------------------------------------------------------ le moteur du moment
 
-/**
- * Les modèles servis par la machine du réseau local, tels qu'ils s'écrivent dans la
- * fenêtre : `qwen/qwen3.8-27b` devient `qwen3.8-27b`. Rempli au démarrage — rien
- * n'est codé en dur, la liste est celle que le serveur annonce.
- */
-const NOMS_MODELES = {}
-/** L'adresse du serveur qui fait tourner le modèle, pour la ligne sous les menus. */
-let moteurAdresse = ''
-
-/** Remplit les deux menus de modèles avec ce que sert le serveur local. */
-function peuplerModeles(moteurInfo, choisi, choisiEquipe) {
-  const dispo = moteurInfo?.modeles || []
-  for (const m of dispo) NOMS_MODELES[m.id] = m.nom
-
-  modelSelect.innerHTML = ''
-  if (!dispo.length) {
-    const o = document.createElement('option')
-    o.value = choisi || ''
-    o.textContent = choisi || 'aucun modèle — serveur injoignable'
-    modelSelect.append(o)
-  }
-  for (const m of dispo) {
-    const o = document.createElement('option')
-    o.value = m.id
-    o.textContent = m.nom
-    modelSelect.append(o)
-  }
-
-  // Le menu de l'équipe garde son « le même que lui » en tête de liste.
-  modeleEquipeSelect.innerHTML = ''
-  const herite = document.createElement('option')
-  herite.value = 'inherit'
-  herite.textContent = 'Le même modèle que lui'
-  modeleEquipeSelect.append(herite)
-  for (const m of dispo) {
-    const o = document.createElement('option')
-    o.value = m.id
-    o.textContent = m.nom
-    modeleEquipeSelect.append(o)
-  }
-
-  modelSelect.value = choisi || (dispo[0]?.id ?? '')
-  modeleEquipeSelect.value = choisiEquipe || 'inherit'
-  moteurAdresse = moteurInfo?.adresse || ''
-  modelSelect.title = moteurAdresse ? `Servi par ${moteurAdresse}` : ''
+/** Les identifiants d'API, tels qu'ils s'écrivent dans la fenêtre. */
+const NOMS_MODELES = {
+  'claude-opus-5': 'Opus 5',
+  'claude-sonnet-5': 'Sonnet 5',
+  'claude-haiku-4-5': 'Haiku 4.5',
 }
 const NOMS_EFFORT = {
   low: 'faible', medium: 'moyen', high: 'élevé', xhigh: 'très élevé', max: 'maximal',
@@ -1305,10 +1265,7 @@ function afficherMoteur() {
   const equipe = eq === 'inherit'
     ? "L'équipe travaille avec le même modèle."
     : `L'équipe travaille avec ${nomModele(eq)}.`
-  // L'adresse du serveur a sa place ici : c'est la seule chose qui rappelle que rien
-  // ne sort de la maison, et le premier endroit où regarder quand plus rien ne répond.
-  const ou = moteurAdresse ? ` Le modèle tourne sur ${moteurAdresse} — aucune sortie sur Internet.` : ''
-  moteurEl.textContent = `${vif ? 'En ce moment' : 'Au prochain message'} : ${m}, effort ${e}. ${equipe}${ou}`
+  moteurEl.textContent = `${vif ? 'En ce moment' : 'Au prochain message'} : ${m}, effort ${e}. ${equipe}`
   return `${m} · effort ${e}`
 }
 
@@ -1719,7 +1676,8 @@ api.onEvent((evt) => {
 // ---------------------------------------------------------------- démarrage
 
 const state = await api.init()
-peuplerModeles(state.moteur, state.config.model, state.config.modeleEquipe)
+modelSelect.value = state.config.model
+modeleEquipeSelect.value = state.config.modeleEquipe || 'inherit'
 effortPrevu = state.config.effort || effortPrevu
 ampleurSelect.value = state.config.ampleur || 'document'
 langueSelect.value = state.config.langue || 'français'
