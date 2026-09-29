@@ -1,255 +1,270 @@
 # Assistant OpenSpace
 
-Une petite app macOS qui ouvre une **équipe virtuelle** — un orchestrateur, ses directeurs
-de pôle, leurs spécialistes — et la fait travailler sur une mission jusqu'à en sortir **un
-livrable Markdown unique**, rangé dans un dossier ordinaire.
+A small macOS app that spins up a **virtual team** — an orchestrator, its department
+heads, their specialists — and puts it to work on a mission until it produces **a single
+Markdown deliverable**, saved in an ordinary folder.
 
-C'est Claude Code, avec une fenêtre au lieu du terminal : chaque membre de l'organigramme
-est un **sous-agent** du Claude Agent SDK, et son texte « âme et rôle » est son prompt
-système. Tu écris la mission, l'équipe passe, tu récupères le document — puis tu discutes
-avec eux pour le retoucher, version après version.
+Think of it as Claude Code with a window instead of a terminal: every member of the org
+chart is a **subagent** of the Claude Agent SDK, and their "soul and role" text is their
+system prompt. You write the mission, the team goes through it, you get the document back —
+then you keep talking with them to refine it, version after version.
 
-## Utilisation
+> The app's interface is in French. Labels quoted below are the ones you will see on
+> screen, with their English meaning.
 
-L'app est installée dans `/Applications/Assistant OpenSpace.app` et épinglée au Dock.
-Un clic l'ouvre, la croix la masque (elle reste dans le Dock), `⌘Q` la quitte.
+## Requirements
 
-| Raccourci | Effet |
+- macOS (the packaged app and the icon script are macOS-only; the tests run anywhere).
+- Node.js 22.
+- A working Claude Code sign-in on the machine: the Claude Agent SDK reuses it.
+
+## Usage
+
+`npm run install-app` installs the app in `/Applications/Assistant OpenSpace.app` and pins
+it to the Dock. A click opens it, the close button hides it (it stays in the Dock), `⌘Q`
+quits it.
+
+| Shortcut | Effect |
 |---|---|
-| `↩` | envoyer |
-| `⇧↩` | nouvelle ligne |
-| `esc` | refuser la carte en attente, sinon interrompre |
-| `⌘.` | interrompre |
-| `⌘N` | nouvelle mission |
-| `⌘L` | afficher / masquer les missions |
-| `⌘D` | afficher / masquer l'équipe et les livrables |
-| `⌘E` | gérer les équipes |
-| `⌘⇧A` | joindre des fichiers |
-| `⌘⇧O` | ouvrir le dossier des livrables |
-| `⌘+` / `⌘-` | grossir / réduire l'affichage |
-| `⌘0` | affichage à sa taille réelle |
-| `⌥⌘0` | largeur de fenêtre par défaut |
+| `↩` | send |
+| `⇧↩` | new line |
+| `esc` | deny the pending card, otherwise interrupt |
+| `⌘.` | interrupt |
+| `⌘N` | new mission |
+| `⌘L` | show / hide the mission list |
+| `⌘D` | show / hide the team and deliverables panel |
+| `⌘E` | manage teams |
+| `⌘⇧A` | attach files |
+| `⌘⇧O` | open the deliverables folder |
+| `⌘+` / `⌘-` | zoom in / out |
+| `⌘0` | actual size |
+| `⌥⌘0` | default window width |
 
-À l'ouverture, l'app **reprend la mission précédente** : elle se souvient de ce que vous
-vous êtes dit ce matin. Le bouton `+` repart de zéro.
+On launch, the app **resumes the previous mission**: it remembers what you talked about
+this morning. The `+` button starts from scratch.
 
-## L'ordre de travail
+## The order of work
 
-C'est toute la valeur de l'outil, et ce n'est pas une recommandation : c'est **imposé** par
-des hooks `PreToolUse` (`src/agent/gardes.mjs`), parce que le prompt seul ne suffisait pas —
-le modèle finissait toujours par écrire le document tout seul en résumant ce qu'il
-« imaginait » que chaque pôle aurait dit.
+This is the whole point of the tool, and it is not a suggestion: it is **enforced** by
+`PreToolUse` hooks (`src/agent/gardes.mjs`), because the prompt alone was not enough — the
+model always ended up writing the document by itself, summarising what it "imagined" each
+department would have said.
 
-1. **Cadrer et titrer.** L'orchestrateur reformule la demande et nomme la mission
-   (`titrer_mission`) : c'est ce que tu reliras dans la liste dans trois semaines.
-2. **Les spécialistes, en parallèle.** Un `Agent` par spécialiste, tous dans le même
-   message. Chacun défriche son angle et rend une matière dense, finie par
-   `## Points ouverts`. L'app ramène chaque convocation **au premier plan** : une
-   convocation en arrière-plan finirait le tour avant que le membre ait répondu, et le
-   directeur passerait sur du vide.
-3. **Les directeurs, ensuite.** Un pôle convoqué **avant** ses spécialistes est **refusé**.
-   Et son brief doit contenir **leurs textes entiers** : si le brief fait moins de 45 % de
-   ce que ses spécialistes ont écrit, l'appel est refusé aussi — c'est exactement ce qu'un
-   résumé ferait perdre. Le directeur recoupe, arbitre, complète : il intègre, il ne compile pas.
-4. **Le livrable.** `rediger_livrable` est **refusé** tant qu'un pôle n'a rien rendu, et la
-   liste des manquants est donnée au modèle, qui va les chercher. Même un « rien à signaler »
-   doit venir du pôle concerné.
-5. **On ne rend pas la main au milieu.** Une mission commencée puis abandonnée — des pôles
-   convoqués, aucun document — ne te laisse rien. Un hook `Stop` renvoie l'orchestrateur au
-   travail avec la liste de ce qui manque, jusqu'à quatre fois par message. Une simple
-   discussion, elle, se termine normalement : rien ne se déclenche si personne n'a été convoqué.
-6. **La discussion.** Une retouche ne remobilise personne : si la demande touche un métier,
-   l'orchestrateur convoque **ce membre-là**, seul, et republie.
+1. **Frame and title.** The orchestrator restates the request and names the mission
+   (`titrer_mission`): that is what you will read in the list three weeks from now.
+2. **Specialists, in parallel.** One `Agent` call per specialist, all in the same message.
+   Each one clears the ground on their angle and returns dense material ending with
+   `## Points ouverts` (open questions). The app brings every call **to the foreground**: a
+   background call would end the turn before the member answered, and the department head
+   would be working from nothing.
+3. **Department heads, next.** A department called **before** its specialists is
+   **denied**. Its brief must also contain **their full texts**: if the brief is shorter
+   than 45% of what its specialists wrote, the call is denied as well — that is exactly
+   what a summary would lose. The head cross-checks, arbitrates, fills gaps: it integrates,
+   it does not just compile.
+4. **The deliverable.** `rediger_livrable` is **denied** as long as any department has not
+   delivered, and the list of missing ones is handed back to the model, which goes and
+   gets them. Even "nothing to report" has to come from the department concerned.
+5. **No handing back halfway.** A mission started then dropped — departments called, no
+   document — leaves you with nothing. A `Stop` hook sends the orchestrator back to work
+   with the list of what is missing, up to four times per message. A plain conversation
+   ends normally: nothing triggers if nobody was called.
+6. **The conversation.** A revision does not mobilise everyone: if the request touches one
+   field, the orchestrator calls **that member** alone, and republishes.
 
-Les contributions ne sont pas déclarées par le modèle : elles sont **mesurées** à la sortie
-de chaque `Agent`. Le générique du livrable (« Équipe mobilisée ») ne peut donc pas mentir.
+Contributions are not declared by the model: they are **measured** at the output of each
+`Agent` call. The deliverable's credits ("Équipe mobilisée", team involved) therefore
+cannot lie.
 
-## Les équipes
+## Teams
 
-Tu en gardes **plusieurs**, dont une seule travaille : une refonte de site et un appel
-d'offres ne se traitent pas avec les mêmes métiers. Le sélecteur en tête de la colonne de
-droite dit laquelle est au travail ; **Gérer…** (ou `⌘E`) ouvre le gestionnaire.
+You can keep **several** teams, only one of which is working: a website redesign and a
+tender response do not call for the same skills. The selector at the top of the right-hand
+column shows which one is active; **Gérer…** (Manage…, or `⌘E`) opens the team manager.
 
-- **Utiliser** bascule : c'est cette équipe-là que les missions suivantes feront travailler.
-- **Dupliquer** copie l'organigramme et ses âmes pour le faire évoluer sans toucher à l'original.
-- Le nom se change en place, dans la liste.
-- **+ Nouvelle équipe** repart de l'équipe type ; **Partir de l'équipe actuelle** copie celle
-  qui travaille. La dernière équipe ne se supprime pas — il en faut toujours une.
+- **Utiliser** (Use) switches: the next missions will use that team.
+- **Dupliquer** (Duplicate) copies the org chart and its souls so you can evolve it without
+  touching the original.
+- The name is edited in place, in the list.
+- **+ Nouvelle équipe** (New team) starts from the default team; **Partir de l'équipe
+  actuelle** (Start from the current team) copies the active one. The last team cannot be
+  deleted — there must always be one.
 
-Changer d'équipe **repart sur un contexte neuf** : les sous-agents sont déclarés au démarrage
-de la session. Les missions déjà écrites et leurs livrables ne bougent pas.
+Switching teams **starts a fresh context**: subagents are declared when the session starts.
+Missions already written and their deliverables are left untouched.
 
-## L'organigramme
+## The org chart
 
-La colonne de droite est l'organigramme de l'équipe active, et c'est le seul vrai réglage de l'app.
+The right-hand column is the active team's org chart, and it is the app's only real setting.
 
-- **`+`** sur l'orchestrateur ajoute un pôle, sur un pôle ajoute un spécialiste. Le nom se
-  tape **directement sur la carte**, `↩` valide, `esc` annule : aucune fenêtre ne s'ouvre,
-  on enchaîne. Double-clic sur un nom pour le corriger de la même façon.
-- **Clic sur un membre** : sa fiche — nom, rattachement, et son texte **âme et rôle**, celui
-  qui deviendra son prompt système. `⌘↩` enregistre, `esc` ferme.
-- **Proposer une âme** : un appel court et isolé (un tour, aucun outil) écrit la fiche à ta
-  place, en tenant compte de qui l'entoure dans l'équipe. Tu relis, tu corriges.
-- Un membre qu'on vient de créer prend l'**identifiant de son vrai nom** dès qu'on le
-  renomme (« Direction financière » → `direction-financiere`) : c'est ce que l'orchestrateur
-  emploie pour le convoquer. Dès qu'il a une âme, l'identifiant se fige.
-- **Glisser-déposer** pour rattacher ailleurs. Trois niveaux, pas quatre : un spécialiste
-  n'encadre personne, et un pôle qui encadre ne peut pas devenir spécialiste.
-- Pendant une mission, chaque membre porte son état en direct : *au travail*, *a rendu*,
-  *en échec*.
+- **`+`** on the orchestrator adds a department; on a department, it adds a specialist. The
+  name is typed **directly on the card**, `↩` confirms, `esc` cancels: no dialog opens, you
+  keep going. Double-click a name to fix it the same way.
+- **Click a member**: their sheet — name, reporting line, and their **soul and role** text,
+  which becomes their system prompt. `⌘↩` saves, `esc` closes.
+- **Proposer une âme** (Suggest a soul): a short, isolated call (one turn, no tools) writes
+  the sheet for you, taking into account who surrounds that member in the team. You review,
+  you correct.
+- A newly created member takes an **identifier derived from their real name** as soon as
+  they are renamed ("Direction financière" → `direction-financiere`): that is what the
+  orchestrator uses to call them. Once they have a soul, the identifier is frozen.
+- **Drag and drop** to change a member's reporting line. Three levels, not four: a
+  specialist manages nobody, and a department that manages people cannot become a specialist.
+- During a mission, each member shows their live status: *working*, *delivered*, *failed*.
 
-Modifier l'organigramme **repart sur un contexte neuf** : les sous-agents sont déclarés au
-démarrage de la session, une équipe changée en cours de route laisserait des sessions
-branchées sur un organigramme qui n'existe plus. Le contexte de chaque mission, lui, est
-enregistré : rien n'est perdu.
+Changing the org chart **starts a fresh context**: subagents are declared when the session
+starts, and a team changed mid-way would leave sessions wired to an org chart that no
+longer exists. Each mission's context is saved: nothing is lost.
 
-## Les sources que tu apportes
+## The sources you bring
 
-Le champ de saisie prend tout ce que tu lui donnes — c'est la matière de la mission.
+The input field takes whatever you give it — it is the mission's raw material.
 
-- **Glisse tes fichiers** n'importe où dans la fenêtre, clique le trombone, ou fais `⌘⇧A` :
-  images, PDF, audio, vidéo, tableurs, code, archives. Une capture **collée** depuis le
-  presse-papiers est enregistrée comme les autres.
-- **Colle des liens** dans le texte : ils sont listés au message comme des sources à ouvrir,
-  et l'orchestrateur les lit avec `WebFetch` avant de répondre. Un lien glissé depuis le
-  navigateur atterrit dans le champ.
-- Chaque pièce est **copiée** dans les données de la mission : elle reste lisible même si tu
-  déplaces l'original, et un fil rouvert dans trois semaines retrouve ses pièces. Jusqu'à
-  512 Mo par fichier.
-- Le message emporte les **chemins absolus** : `Read` ouvre images, PDF et tout ce qui est
-  texte ; pour un audio ou une vidéo, l'agent passe par `Bash` (`ffprobe`, `ffmpeg`, `sips`).
-  Si l'outil manque sur la machine, il le dit au lieu d'inventer.
-- L'orchestrateur **transmet ces sources à l'équipe** : le chemin exact va dans le brief du
-  membre concerné, qui l'ouvre lui-même. Un directeur artistique qui doit juger une maquette
-  a besoin du fichier, pas d'une description.
-- Une pièce sans un mot vaut une demande : « regarde ça ».
+- **Drop your files** anywhere in the window, click the paperclip, or press `⌘⇧A`: images,
+  PDFs, audio, video, spreadsheets, code, archives. A screenshot **pasted** from the
+  clipboard is saved like any other file.
+- **Paste links** into the text: they are listed on the message as sources to open, and the
+  orchestrator reads them with `WebFetch` before answering. A link dragged from the browser
+  lands in the field.
+- Each attachment is **copied** into the mission's data: it stays readable even if you move
+  the original, and a thread reopened three weeks later still finds its attachments. Up to
+  512 MB per file.
+- The message carries **absolute paths**: `Read` opens images, PDFs and anything textual;
+  for audio or video, the agent goes through `Bash` (`ffprobe`, `ffmpeg`, `sips`). If the
+  tool is missing on the machine, it says so instead of making things up.
+- The orchestrator **passes these sources on to the team**: the exact path goes into the
+  brief of the member concerned, who opens it themselves. An art director who has to judge
+  a mock-up needs the file, not a description of it.
+- An attachment with no text counts as a request: "have a look at this".
 
-## Le livrable
+## The deliverable
 
-Un `.md` ordinaire, dans `~/OpenSpace` (changeable dans les réglages ⚙).
+A regular `.md` file, in `~/OpenSpace` (configurable in the ⚙ settings).
 
-- Le **sommaire** et le bloc **« À propos de ce livrable »** sont composés par l'app, pas par
-  le modèle : une table des matières qui ment est pire que pas de table. Ce bloc porte le
-  modèle et l'effort qui ont écrit le document.
-- Republier sur le même fichier crée une **nouvelle version**. L'ancienne part dans
-  `Versions/`, consultable et restaurable. **Rien n'est écrasé, donc rien n'est à valider** —
-  c'est ce qui permet de retoucher un document en discussion sans confirmer trois fois.
-- La colonne **Livrables** montre ceux de la mission ouverte (ou tout le dossier), avec
-  leurs versions, l'ouverture dans ton éditeur Markdown, l'export et le Finder.
+- The **table of contents** and the **"À propos de ce livrable"** (About this deliverable)
+  block are built by the app, not by the model: a table of contents that lies is worse than
+  none. That block records the model and effort that wrote the document.
+- Republishing to the same file creates a **new version**. The previous one moves to
+  `Versions/`, where it can be viewed and restored. **Nothing is overwritten, so nothing
+  needs approval** — which is what lets you revise a document in conversation without
+  confirming three times.
+- The **Livrables** (Deliverables) column shows those of the open mission (or the whole
+  folder), with their versions, opening in your Markdown editor, export and Finder.
 
-## Les cartes de validation
+## Approval cards
 
-En **autonomie** (par défaut), l'équipe mène la mission de bout en bout : convoquer,
-publier, retoucher, tout part seul. Une seule carte subsiste — **supprimer un livrable**,
-parce que ça emporte tout son historique — et le fichier part à la corbeille du Mac.
+In **autonomous** mode (the default), the team runs the mission end to end: calling
+members, publishing, revising, everything goes through on its own. Only one card remains —
+**deleting a deliverable**, because it takes its whole history with it — and the file goes
+to the macOS Trash.
 
-En mode **prudent**, une carte s'ouvre avant `Bash`, avant une écriture de fichier hors du
-dossier des livrables, et avant un effacement. Au clavier, quand une carte attend : **`↩`
-autorise**, **`esc` refuse**. `↩` n'autorise que si le champ de saisie est vide — sinon la
-phrase en cours part comme message, elle ne valide rien par accident.
+In **cautious** mode, a card opens before `Bash`, before writing a file outside the
+deliverables folder, and before a deletion. With the keyboard, when a card is waiting:
+**`↩` allows**, **`esc` denies**. `↩` only allows when the input field is empty —
+otherwise the sentence being typed is sent as a message, it never approves anything by
+accident.
 
-Les règles d'organisation, elles, ne sont **pas** des permissions : elles s'appliquent dans
-les deux modes.
+The organisation rules are **not** permissions: they apply in both modes.
 
-## Écrire pendant qu'ils travaillent
+## Typing while they work
 
-Le champ de saisie n'est jamais bloqué. Un message envoyé pendant un traitement est **fondu
-dans le tour en cours** : l'orchestrateur le lit en route et refait son plan avec. La bulle
-porte la mention *pris en compte à la prochaine étape*.
+The input field is never locked. A message sent while the team is working is **merged into
+the current turn**: the orchestrator reads it along the way and re-plans with it. The bubble
+is marked *taken into account at the next step*.
 
-Le bouton reste **envoyer** tant qu'il y a du texte ; il ne devient **arrêter** que si le
-champ est vide (sinon `esc` ou `⌘.`).
+The button stays **send** as long as there is text; it only turns into **stop** when the
+field is empty (otherwise use `esc` or `⌘.`).
 
-**Deux missions peuvent tourner en même temps** (`src/agent/pool.mjs`). Changer de mission
-dans la colonne de gauche **n'interrompt rien** : ça ne change que ce qu'on regarde. Une
-troisième demande attend son tour, et part dès qu'une place se libère.
+**Two missions can run at the same time** (`src/agent/pool.mjs`). Switching missions in the
+left-hand column **interrupts nothing**: it only changes what you are looking at. A third
+request waits its turn, and starts as soon as a slot frees up.
 
-## Réglages
+## Settings
 
-| Réglage | Effet |
+| Setting | Effect |
 |---|---|
-| **Orchestrateur** | le modèle de la session principale (Opus 5 par défaut) |
-| **L'équipe travaille avec** | le modèle des sous-agents : le même, ou plus rapide pour une mission large |
-| **Ampleur du livrable** | note (~1 200 mots) · document (~3 000) · dossier (~7 500) — cale aussi ce qu'on attend de chaque membre |
-| **Langue de rédaction** | français par défaut |
-| **Autonomie** | seul, ou avec des cartes avant les actions sensibles |
-| **Dossier des livrables** | `~/OpenSpace` par défaut |
+| **Orchestrateur** (Orchestrator) | the main session's model (Opus 5 by default) |
+| **L'équipe travaille avec** (Team model) | the subagents' model: the same one, or a faster one for a broad mission |
+| **Ampleur du livrable** (Deliverable size) | note (~1,200 words) · document (~3,000) · dossier (~7,500) — also sets what is expected from each member |
+| **Langue de rédaction** (Writing language) | French by default, or English |
+| **Autonomie** (Autonomy) | on its own, or with cards before sensitive actions |
+| **Dossier des livrables** (Deliverables folder) | `~/OpenSpace` by default |
 
-Changer l'ampleur, la langue, l'autonomie ou le modèle de l'équipe repart sur une mission
-neuve : ces règles vivent dans les consignes du système.
+Changing the size, language, autonomy or team model starts a fresh mission: these rules
+live in the system instructions.
 
-### Ce qui tourne vraiment
+### What is actually running
 
-Les deux menus du haut disent ce qu'on **demande** ; la ligne juste en dessous dit ce qui
-**sert** : `En ce moment : Opus 5, effort élevé. L'équipe travaille avec le même modèle.`
-Le modèle y vient de ce que le SDK annonce au démarrage de la session, pas du menu — tant
-qu'une session n'a pas redémarré, les deux peuvent différer. Avant le premier message
-d'une mission, la phrase s'ouvre sur *Au prochain message*.
+The two menus at the top say what you **ask for**; the line right below says what is
+**in use** — for example "Opus 5, high effort; the team works with the same model". The
+model shown there comes from what the SDK reports when the session starts, not from the
+menu — until a session restarts, the two may differ. Before a mission's first message, the
+sentence starts with *At the next message*.
 
-La version courte (`Opus 5 · effort élevé`) tient aussi sous le titre de la fenêtre, et le
-générique de chaque livrable la garde par écrit : *Produit par l'Assistant OpenSpace
-(claude-opus-5, effort high)*. C'est ce qui explique, trois semaines plus tard, pourquoi
-deux versions du même document ne se valent pas.
+The short version (`Opus 5 · effort élevé`) also sits under the window title, and each
+deliverable's credits keep it in writing: *Produit par l'Assistant OpenSpace
+(claude-opus-5, effort high)*. That is what explains, three weeks later, why two versions of
+the same document are not equally good.
 
-L'**effort** (`high`) n'est pas réglable depuis la fenêtre : c'est une constante unique,
-`EFFORT` dans `src/agent/session.mjs`, d'où partent à la fois l'appel au SDK, l'affichage
-et le générique.
+The **effort** (`high`) cannot be changed from the window: it is a single constant,
+`EFFORT` in `src/agent/session.mjs`, which feeds the SDK call, the display and the credits
+alike.
 
 ## Architecture
 
 ```
-src/main.mjs              processus principal Electron : fenêtre, IPC, permissions, config
-src/preload.cjs           pont contextIsolation (aucun accès Node côté page)
-src/agent/session.mjs     session Claude Agent SDK : options, routage, permissions, mesure des contributions
-src/agent/prompt.mjs      les six règles de l'orchestrateur (PROMPT_VERSION à incrémenter si elles changent)
-src/agent/equipe.mjs      l'organigramme devient des sous-agents (AgentDefinition, une âme par prompt)
-src/agent/gardes.mjs      hooks PreToolUse : l'ordre de passage et le livrable nourri par l'équipe
-src/agent/outils.mjs      serveur MCP interne : livrables, versions, titre, organigramme
-src/agent/pool.mjs        deux missions de front, la file d'attente, la navigation qui n'interrompt rien
-src/agent/ame.mjs         « Proposer une âme » : un appel isolé, un tour, aucun outil
-src/agent/resume.mjs      les demandes de validation, en français lisible
-src/espace/equipe.mjs     les équipes nommées, leurs organigrammes et leurs âmes ; celle qui est active
-src/espace/pieces.mjs     les pièces jointes : copie, reconnaissance du type, chemins passés à l'agent
-src/espace/livrables.mjs  les .md, le sommaire, le générique, les versions
-src/espace/missions.mjs   un fichier par mission : le fil rejouable et la session à reprendre
-src/espace/paths.mjs      où vivent les données et les livrables
-src/espace/journal.mjs    journal technique (l'app lancée depuis le Dock n'a pas de terminal)
-src/renderer/             la fenêtre : index.html, app.js, style.css, markdown.js
-scripts/                  icône, build, installation, tests
+src/main.mjs              Electron main process: window, IPC, permissions, config
+src/preload.cjs           contextIsolation bridge (no Node access from the page)
+src/agent/session.mjs     Claude Agent SDK session: options, routing, permissions, contribution measurement
+src/agent/prompt.mjs      the orchestrator's six rules (bump PROMPT_VERSION when they change)
+src/agent/equipe.mjs      turns the org chart into subagents (AgentDefinition, one soul per prompt)
+src/agent/gardes.mjs      PreToolUse hooks: calling order and a deliverable fed by the team
+src/agent/outils.mjs      in-process MCP server: deliverables, versions, title, org chart
+src/agent/pool.mjs        two missions at once, the queue, navigation that interrupts nothing
+src/agent/ame.mjs         "Suggest a soul": an isolated call, one turn, no tools
+src/agent/resume.mjs      approval requests, in readable French
+src/espace/equipe.mjs     named teams, their org charts and souls; which one is active
+src/espace/pieces.mjs     attachments: copy, type detection, paths handed to the agent
+src/espace/livrables.mjs  the .md files, table of contents, credits, versions
+src/espace/missions.mjs   one file per mission: the replayable thread and the session to resume
+src/espace/paths.mjs      where data and deliverables live
+src/espace/journal.mjs    technical log (an app launched from the Dock has no terminal)
+src/renderer/             the window: index.html, app.js, style.css, markdown.js
+scripts/                  icon, build, install, tests
 ```
 
-Où vivent les choses :
+Where things live:
 
-| Quoi | Où |
+| What | Where |
 |---|---|
-| Livrables | `~/OpenSpace` (et `~/OpenSpace/Versions`) |
-| Équipes, missions, pièces jointes, réglages | `~/Library/Application Support/Assistant OpenSpace` |
-| Journal de bord | `~/Library/Application Support/Assistant OpenSpace/journal.log` |
+| Deliverables | `~/OpenSpace` (and `~/OpenSpace/Versions`) |
+| Teams, missions, attachments, settings | `~/Library/Application Support/Assistant OpenSpace` |
+| Log | `~/Library/Application Support/Assistant OpenSpace/journal.log` |
 
-Le fichier `equipes.json` est lisible et modifiable à la main (menu **Mission → Ouvrir le
-fichier des équipes**) : c'est un JSON, il se sauvegarde et se copie d'une machine à l'autre.
-Une installation qui vient d'une version précédente reprend son `equipe.json` et ses
-compositions archivées : chacune devient une équipe de la bibliothèque.
+The `equipes.json` file can be read and edited by hand (menu **Mission → Ouvrir le fichier
+des équipes**, Open the teams file): it is plain JSON, easy to back up and copy from one
+machine to another. An install coming from an earlier version picks up its `equipe.json`
+and its archived line-ups: each one becomes a team in the library.
 
-## Développement
+## Development
 
 ```bash
 npm install
-npm start          # lance l'app depuis les sources
-npm test           # équipes, gardes, livrables, missions, pièces jointes — sans réseau
-npm run selftest   # une vraie mission de bout en bout, dans un dossier temporaire
-npm run build      # « Assistant OpenSpace.app » dans build/
-npm run install-app # reconstruit, installe dans /Applications, épingle au Dock
-npm run icon       # régénère assets/icon.icns (rendu CoreGraphics, scripts/make-icon.swift)
+npm start           # run the app from source
+npm test            # teams, guards, deliverables, missions, attachments — no network
+npm run selftest    # a real end-to-end mission, in a temporary folder
+npm run build       # "Assistant OpenSpace.app" in build/
+npm run install-app # rebuild, install in /Applications, pin to the Dock
+npm run icon        # regenerate assets/icon.icns (CoreGraphics rendering, scripts/make-icon.swift)
 ```
 
-`npm test` ne touche ni au réseau ni à tes données : chaque script travaille dans un dossier
-temporaire (`OPENSPACE_DATA_DIR`, `OPENSPACE_LIVRABLES`). `npm run selftest` démarre une
-vraie session avec une équipe réduite à deux membres et vérifie l'ordre de passage complet —
-spécialiste, puis directeur, puis livrable.
+`npm test` touches neither the network nor your data: each script works in a temporary
+folder (`OPENSPACE_DATA_DIR`, `OPENSPACE_LIVRABLES`). `npm run selftest` starts a real
+session with a team cut down to two members and checks the full calling order —
+specialist, then department head, then deliverable.
 
-`OPENSPACE_DEBUG=1 npm start` renvoie la sortie d'erreur de Claude Code dans le terminal.
+`OPENSPACE_DEBUG=1 npm start` forwards Claude Code's stderr to the terminal.
 
-## Licence
+## License
 
-Projet privé, usage local.
+No license has been granted yet: all rights reserved.
