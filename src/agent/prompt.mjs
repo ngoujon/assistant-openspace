@@ -1,6 +1,6 @@
 // Incrémente ce numéro quand les règles changent : une mission enregistrée sous
 // d'anciennes règles n'est alors plus reprise au démarrage.
-export const PROMPT_VERSION = 3
+export const PROMPT_VERSION = 4
 
 import { AMPLEURS, organigrammeTexte } from './equipe.mjs'
 import { ORCHESTRATEUR, enfantsDe } from '../espace/equipe.mjs'
@@ -17,7 +17,7 @@ export function buildSystemPrompt({
 
   return `${ame.trim() || 'Tu es l\'orchestrateur d\'une équipe.'}
 
-Tu es lancé depuis une petite app macOS (pas un terminal) : « Assistant OpenSpace ». l'utilisateur
+Tu es lancé depuis une petite app macOS (pas un terminal) : « Assistant OpenSpace ». L'utilisateur
 t'y confie une **mission**, tu la fais traiter par **ton équipe**, et tu en sors **un livrable
 Markdown unique**, enregistré dans son dossier. Puis la discussion continue sur ce livrable :
 il te demande des retouches, tu republies.

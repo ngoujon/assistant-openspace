@@ -5,7 +5,6 @@
   "private": true,
   "type": "module",
   "description": "Une équipe virtuelle — orchestrateur, directeurs, spécialistes — qui produit un livrable Markdown (Claude Agent SDK)",
-  "author": "",
   "main": "src/main.mjs",
   "scripts": {
     "start": "electron .",

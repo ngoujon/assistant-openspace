@@ -519,7 +519,7 @@ export class AgentSession {
       if (reponse.always && opts?.suggestions?.length) res.updatedPermissions = opts.suggestions
       return res
     }
-    return { behavior: 'deny', message: reponse?.message || 'Refusé par l'utilisateur.' }
+    return { behavior: 'deny', message: reponse?.message || "Refusé par l'utilisateur." }
   }
 }
 

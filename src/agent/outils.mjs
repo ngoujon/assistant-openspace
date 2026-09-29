@@ -97,7 +97,7 @@ export function serveurOpenspace(contexte = {}) {
       {
         titre: z.string().describe('titre du livrable, tel qu\'il apparaîtra en tête'),
         markdown: z.string().describe('le corps ENTIER du document, en Markdown, sans sommaire ni bloc « À propos »'),
-        mission: z.string().optional().describe('la demande de l'utilisateur, en une phrase'),
+        mission: z.string().optional().describe("la demande de l'utilisateur, en une phrase"),
         nom: z.string().optional().describe('nom de fichier d\'un livrable existant pour en publier une nouvelle version ; sinon composé depuis le titre et la date'),
       },
       sur(async ({ titre, markdown, mission, nom }) => {
@@ -191,7 +191,7 @@ export function serveurOpenspace(contexte = {}) {
           supprime: doc.nom,
           corbeille: aCorbeille,
           note: aCorbeille
-            ? 'Le livrable est dans la corbeille du Mac : l'utilisateur peut le récupérer.'
+            ? "Le livrable est dans la corbeille du Mac : l'utilisateur peut le récupérer."
             : 'Le livrable a été effacé du disque.',
         }
       }),

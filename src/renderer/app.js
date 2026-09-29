@@ -96,7 +96,7 @@ function showWelcome() {
   const box = el('div', 'welcome')
   const h = new Date().getHours()
   const salut = h < 5 ? 'Bonne nuit' : h < 12 ? 'Bonjour' : h < 18 ? 'Bon après-midi' : 'Bonsoir'
-  box.appendChild(el('h1', null, `${salut} l'utilisateur 👋`))
+  box.appendChild(el('h1', null, `${salut} 👋`))
   const poles = enfantsDe('orchestrateur')
   box.appendChild(el('p', null, poles.length
     ? `${poles.length} pôle${poles.length > 1 ? 's' : ''} t'attendent : ${poles.map((p) => p.label).join(', ')}. `
@@ -1174,7 +1174,7 @@ function addPermission(evt) {
     input.focus()
   }
   entree.allow = () => repondre({ behavior: 'allow' })
-  entree.deny = () => repondre({ behavior: 'deny', message: 'Refusé par l'utilisateur.' })
+  entree.deny = () => repondre({ behavior: 'deny', message: "Refusé par l'utilisateur." })
   entree.card = card
   permsEnAttente.push(entree)
 

@@ -23,7 +23,7 @@ function defaultRoot() {
  *
  * Pas dans ~/Documents, malgré l'évidence : macOS y protège l'accès et redemande
  * l'autorisation dès que la signature de l'app change — c'est-à-dire à chaque
- * reconstruction. La racine du dossier personnel n'est pas surveillée. l'utilisateur peut
+ * reconstruction. La racine du dossier personnel n'est pas surveillée. L'utilisateur peut
  * toujours choisir ~/Documents dans les réglages et l'autoriser une fois.
  */
 function defaultLivrables() {
@@ -43,7 +43,7 @@ export function setDataRoot(dir) {
   ensureDirs()
 }
 
-/** l'utilisateur peut ranger ses livrables où il veut (réglages ⚙). */
+/** L'utilisateur peut ranger ses livrables où il veut (réglages ⚙). */
 export function setLivrables(dir) {
   if (!dir) return
   livrables = path.resolve(dir)

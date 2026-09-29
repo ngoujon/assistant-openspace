@@ -94,7 +94,7 @@ teigneux.noteContribution('cto-dev', texteLong(1200))
 const relances = [1, 2, 3, 4, 5].map(() => teigneux.raisonDeRelancer())
 assert.equal(relances.filter(Boolean).length, 4)
 teigneux.nouveauTour()
-assert.ok(teigneux.raisonDeRelancer(), 'un nouveau message de l'utilisateur redonne du crédit')
+assert.ok(teigneux.raisonDeRelancer(), "un nouveau message de l'utilisateur redonne du crédit")
 
 // 10. Les hooks passés au SDK couvrent bien les deux familles d'outils, et l'arrêt.
 const hooks = arret.hooks()
