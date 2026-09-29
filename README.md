@@ -12,6 +12,14 @@ then you keep talking with them to refine it, version after version.
 > The app's interface is in French. Labels quoted below are the ones you will see on
 > screen, with their English meaning.
 
+## Screenshots
+
+*Demo data: a fictional product-launch mission, team and deliverables (the UI is in French).*
+
+![Mission thread and team](docs/screenshots/team.png)
+
+![Deliverables panel](docs/screenshots/deliverables.png)
+
 ## Requirements
 
 - macOS (the packaged app and the icon script are macOS-only; the tests run anywhere).
