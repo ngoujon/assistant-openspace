@@ -13,9 +13,17 @@
 // Personne d'autre que l'orchestrateur n'écrit le livrable : les outils OpenSpace
 // leur sont retirés. Un pôle qui publierait son coin de document ferait exactement
 // ce que cette application cherche à éviter — un rapport en silos.
+import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk'
 import { ORCHESTRATEUR, enfantsDe, profondeur } from '../espace/equipe.mjs'
+import type { Ampleur, Membre } from '../contrat.mjs'
 
-export const AMPLEURS = {
+interface Gabarit {
+  livrable: string
+  membre: string
+  note: string
+}
+
+export const AMPLEURS: Record<Ampleur, Gabarit> = {
   note: { livrable: '900 à 1 500 mots', membre: '250 à 400 mots', note: 'Une note : l\'essentiel, décidé, sans développement.' },
   document: { livrable: '2 500 à 4 000 mots', membre: '500 à 900 mots', note: 'Un document de travail : chaque volet du sujet a sa section.' },
   dossier: { livrable: '6 000 à 9 000 mots', membre: '900 à 1 600 mots', note: 'Un dossier : contexte, options, chiffres, risques, plan.' },
@@ -24,7 +32,7 @@ export const AMPLEURS = {
 /** Outils laissés à l'équipe : de quoi se renseigner, rien pour publier. */
 const OUTILS_MEMBRE = ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite']
 
-const CONSIGNES_COMMUNES = (a, langue) => `
+const CONSIGNES_COMMUNES = (a: Gabarit, langue: string) => `
 
 # Ce qu'on attend de toi, ici
 
@@ -44,7 +52,7 @@ c'est **de la matière** que l'orchestrateur assemblera dans un livrable unique.
   l'utilisateur : tu les ouvres (\`Read\`, \`WebFetch\`) avant d'écrire, et tu dis ce que tu en tires.
 - Tu ne rédiges **jamais** le document final et tu ne parles pas à la place des autres pôles.`
 
-const CONSIGNES_POLE = (enfants) => `
+const CONSIGNES_POLE = (enfants: Membre[]) => `
 
 # Ton tour vient après le leur
 
@@ -61,7 +69,7 @@ retrouver dans ce que tu rends. Si tu supprimes quelque chose, c'est que c'est f
 redondant, et tu le signales en fin de texte.`
 
 /** La première ligne utile d'une âme : ce qui décrit le mieux à quoi sert ce membre. */
-function accroche(ame, label) {
+function accroche(ame: string, label: string): string {
   const ligne = String(ame || '')
     .split('\n')
     .map((l) => l.trim())
@@ -71,12 +79,14 @@ function accroche(ame, label) {
 
 /**
  * Les définitions de sous-agents à passer à `query()`.
- * @param {Array} membres l'organigramme
- * @param {{ampleur?: string, langue?: string, modele?: string}} reglages
+ * @param membres l'organigramme
  */
-export function definitionsAgents(membres, { ampleur = 'document', langue = 'français', modele } = {}) {
-  const a = AMPLEURS[ampleur] || AMPLEURS.document
-  const out = {}
+export function definitionsAgents(
+  membres: Membre[],
+  { ampleur = 'document', langue = 'français', modele }: { ampleur?: string, langue?: string, modele?: string } = {},
+): Record<string, AgentDefinition> {
+  const a = AMPLEURS[ampleur as Ampleur] || AMPLEURS.document
+  const out: Record<string, AgentDefinition> = {}
   for (const m of membres) {
     if (m.id === ORCHESTRATEUR) continue
     const enfants = enfantsDe(m.id, membres)
@@ -97,8 +107,8 @@ export function definitionsAgents(membres, { ampleur = 'document', langue = 'fra
 }
 
 /** L'organigramme en texte, pour le prompt de l'orchestrateur. */
-export function organigrammeTexte(membres) {
-  const lignes = []
+export function organigrammeTexte(membres: Membre[]): string {
+  const lignes: string[] = []
   for (const p of enfantsDe(ORCHESTRATEUR, membres)) {
     const enfants = enfantsDe(p.id, membres)
     lignes.push(`- **${p.label}** — pôle, sous-agent \`${p.id}\``)
@@ -109,7 +119,7 @@ export function organigrammeTexte(membres) {
 }
 
 /** L'ordre de passage imposé : chaque pôle, ses spécialistes d'abord. */
-export function ordreDePassage(membres) {
+export function ordreDePassage(membres: Membre[]): { pole: string, label: string, specialistes: { id: string, label: string }[] }[] {
   return enfantsDe(ORCHESTRATEUR, membres).map((p) => ({
     pole: p.id,
     label: p.label,

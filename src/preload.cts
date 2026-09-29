@@ -1,11 +1,15 @@
-const { contextBridge, ipcRenderer, webUtils } = require('electron')
+import electron = require('electron')
+import type { IpcRendererEvent } from 'electron'
+import type { EvenementFenetre, OpenspaceApi } from './contrat.mjs' with { 'resolution-mode': 'import' }
+
+const { contextBridge, ipcRenderer, webUtils } = electron
 
 /**
  * Le chemin d'un fichier glissé dans la fenêtre. Depuis Electron 32, `File.path`
  * n'existe plus : c'est le seul moyen de retrouver l'original sur le disque, et
  * donc de le joindre sans en recharger les octets dans la page.
  */
-function cheminDeFichier(file) {
+function cheminDeFichier(file: File): string {
   try {
     return webUtils?.getPathForFile ? webUtils.getPathForFile(file) : ''
   } catch {
@@ -13,7 +17,7 @@ function cheminDeFichier(file) {
   }
 }
 
-contextBridge.exposeInMainWorld('openspace', {
+const api: OpenspaceApi = {
   init: () => ipcRenderer.invoke('app:init'),
   send: (texte, pieces) => ipcRenderer.send('chat:send', { texte, pieces }),
   interrupt: () => ipcRenderer.send('chat:interrupt'),
@@ -74,8 +78,10 @@ contextBridge.exposeInMainWorld('openspace', {
   openExternal: (url) => ipcRenderer.send('app:open-external', url),
 
   onEvent: (cb) => {
-    const handler = (_e, evt) => cb(evt)
+    const handler = (_e: IpcRendererEvent, evt: EvenementFenetre) => cb(evt)
     ipcRenderer.on('agent', handler)
     return () => ipcRenderer.removeListener('agent', handler)
   },
-})
+}
+
+contextBridge.exposeInMainWorld('openspace', api)

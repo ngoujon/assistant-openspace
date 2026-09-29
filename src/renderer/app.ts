@@ -1,65 +1,93 @@
 import { renderMarkdown } from './markdown.js'
+import type {
+  DemandePermission, EquipeResume, EtatEquipe, EvenementFenetre, EvenementFil, LivrableInfo, Membre,
+  MissionResume, OpenspaceApi, PatchConfig, Piece, PieceMessage, PorteeLivrables, ReponsePermission,
+  ResultatPieces,
+} from '../contrat.mjs'
+
+declare global {
+  interface Window {
+    openspace: OpenspaceApi
+  }
+}
+
+type Evenement<K extends EvenementFenetre['k']> = Extract<EvenementFenetre, { k: K }>
+type EtatMembre = 'travaille' | 'livre' | 'echec'
+
+/** Un élément de la page, qui doit exister : sans lui, l'interface n'a pas de sens. */
+function $<T extends HTMLElement = HTMLElement>(id: string): T {
+  const n = document.getElementById(id)
+  if (!n) throw new Error(`Élément #${id} introuvable.`)
+  return n as T
+}
 
 const api = window.openspace
-const thread = document.getElementById('thread')
-const scroll = document.getElementById('scroll')
-const input = document.getElementById('input')
-const sendBtn = document.getElementById('btn-send')
-const statusLine = document.getElementById('status-line')
-const panneauReglages = document.getElementById('settings')
-const modelSelect = document.getElementById('model')
-const modeleEquipeSelect = document.getElementById('modele-equipe')
-const ampleurSelect = document.getElementById('ampleur')
-const langueSelect = document.getElementById('langue')
-const autonomieSelect = document.getElementById('autonomie')
-const cheminDossier = document.getElementById('chemin-dossier')
-const moteurEl = document.getElementById('moteur')
-const barre = document.getElementById('barre')
-const panneau = document.getElementById('panneau')
-const recherche = document.getElementById('recherche')
-const listeMissions = document.getElementById('liste-missions')
-const listeLivrables = document.getElementById('liste-livrables')
-const arbreEl = document.getElementById('arbre')
-const selectEquipe = document.getElementById('equipe-active')
-const listeEquipesEl = document.getElementById('liste-equipes')
-const modaleEquipes = document.getElementById('modale-equipes')
-const piecesEl = document.getElementById('pieces')
-const depotEl = document.getElementById('depot')
+const thread = $('thread')
+const scroll = $('scroll')
+const input = $<HTMLTextAreaElement>('input')
+const sendBtn = $<HTMLButtonElement>('btn-send')
+const statusLine = $('status-line')
+const panneauReglages = $('settings')
+const modelSelect = $<HTMLSelectElement>('model')
+const modeleEquipeSelect = $<HTMLSelectElement>('modele-equipe')
+const ampleurSelect = $<HTMLSelectElement>('ampleur')
+const langueSelect = $<HTMLSelectElement>('langue')
+const autonomieSelect = $<HTMLSelectElement>('autonomie')
+const cheminDossier = $('chemin-dossier')
+const moteurEl = $('moteur')
+const barre = $('barre')
+const panneau = $('panneau')
+const recherche = $<HTMLInputElement>('recherche')
+const listeMissions = $('liste-missions')
+const listeLivrables = $('liste-livrables')
+const arbreEl = $('arbre')
+const selectEquipe = $<HTMLSelectElement>('equipe-active')
+const listeEquipesEl = $('liste-equipes')
+const modaleEquipes = $('modale-equipes')
+const piecesEl = $('pieces')
+const depotEl = $('depot')
 
 let busy = false
-let currentText = null
-let currentThinking = null
-let toolEls = new Map()
+let currentText: { el: HTMLElement, raw: string } | null = null
+let currentThinking: { el: HTMLElement, raw: string } | null = null
+let toolEls = new Map<string, HTMLElement>()
 /** La carte ouverte pour chaque membre en train de travailler. */
-let convocEls = new Map()
-let livrables = []
-let missions = []
-let missionCourante = null
-let membres = []
+let convocEls = new Map<string, HTMLElement>()
+let livrables: LivrableInfo[] = []
+let missions: MissionResume[] = []
+let missionCourante: string | null = null
+let membres: Membre[] = []
 /** Les équipes rangées, et celle qui travaille. */
-let equipes = []
-let equipeActive = null
+let equipes: EquipeResume[] = []
+let equipeActive: EtatEquipe['equipeActive'] | null = null
 /** Les pièces jointes préparées pour le prochain message. */
-let piecesEnCours = []
+let piecesEnCours: Piece[] = []
 let dossier = ''
-let porteeLivrables = 'mission'
+let porteeLivrables: PorteeLivrables = 'mission'
 let totalLivrables = 0
 /** Le modèle et l'effort de la session en cours, tels que le SDK les annonce. */
-let moteur = null
-/** L'effort que l'app demandera : constant, décidé dans agent/session.mjs. */
+let moteur: { model: string, effort: string, modeleEquipe: string } | null = null
+/** L'effort que l'app demandera : constant, décidé dans agent/session.mts. */
 let effortPrevu = 'high'
 /** L'état vivant de chaque membre pendant une mission : travaille, livre, echec. */
-const etatsMembres = new Map()
-const permsEnAttente = []
+const etatsMembres = new Map<string, EtatMembre>()
+
+interface PermissionEnAttente {
+  id: string
+  allow: () => void
+  deny: () => void
+  card: HTMLElement
+}
+const permsEnAttente: PermissionEnAttente[] = []
 /** Messages écrits pendant qu'ils travaillaient, pas encore repris par l'orchestrateur. */
-let enFile = []
+let enFile: HTMLElement[] = []
 
 // ------------------------------------------------------------------ outils
 
-const el = (tag, cls, text) => {
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string | null, text?: unknown): HTMLElementTagNameMap[K] {
   const n = document.createElement(tag)
   if (cls) n.className = cls
-  if (text != null) n.textContent = text
+  if (text != null) n.textContent = String(text)
   return n
 }
 
@@ -67,20 +95,23 @@ const nearBottom = () => scroll.scrollHeight - scroll.scrollTop - scroll.clientH
 let stick = true
 scroll.addEventListener('scroll', () => { stick = nearBottom() })
 
-function scrollDown(force) {
+function scrollDown(force = false): void {
   if (force) stick = true
   if (stick) scroll.scrollTop = scroll.scrollHeight
 }
 
-function add(node) {
+function add<T extends HTMLElement>(node: T): T {
   thread.appendChild(node)
   scrollDown()
   return node
 }
 
-const membreParId = (id) => membres.find((m) => m.id === id) || null
-const enfantsDe = (id) => membres.filter((m) => m.parentId === id)
-const initiales = (label) => String(label || '?')
+const membreParId = (id: string | null | undefined): Membre | null => membres.find((m) => m.id === id) || null
+const enfantsDe = (id: string): Membre[] => membres.filter((m) => m.parentId === id)
+/** Le message lisible d'une erreur, quelle que soit sa forme. */
+const messageDe = (err: unknown) => String((err as { message?: unknown } | null)?.message || err)
+
+const initiales = (label: string) => String(label || '?')
   .split(/[\s/-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
 
 // ------------------------------------------------------------------ accueil
@@ -113,7 +144,7 @@ function showWelcome() {
 }
 
 /** Les pièces d'un message déjà parti : elles restent cliquables dans le fil. */
-function pucesPieces(pieces) {
+function pucesPieces(pieces: PieceMessage[]): HTMLElement {
   const box = el('div', 'pieces-msg')
   for (const piece of pieces) {
     const puce = el('span', 'pj')
@@ -132,7 +163,7 @@ function dropWelcome() {
 
 // ---------------------------------------------------------- noms des outils
 
-const OUTILS = {
+const OUTILS: Record<string, [string, string]> = {
   rediger_livrable: ['📄', 'Écrire le livrable'],
   lister_livrables: ['📚', 'Parcourir les livrables'],
   lire_livrable: ['📖', 'Relire le livrable'],
@@ -145,7 +176,7 @@ const OUTILS = {
   equipe: ['👥', "Consulter l'organigramme"],
 }
 
-const BUILTIN = {
+const BUILTIN: Record<string, [string, string]> = {
   Bash: ['⌘', 'Terminal'],
   Read: ['📄', 'Lire un fichier'],
   Write: ['✏️', 'Écrire un fichier'],
@@ -158,23 +189,25 @@ const BUILTIN = {
   Agent: ['👤', 'Convoquer un membre'],
 }
 
-function describeTool(name) {
+function describeTool(name: string): [string, string] {
   if (name.startsWith('mcp__openspace__')) {
     const court = name.slice('mcp__openspace__'.length)
     return OUTILS[court] || ['📄', court.replace(/_/g, ' ')]
   }
-  if (BUILTIN[name]) return BUILTIN[name]
+  const connu = BUILTIN[name]
+  if (connu) return connu
   if (name.startsWith('mcp__')) return ['🔌', name.split('__').slice(1).join(' · ')]
   return ['•', name]
 }
 
-function summarizeInput(name, input) {
+function summarizeInput(name: string, input: Record<string, unknown> | null | undefined): string {
   if (!input || typeof input !== 'object') return ''
   if (name === 'Bash') return String(input.command || '')
   if (name.endsWith('rediger_livrable')) return String(input.titre || '')
-  if (input.file_path) return String(input.file_path).split('/').pop()
+  if (input.file_path) return String(input.file_path).split('/').pop() || ''
   for (const k of ['subagent_type', 'url', 'query', 'nom', 'titre', 'description', 'pattern']) {
-    if (typeof input[k] === 'string' && input[k]) return input[k]
+    const v = input[k]
+    if (typeof v === 'string' && v) return v
   }
   const first = Object.values(input).find((v) => typeof v === 'string' && v)
   return first ? String(first) : ''
@@ -182,14 +215,14 @@ function summarizeInput(name, input) {
 
 const MONO_TOOLS = new Set(['Bash', 'Write', 'Edit'])
 
-const ETIQUETTES = {
+const ETIQUETTES: Record<string, string> = {
   titre: 'titre', mission: 'mission', nom: 'fichier', markdown: 'document',
   subagent_type: 'membre', prompt: 'brief', description: 'objet',
   command: 'commande', file_path: 'fichier', query: 'recherche', url: 'adresse',
   numero: 'version',
 }
 
-function humanizeInput(value, depth = 0, lines = []) {
+function humanizeInput(value: unknown, depth = 0, lines: string[] = []): string[] {
   if (lines.length > 18) return lines
   if (Array.isArray(value)) {
     value.slice(0, 8).forEach((item) => lines.push(`${'  '.repeat(depth)}• ${item}`))
@@ -216,7 +249,7 @@ function humanizeInput(value, depth = 0, lines = []) {
 
 // -------------------------------------------------------------------- rendu
 
-function pushUserMessage(text, enAttente, pieces) {
+function pushUserMessage(text: string, enAttente: boolean, pieces: Piece[]): void {
   dropWelcome()
   const node = el('div', `msg user${enAttente ? ' enfile' : ''}`, text)
   if (pieces?.length) node.appendChild(pucesPieces(pieces))
@@ -239,19 +272,20 @@ function videEnFile() {
   }
 }
 
-function startTextBlock() {
+function startTextBlock(): { el: HTMLElement, raw: string } {
   dropWelcome()
   videEnFile()
   finishThinking()
   const node = el('div', 'msg assistant md')
   currentText = { el: node, raw: '' }
   add(node)
+  return currentText
 }
 
 let renderQueued = false
-function appendText(chunk) {
-  if (!currentText) startTextBlock()
-  currentText.raw += chunk
+function appendText(chunk: string): void {
+  const bloc = currentText || startTextBlock()
+  bloc.raw += chunk
   if (renderQueued) return
   renderQueued = true
   requestAnimationFrame(() => {
@@ -270,19 +304,20 @@ function finishText() {
   currentText = null
 }
 
-function startThinking() {
+function startThinking(): { el: HTMLElement, raw: string } {
   finishText()
-  if (currentThinking) return
+  if (currentThinking) return currentThinking
   const node = el('div', 'msg thinking')
   currentThinking = { el: node, raw: '' }
   add(node)
+  return currentThinking
 }
 
-function appendThinking(chunk) {
-  if (!currentThinking) startThinking()
-  currentThinking.raw += chunk
-  currentThinking.el.textContent = currentThinking.raw
-  currentThinking.el.scrollTop = currentThinking.el.scrollHeight
+function appendThinking(chunk: string): void {
+  const bloc = currentThinking || startThinking()
+  bloc.raw += chunk
+  bloc.el.textContent = bloc.raw
+  bloc.el.scrollTop = bloc.el.scrollHeight
   scrollDown()
 }
 
@@ -291,7 +326,7 @@ function finishThinking() {
   currentThinking = null
 }
 
-function addTool(evt) {
+function addTool(evt: Evenement<'tool-use'>): void {
   videEnFile()
   finishText()
   finishThinking()
@@ -304,7 +339,7 @@ function addTool(evt) {
 }
 
 /** La ligne d'un appel d'outil. Sert aussi à rejouer un fil enregistré. */
-function noeudOutil(nom, arg, detail) {
+function noeudOutil(nom: string, arg: string, detail: string): HTMLElement {
   const [glyph, label] = describeTool(nom)
   const node = el('div', 'msg tool')
   const head = el('div', 'head')
@@ -320,12 +355,12 @@ function noeudOutil(nom, arg, detail) {
   return node
 }
 
-function endTool(evt) {
+function endTool(evt: Evenement<'tool-result'>): void {
   const node = toolEls.get(evt.id)
   if (!node) return
   node.classList.remove('running')
   node.classList.add(evt.ok ? 'ok' : 'err')
-  const body = node.querySelector('.body')
+  const body = node.querySelector<HTMLElement>('.body')!
   if (evt.preview) body.textContent = `${body.textContent}\n\n— — —\n${evt.preview}`
   if (!evt.ok) node.classList.add('open')
 }
@@ -333,7 +368,13 @@ function endTool(evt) {
 // ------------------------------------------------- le travail de l'équipe
 
 /** La carte d'un membre convoqué : elle s'allume au départ, se remplit au retour. */
-function carteConvocation({ label, brief, etat = 'travaille', texte = '', taille = 0 }) {
+function carteConvocation({ label, brief = '', etat = 'travaille', texte = '', taille = 0 }: {
+  label: string
+  brief?: string
+  etat?: EtatMembre
+  texte?: string
+  taille?: number
+}): HTMLElement {
   const node = el('div', `msg convoc ${etat}`)
   const head = el('div', 'head')
   head.appendChild(el('span', 'qui', label))
@@ -344,12 +385,12 @@ function carteConvocation({ label, brief, etat = 'travaille', texte = '', taille
   body.textContent = texte || ''
   node.appendChild(body)
   head.addEventListener('click', () => {
-    if (node.querySelector('.body').textContent.trim()) node.classList.toggle('open')
+    if (body.textContent?.trim()) node.classList.toggle('open')
   })
   return node
 }
 
-function addConvocation(evt) {
+function addConvocation(evt: Evenement<'membre'>): void {
   videEnFile()
   finishText()
   finishThinking()
@@ -360,7 +401,7 @@ function addConvocation(evt) {
   scrollDown(true)
 }
 
-function finirConvocation(evt) {
+function finirConvocation(evt: Evenement<'contribution'>): void {
   const node = convocEls.get(evt.id)
   marquerMembre(evt.id, evt.etat)
   if (!node) {
@@ -372,15 +413,15 @@ function finirConvocation(evt) {
   }
   convocEls.delete(evt.id)
   node.className = `msg convoc ${evt.etat}`
-  const etat = node.querySelector('.etat')
+  const etat = node.querySelector<HTMLElement>('.etat')!
   etat.textContent = evt.etat === 'echec' ? '✕' : `${Math.max(1, Math.round((evt.taille || 0) / 100) / 10)} k`
-  const body = node.querySelector('.body')
+  const body = node.querySelector<HTMLElement>('.body')!
   body.textContent = evt.texte || evt.apercu || ''
   if (evt.etat === 'echec') node.classList.add('open')
   scrollDown()
 }
 
-function marquerMembre(id, etat) {
+function marquerMembre(id: string, etat: EtatMembre | null): void {
   if (etat) etatsMembres.set(id, etat)
   else etatsMembres.delete(id)
   const ligne = arbreEl.querySelector(`[data-membre="${CSS.escape(id)}"]`)
@@ -388,14 +429,14 @@ function marquerMembre(id, etat) {
   ligne.classList.remove('travaille', 'livre', 'echec')
   if (etat) ligne.classList.add(etat)
   const fanion = ligne.querySelector('.fanion')
-  if (fanion) fanion.textContent = FANIONS[etat] || ''
+  if (fanion) fanion.textContent = (etat && FANIONS[etat]) || ''
 }
 
-const FANIONS = { travaille: 'au travail', livre: 'a rendu', echec: 'en échec' }
+const FANIONS: Record<EtatMembre, string> = { travaille: 'au travail', livre: 'a rendu', echec: 'en échec' }
 
 // -------------------------------------------------------- livrable produit
 
-function carteLivrable(d) {
+function carteLivrable(d: Pick<LivrableInfo, 'nom' | 'titre' | 'mots' | 'version' | 'remplace'> & { equipe?: string[] }): HTMLElement {
   const version = Number(d.version || 1)
   const carte = el('div', 'doc-carte')
   const entete = el('div', 'entete')
@@ -422,14 +463,14 @@ function carteLivrable(d) {
   return carte
 }
 
-function addLivrable(evt) {
+function addLivrable(evt: Evenement<'livrable'>): void {
   finishText()
   finishThinking()
   add(carteLivrable(evt.livrable))
   scrollDown(true)
 }
 
-function addNote(text, kind) {
+function addNote(text: string, kind?: string): void {
   finishText()
   add(el('div', `note${kind ? ` ${kind}` : ''}`, text))
 }
@@ -438,7 +479,7 @@ function addNote(text, kind) {
  * Un tour s'est arrêté en route. Plutôt qu'un message d'erreur, on offre la reprise :
  * l'application rebranche la session sur son contexte et redemande la suite.
  */
-function proposerReprise(texte) {
+function proposerReprise(texte?: string): void {
   thread.querySelector('.reprise')?.remove()
   const box = el('div', 'reprise')
   const bouton = el('button', 'chip', texte || '↻ Reprendre où tu t\'es arrêté')
@@ -456,11 +497,11 @@ function proposerReprise(texte) {
 
 const LARGEUR_MIN = 190
 
-function appliquerLargeur(colonne, px) {
+function appliquerLargeur(colonne: HTMLElement, px: number | null): void {
   colonne.style.flex = px ? `0 0 ${px}px` : ''
 }
 
-function poser(poignee, colonne, cote, cle) {
+function poser(poignee: HTMLElement, colonne: HTMLElement, cote: 'gauche' | 'droite', cle: 'largeurBarre' | 'largeurPanneau'): void {
   poignee.addEventListener('pointerdown', (e) => {
     e.preventDefault()
     poignee.setPointerCapture(e.pointerId)
@@ -470,7 +511,7 @@ function poser(poignee, colonne, cote, cle) {
     const initiale = colonne.offsetWidth
     let derniere = initiale
 
-    const bouge = (ev) => {
+    const bouge = (ev: PointerEvent) => {
       const delta = cote === 'gauche' ? ev.clientX - depart : depart - ev.clientX
       // On garde toujours de quoi lire le fil : au moins un quart de la fenêtre.
       const max = Math.max(LARGEUR_MIN, Math.round(window.innerWidth * 0.45))
@@ -494,12 +535,12 @@ function poser(poignee, colonne, cote, cle) {
   })
 }
 
-poser(document.getElementById('poignee-barre'), barre, 'gauche', 'largeurBarre')
-poser(document.getElementById('poignee-panneau'), panneau, 'droite', 'largeurPanneau')
+poser($('poignee-barre'), barre, 'gauche', 'largeurBarre')
+poser($('poignee-panneau'), panneau, 'droite', 'largeurPanneau')
 
 // ============================================================ l'équipe
 
-function ligneMembre(m, rang) {
+function ligneMembre(m: Membre, rang: number): HTMLElement {
   const ligne = el('div', `membre rang-${rang}${rang === 0 ? ' orchestrateur' : ''}`)
   ligne.dataset.membre = m.id
   const etat = etatsMembres.get(m.id)
@@ -514,13 +555,13 @@ function ligneMembre(m, rang) {
     : 'âme à écrire'
   infos.appendChild(el('div', `m${m.ame?.trim() ? '' : ' sans-ame'}`, sousTitre))
   ligne.appendChild(infos)
-  ligne.appendChild(el('span', 'fanion', FANIONS[etat] || ''))
+  ligne.appendChild(el('span', 'fanion', (etat && FANIONS[etat]) || ''))
 
   // Le nom se tape sur la carte, sans ouvrir la fiche : créer un membre doit aller
   // vite. La fiche, elle, s'ouvre quand on veut écrire son âme.
-  const finEdition = async (garder) => {
+  const finEdition = async (garder: boolean) => {
     if (!titre.isContentEditable) return
-    const valeur = titre.textContent.replace(/\s+/g, ' ').trim()
+    const valeur = (titre.textContent || '').replace(/\s+/g, ' ').trim()
     titre.contentEditable = 'false'
     titre.classList.remove('edition')
     if (garder && valeur && valeur !== m.label) {
@@ -563,15 +604,15 @@ function ligneMembre(m, rang) {
     ligne.addEventListener('dragstart', (e) => {
       // Un nom en cours de saisie se sélectionne à la souris : ce n'est pas un glisser.
       if (titre.isContentEditable) { e.preventDefault(); return }
-      e.dataTransfer.setData('text/plain', m.id)
-      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer?.setData('text/plain', m.id)
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
       ligne.classList.add('glisse')
     })
     ligne.addEventListener('dragend', () => ligne.classList.remove('glisse'))
   }
   if (rang < 2) {
     ligne.addEventListener('dragover', (e) => {
-      const id = e.dataTransfer.getData('text/plain')
+      const id = e.dataTransfer?.getData('text/plain')
       if (id === m.id) return
       e.preventDefault()
       ligne.classList.add('cible')
@@ -580,10 +621,10 @@ function ligneMembre(m, rang) {
     ligne.addEventListener('drop', async (e) => {
       e.preventDefault()
       ligne.classList.remove('cible')
-      const id = e.dataTransfer.getData('text/plain')
+      const id = e.dataTransfer?.getData('text/plain')
       if (!id || id === m.id) return
       const res = await api.equipe.reparent(id, m.id)
-      if (res?.refus) {
+      if ('refus' in res) {
         addNote(res.refus, 'err')
         membres = res.membres
       } else {
@@ -595,17 +636,17 @@ function ligneMembre(m, rang) {
   return ligne
 }
 
-function premiereLigneUtile(ame) {
+function premiereLigneUtile(ame: string): string {
   const ligne = String(ame).split('\n').map((l) => l.trim())
     .find((l) => l && !/^tu es\b/i.test(l))
   return (ligne || String(ame).trim().split('\n')[0] || '').replace(/^(Rôle|Âme)\s*:\s*/i, '').slice(0, 90)
 }
 
 /** Passe le nom d'une carte en saisie, tout sélectionné : on tape par-dessus. */
-function editerLigne(ligne) {
-  const titre = ligne?.querySelector('.t')
+function editerLigne(ligne: HTMLElement | null): void {
+  const titre = ligne?.querySelector<HTMLElement>('.t')
   if (!titre) return
-  ligne.scrollIntoView({ block: 'nearest' })
+  ligne!.scrollIntoView({ block: 'nearest' })
   titre.contentEditable = 'plaintext-only'
   titre.classList.add('edition')
   titre.focus()
@@ -616,14 +657,14 @@ function editerLigne(ligne) {
  * Crée un membre et laisse le curseur dans son nom. Pas de fiche qui s'ouvre : on
  * tape, on valide, on enchaîne. L'âme s'écrit plus tard, en cliquant sur la carte.
  */
-async function ajouterMembre(parentId, label) {
+async function ajouterMembre(parentId: string, label: string): Promise<void> {
   membres = await api.equipe.add(parentId, label)
   const cree = [...membres].reverse().find((x) => x.parentId === parentId)
   renderEquipe()
-  if (cree) editerLigne(arbreEl.querySelector(`[data-membre="${CSS.escape(cree.id)}"]`))
+  if (cree) editerLigne(arbreEl.querySelector<HTMLElement>(`[data-membre="${CSS.escape(cree.id)}"]`))
 }
 
-function renderEquipe() {
+function renderEquipe(): void {
   arbreEl.replaceChildren()
   const orch = membreParId('orchestrateur')
   if (!orch) return
@@ -644,7 +685,7 @@ function renderEquipe() {
 // sous-agents — et le sélecteur en tête de colonne dit laquelle.
 
 /** Reprend ce que le processus principal vient de dire de l'équipe. */
-function appliquerEtatEquipe(etat) {
+function appliquerEtatEquipe(etat: (Partial<EtatEquipe> & { refus?: string }) | null | undefined): void {
   if (!etat) return
   if (etat.refus) addNote(etat.refus, 'err')
   if (Array.isArray(etat.membres)) membres = etat.membres
@@ -654,7 +695,7 @@ function appliquerEtatEquipe(etat) {
   if (!modaleEquipes.classList.contains('hidden')) renderListeEquipes()
 }
 
-function renderSelecteurEquipes() {
+function renderSelecteurEquipes(): void {
   if (!equipes.length) return
   selectEquipe.replaceChildren()
   for (const e of equipes) {
@@ -669,7 +710,7 @@ selectEquipe.addEventListener('change', async () => {
   appliquerEtatEquipe(await api.equipe.activer(selectEquipe.value))
 })
 
-function renderListeEquipes() {
+function renderListeEquipes(): void {
   listeEquipesEl.replaceChildren()
   for (const e of equipes) {
     const ligne = el('div', `equipe-ligne${e.actif ? ' active' : ''}`)
@@ -727,24 +768,24 @@ function renderListeEquipes() {
   }
 }
 
-function ouvrirModaleEquipes() {
+function ouvrirModaleEquipes(): void {
   renderListeEquipes()
   modaleEquipes.classList.remove('hidden')
-  listeEquipesEl.querySelector('.en')?.focus()
+  listeEquipesEl.querySelector<HTMLElement>('.en')?.focus()
 }
 
-function fermerModaleEquipes() {
+function fermerModaleEquipes(): void {
   modaleEquipes.classList.add('hidden')
 }
 
-document.getElementById('btn-equipes').addEventListener('click', ouvrirModaleEquipes)
-document.getElementById('equipes-fermer').addEventListener('click', fermerModaleEquipes)
-modaleEquipes.querySelector('.modale-fond').addEventListener('click', fermerModaleEquipes)
-document.getElementById('equipes-fichier').addEventListener('click', () => api.equipe.openFile())
-document.getElementById('equipes-nouvelle').addEventListener('click', async () => {
+$('btn-equipes').addEventListener('click', ouvrirModaleEquipes)
+$('equipes-fermer').addEventListener('click', fermerModaleEquipes)
+modaleEquipes.querySelector('.modale-fond')!.addEventListener('click', fermerModaleEquipes)
+$('equipes-fichier').addEventListener('click', () => api.equipe.openFile())
+$('equipes-nouvelle').addEventListener('click', async () => {
   appliquerEtatEquipe(await api.equipe.creer(`Équipe ${equipes.length + 1}`, 'defaut'))
 })
-document.getElementById('equipes-copie').addEventListener('click', async () => {
+$('equipes-copie').addEventListener('click', async () => {
   appliquerEtatEquipe(await api.equipe.creer(`${equipeActive?.nom || 'Équipe'} (copie)`, 'actuelle'))
 })
 modaleEquipes.addEventListener('keydown', (e) => {
@@ -754,25 +795,25 @@ modaleEquipes.addEventListener('keydown', (e) => {
 
 // ------------------------------------------------------------- modale âme
 
-const modale = document.getElementById('modale')
-const modaleNom = document.getElementById('modale-nom')
-const modaleSous = document.getElementById('modale-titre')
-const modaleAme = document.getElementById('modale-ame')
-const modaleParent = document.getElementById('modale-rattachement')
-const modaleParentRow = modale.querySelector('.modale-parent')
-const btnProposer = document.getElementById('modale-proposer')
-const btnSupprimer = document.getElementById('modale-supprimer')
-const btnEnregistrer = document.getElementById('modale-enregistrer')
+const modale = $('modale')
+const modaleNom = $<HTMLInputElement>('modale-nom')
+const modaleSous = $('modale-titre')
+const modaleAme = $<HTMLTextAreaElement>('modale-ame')
+const modaleParent = $<HTMLSelectElement>('modale-rattachement')
+const modaleParentRow = modale.querySelector<HTMLElement>('.modale-parent')!
+const btnProposer = $<HTMLButtonElement>('modale-proposer')
+const btnSupprimer = $<HTMLButtonElement>('modale-supprimer')
+const btnEnregistrer = $<HTMLButtonElement>('modale-enregistrer')
 
-let membreOuvert = null
+let membreOuvert: string | null = null
 
-function rangDe(id) {
+function rangDe(id: string): number {
   const m = membreParId(id)
   if (!m || !m.parentId) return 0
   return membreParId(m.parentId)?.parentId ? 2 : 1
 }
 
-function ouvrirModale(id) {
+function ouvrirModale(id: string): void {
   const m = membreParId(id)
   if (!m) return
   membreOuvert = id
@@ -791,7 +832,7 @@ function ouvrirModale(id) {
   modaleParent.replaceChildren()
   if (rang > 0) {
     const cibles = [membreParId('orchestrateur'), ...enfantsDe('orchestrateur')]
-      .filter(Boolean)
+      .filter((c): c is Membre => c !== null)
       .filter((c) => c.id !== id)
       .filter((c) => c.id === m.parentId || c.id === 'orchestrateur' || !enfantsDe(id).length)
     for (const c of cibles) {
@@ -799,7 +840,7 @@ function ouvrirModale(id) {
       opt.value = c.id
       modaleParent.appendChild(opt)
     }
-    modaleParent.value = m.parentId
+    modaleParent.value = m.parentId || ''
   }
 
   btnSupprimer.classList.toggle('hidden', rang === 0)
@@ -807,15 +848,16 @@ function ouvrirModale(id) {
   modaleAme.focus()
 }
 
-function fermerModale() {
+function fermerModale(): void {
   modale.classList.add('hidden')
   membreOuvert = null
 }
 
-async function enregistrerModale() {
+async function enregistrerModale(): Promise<void> {
   if (!membreOuvert) return
   const id = membreOuvert
   const m = membreParId(id)
+  if (!m) return
   const label = modaleNom.value.trim()
   const ame = modaleAme.value
   btnEnregistrer.disabled = true
@@ -825,8 +867,8 @@ async function enregistrerModale() {
     if (ame !== (m.ame || '')) membres = await api.equipe.setAme(id, ame)
     if (modaleParent.value && modaleParent.value !== m.parentId) {
       const res = await api.equipe.reparent(id, modaleParent.value)
-      if (res?.refus) addNote(res.refus, 'err')
-      membres = res?.refus ? res.membres : res
+      if ('refus' in res) addNote(res.refus, 'err')
+      membres = 'refus' in res ? res.membres : res
     }
     if (label && label !== m.label) membres = await api.equipe.rename(id, label)
   } finally {
@@ -837,8 +879,8 @@ async function enregistrerModale() {
 }
 
 btnEnregistrer.addEventListener('click', enregistrerModale)
-document.getElementById('modale-fermer').addEventListener('click', fermerModale)
-modale.querySelector('.modale-fond').addEventListener('click', fermerModale)
+$('modale-fermer').addEventListener('click', fermerModale)
+modale.querySelector('.modale-fond')!.addEventListener('click', fermerModale)
 
 btnSupprimer.addEventListener('click', async () => {
   if (!membreOuvert) return
@@ -849,7 +891,7 @@ btnSupprimer.addEventListener('click', async () => {
 
 btnProposer.addEventListener('click', async () => {
   if (!membreOuvert) return
-  const label = modaleNom.value.trim() || membreParId(membreOuvert)?.label
+  const label = modaleNom.value.trim() || membreParId(membreOuvert)?.label || ''
   btnProposer.textContent = 'Il y réfléchit…'
   btnProposer.disabled = true
   try {
@@ -868,11 +910,11 @@ modale.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); enregistrerModale() }
 })
 
-document.getElementById('btn-ajouter-pole').addEventListener('click', () => (
+$('btn-ajouter-pole').addEventListener('click', () => (
   ajouterMembre('orchestrateur', 'Nouveau pôle')
 ))
 
-document.getElementById('btn-equipe-defaut').addEventListener('click', async () => {
+$('btn-equipe-defaut').addEventListener('click', async () => {
   membres = await api.equipe.reset()
   renderEquipe()
 })
@@ -883,12 +925,12 @@ document.getElementById('btn-equipe-defaut').addEventListener('click', async () 
 // enregistrement, export de tableur, dossier de code. On ne lit rien ici — on
 // prépare la liste, et le message emporte les chemins.
 
-const GLYPHES = {
+const GLYPHES: Record<string, string> = {
   image: '🖼', video: '🎬', audio: '🎧', document: '📄',
   tableur: '📊', texte: '📝', code: '💻', archive: '🗜', fichier: '📎',
 }
 
-function renderPieces() {
+function renderPieces(): void {
   piecesEl.replaceChildren()
   piecesEl.classList.toggle('hidden', !piecesEnCours.length)
   for (const piece of piecesEnCours) {
@@ -914,7 +956,7 @@ function renderPieces() {
 }
 
 /** Le retour du processus principal : ce qui a été joint, et ce qui a été refusé. */
-function accuserPieces(resultat) {
+function accuserPieces(resultat: ResultatPieces | null | undefined): void {
   for (const piece of resultat?.pieces || []) {
     if (!piecesEnCours.some((x) => x.chemin === piece.chemin)) piecesEnCours.push(piece)
   }
@@ -924,7 +966,7 @@ function accuserPieces(resultat) {
 }
 
 /** Un fichier sans chemin sur le disque (collé, ou glissé depuis une page web). */
-function lireEnBase64(file) {
+function lireEnBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const lecteur = new FileReader()
     lecteur.onerror = () => reject(new Error(`Impossible de lire « ${file.name} ».`))
@@ -933,9 +975,9 @@ function lireEnBase64(file) {
   })
 }
 
-async function joindreFichiers(fichiers) {
-  const chemins = []
-  const sansChemin = []
+async function joindreFichiers(fichiers: File[]): Promise<void> {
+  const chemins: string[] = []
+  const sansChemin: File[] = []
   for (const file of fichiers) {
     const chemin = api.pieces.cheminDe(file)
     if (chemin) chemins.push(chemin)
@@ -947,18 +989,18 @@ async function joindreFichiers(fichiers) {
       const base64 = await lireEnBase64(file)
       accuserPieces(await api.pieces.coller(file.name, base64))
     } catch (err) {
-      addNote(String(err?.message || err), 'err')
+      addNote(messageDe(err), 'err')
     }
   }
 }
 
-document.getElementById('btn-joindre').addEventListener('click', async () => {
+$('btn-joindre').addEventListener('click', async () => {
   accuserPieces(await api.pieces.choisir())
 })
 
 // Glisser-déposer sur toute la fenêtre : c'est le geste naturel, et viser le champ
 // de saisie au pixel près ne l'est pas.
-const porteFichiers = (e) => [...(e.dataTransfer?.types || [])].includes('Files')
+const porteFichiers = (e: DragEvent) => [...(e.dataTransfer?.types || [])].includes('Files')
 let profondeurGlisse = 0
 
 window.addEventListener('dragenter', (e) => {
@@ -969,7 +1011,7 @@ window.addEventListener('dragenter', (e) => {
 window.addEventListener('dragover', (e) => {
   if (!porteFichiers(e)) return
   e.preventDefault()
-  e.dataTransfer.dropEffect = 'copy'
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
 })
 window.addEventListener('dragleave', () => {
   profondeurGlisse = Math.max(0, profondeurGlisse - 1)
@@ -988,7 +1030,7 @@ window.addEventListener('drop', async (e) => {
     await joindreFichiers(fichiers)
     return
   }
-  input.value = input.value ? `${input.value.trimEnd()}\n${lien}` : lien
+  input.value = input.value ? `${input.value.trimEnd()}\n${lien}` : lien || ''
   autoGrow()
   majBouton()
   input.focus()
@@ -1004,35 +1046,35 @@ input.addEventListener('paste', async (e) => {
 
 // ---------------------------------------------------- colonne des livrables
 
-function changerOnglet(nom) {
-  document.getElementById('onglet-equipe').classList.toggle('actif', nom === 'equipe')
-  document.getElementById('onglet-livrables').classList.toggle('actif', nom === 'livrables')
-  document.getElementById('vue-equipe').classList.toggle('hidden', nom !== 'equipe')
-  document.getElementById('vue-livrables').classList.toggle('hidden', nom !== 'livrables')
+function changerOnglet(nom: 'equipe' | 'livrables'): void {
+  $('onglet-equipe').classList.toggle('actif', nom === 'equipe')
+  $('onglet-livrables').classList.toggle('actif', nom === 'livrables')
+  $('vue-equipe').classList.toggle('hidden', nom !== 'equipe')
+  $('vue-livrables').classList.toggle('hidden', nom !== 'livrables')
   api.setConfig({ onglet: nom })
 }
 
-document.getElementById('onglet-equipe').addEventListener('click', () => changerOnglet('equipe'))
-document.getElementById('onglet-livrables').addEventListener('click', () => changerOnglet('livrables'))
+$('onglet-equipe').addEventListener('click', () => changerOnglet('equipe'))
+$('onglet-livrables').addEventListener('click', () => changerOnglet('livrables'))
 
-async function changerPortee(portee) {
+async function changerPortee(portee: PorteeLivrables): Promise<void> {
   porteeLivrables = portee
-  document.getElementById('portee-mission').classList.toggle('actif', portee === 'mission')
-  document.getElementById('portee-tous').classList.toggle('actif', portee === 'tous')
+  $('portee-mission').classList.toggle('actif', portee === 'mission')
+  $('portee-tous').classList.toggle('actif', portee === 'tous')
   api.setConfig({ porteeLivrables: portee })
   livrables = await api.livrables.list(portee)
   renderLivrables()
 }
 
-document.getElementById('portee-mission').addEventListener('click', () => changerPortee('mission'))
-document.getElementById('portee-tous').addEventListener('click', () => changerPortee('tous'))
+$('portee-mission').addEventListener('click', () => changerPortee('mission'))
+$('portee-tous').addEventListener('click', () => changerPortee('tous'))
 
-function panneauVisible(v) {
+function panneauVisible(v: boolean): void {
   document.body.classList.toggle('panneau-cache', !v)
   api.setConfig({ panneauVisible: v })
 }
 
-function surlignerLivrable(nom) {
+function surlignerLivrable(nom: string): void {
   const fiche = listeLivrables.querySelector(`[data-nom="${CSS.escape(nom)}"]`)
   if (!fiche) return
   fiche.scrollIntoView({ block: 'nearest' })
@@ -1040,7 +1082,7 @@ function surlignerLivrable(nom) {
 }
 
 /** Les versions d'un livrable, la plus récente en tête. */
-async function remplirVersions(hote, nom) {
+async function remplirVersions(hote: HTMLElement, nom: string): Promise<void> {
   hote.replaceChildren(el('div', 'vide', 'Chargement…'))
   const versions = await api.livrables.versions(nom)
   hote.replaceChildren()
@@ -1060,7 +1102,7 @@ async function remplirVersions(hote, nom) {
   }
 }
 
-function ficheLivrable(d) {
+function ficheLivrable(d: LivrableInfo): HTMLElement {
   const fiche = el('div', 'doc-fiche')
   fiche.dataset.nom = d.nom
   fiche.appendChild(el('div', 't', d.titre))
@@ -1110,7 +1152,7 @@ function ficheLivrable(d) {
   return fiche
 }
 
-function renderLivrables() {
+function renderLivrables(): void {
   listeLivrables.replaceChildren()
   if (!livrables.length) {
     listeLivrables.appendChild(el('div', 'vide', porteeLivrables === 'tous'
@@ -1123,7 +1165,7 @@ function renderLivrables() {
 
 // --------------------------------------------------------------- permissions
 
-function addPermission(evt) {
+function addPermission(evt: DemandePermission): void {
   finishText()
   finishThinking()
   const [glyph, label] = describeTool(evt.toolName)
@@ -1162,8 +1204,7 @@ function addPermission(evt) {
   }
 
   const btns = el('div', 'btns')
-  const entree = { id: evt.id }
-  const repondre = (a) => {
+  const repondre = (a: ReponsePermission) => {
     if (!permsEnAttente.includes(entree)) return
     permsEnAttente.splice(permsEnAttente.indexOf(entree), 1)
     api.replyPermission(evt.id, a)
@@ -1173,9 +1214,12 @@ function addPermission(evt) {
     refreshActivePerm()
     input.focus()
   }
-  entree.allow = () => repondre({ behavior: 'allow' })
-  entree.deny = () => repondre({ behavior: 'deny', message: "Refusé par l'utilisateur." })
-  entree.card = card
+  const entree: PermissionEnAttente = {
+    id: evt.id,
+    allow: () => repondre({ behavior: 'allow' }),
+    deny: () => repondre({ behavior: 'deny', message: "Refusé par l'utilisateur." }),
+    card,
+  }
   permsEnAttente.push(entree)
 
   const oui = el('button', 'primary')
@@ -1199,14 +1243,14 @@ function addPermission(evt) {
   scrollDown(true)
 }
 
-function refreshActivePerm() {
+function refreshActivePerm(): void {
   for (const p of permsEnAttente) p.card.classList.remove('active')
   permsEnAttente[0]?.card.classList.add('active')
 }
 
 // --------------------------------------------------------------------- état
 
-function setBusy(v) {
+function setBusy(v: boolean): void {
   busy = v
   document.body.classList.toggle('busy', v)
   sendBtn.disabled = !v && !input.value.trim() && !piecesEnCours.length
@@ -1217,11 +1261,11 @@ function setBusy(v) {
   }
 }
 
-function setStatus(text, kind) {
+function setStatus(text: string, kind?: string): void {
   statusLine.replaceChildren(el('span', `dot ${kind || ''}`), document.createTextNode(text))
 }
 
-function statutEquipe() {
+function statutEquipe(): void {
   const n = Math.max(0, membres.length - 1)
   const socle = totalLivrables
     ? `${n} membre${n > 1 ? 's' : ''} · ${totalLivrables} livrable${totalLivrables > 1 ? 's' : ''}`
@@ -1229,22 +1273,22 @@ function statutEquipe() {
   const bref = afficherMoteur()
   setStatus(bref ? `${socle} · ${bref}` : socle, 'ok')
   // La ligne est tronquée dans une fenêtre étroite : la phrase entière reste en bulle.
-  statusLine.title = moteurEl.textContent
+  statusLine.title = moteurEl.textContent || ''
 }
 
 // ------------------------------------------------------ le moteur du moment
 
 /** Les identifiants d'API, tels qu'ils s'écrivent dans la fenêtre. */
-const NOMS_MODELES = {
+const NOMS_MODELES: Record<string, string> = {
   'claude-opus-5': 'Opus 5',
   'claude-sonnet-5': 'Sonnet 5',
   'claude-haiku-4-5': 'Haiku 4.5',
 }
-const NOMS_EFFORT = {
+const NOMS_EFFORT: Record<string, string> = {
   low: 'faible', medium: 'moyen', high: 'élevé', xhigh: 'très élevé', max: 'maximal',
 }
-const nomModele = (id) => NOMS_MODELES[id] || id || 'modèle inconnu'
-const nomEffort = (e) => NOMS_EFFORT[e] || e || 'inconnu'
+const nomModele = (id: string) => NOMS_MODELES[id] || id || 'modèle inconnu'
+const nomEffort = (e: string) => NOMS_EFFORT[e] || e || 'inconnu'
 
 /**
  * Écrit dans les réglages ce qui tourne vraiment — pas ce qui est coché dans les deux
@@ -1252,13 +1296,13 @@ const nomEffort = (e) => NOMS_EFFORT[e] || e || 'inconnu'
  * session, et les deux diffèrent tant qu'elle n'a pas redémarré. Renvoie la version
  * courte, pour la ligne sous le titre.
  */
-function afficherMoteur() {
+function afficherMoteur(): string {
   // Avant le premier message, aucune session n'est ouverte et le SDK n'a rien annoncé :
   // on montre alors ce qui partira, tel qu'il est coché juste au-dessus.
   const vif = Boolean(moteur)
-  const modele = vif ? moteur.model : modelSelect.value
-  const effort = vif ? moteur.effort : effortPrevu
-  const eq = (vif ? moteur.modeleEquipe : modeleEquipeSelect.value) || 'inherit'
+  const modele = moteur ? moteur.model : modelSelect.value
+  const effort = moteur ? moteur.effort : effortPrevu
+  const eq = (moteur ? moteur.modeleEquipe : modeleEquipeSelect.value) || 'inherit'
 
   const m = nomModele(modele)
   const e = nomEffort(effort)
@@ -1276,7 +1320,7 @@ function afficherMoteur() {
  * l'orchestrateur refait son plan avec. C'est le comportement de Claude Code, et
  * c'est ce qui permet de réorienter une mission en cours.
  */
-function submit(forced) {
+function submit(forced?: string): void {
   const text = (forced ?? input.value).trim()
   const pieces = piecesEnCours
   // Des pièces sans un mot valent une demande : « regarde ça ».
@@ -1292,13 +1336,13 @@ function submit(forced) {
 }
 
 /** Le bouton envoie tant qu'il y a de quoi ; il n'arrête l'équipe que sur un champ vide. */
-function majBouton() {
+function majBouton(): void {
   const aQuoiEnvoyer = !!input.value.trim() || piecesEnCours.length > 0
   document.body.classList.toggle('peut-envoyer', aQuoiEnvoyer)
   if (!busy) sendBtn.disabled = !aQuoiEnvoyer
 }
 
-function autoGrow() {
+function autoGrow(): void {
   input.style.height = 'auto'
   input.style.height = `${Math.min(input.scrollHeight, 168)}px`
 }
@@ -1345,14 +1389,14 @@ sendBtn.addEventListener('click', () => {
   else if (busy) api.interrupt()
 })
 
-document.getElementById('btn-new').addEventListener('click', nouvelleMission)
-document.getElementById('btn-settings').addEventListener('click', () => panneauReglages.classList.toggle('hidden'))
-document.getElementById('btn-panneau').addEventListener('click', () => {
+$('btn-new').addEventListener('click', nouvelleMission)
+$('btn-settings').addEventListener('click', () => panneauReglages.classList.toggle('hidden'))
+$('btn-panneau').addEventListener('click', () => {
   panneauVisible(document.body.classList.contains('panneau-cache'))
 })
-document.getElementById('btn-ouvrir-dossier').addEventListener('click', () => api.openDossier())
-document.getElementById('btn-ouvrir-dossier-2').addEventListener('click', () => api.openDossier())
-document.getElementById('btn-choisir').addEventListener('click', async () => {
+$('btn-ouvrir-dossier').addEventListener('click', () => api.openDossier())
+$('btn-ouvrir-dossier-2').addEventListener('click', () => api.openDossier())
+$('btn-choisir').addEventListener('click', async () => {
   const res = await api.choisirDossier()
   dossier = res.dossier
   livrables = res.livrables
@@ -1374,15 +1418,15 @@ modeleEquipeSelect.addEventListener('change', () => {
   moteur = null
   statutEquipe()
 })
-ampleurSelect.addEventListener('change', () => api.setConfig({ ampleur: ampleurSelect.value }))
+ampleurSelect.addEventListener('change', () => api.setConfig({ ampleur: ampleurSelect.value as PatchConfig['ampleur'] }))
 langueSelect.addEventListener('change', () => api.setConfig({ langue: langueSelect.value }))
-autonomieSelect.addEventListener('change', () => api.setConfig({ autonomie: autonomieSelect.value }))
+autonomieSelect.addEventListener('change', () => api.setConfig({ autonomie: autonomieSelect.value as PatchConfig['autonomie'] }))
 
 document.addEventListener('click', (e) => {
-  const lien = e.target.closest('a[data-ext]')
+  const lien = (e.target as Element | null)?.closest('a[data-ext]')
   if (!lien) return
   e.preventDefault()
-  api.openExternal(lien.getAttribute('href'))
+  api.openExternal(lien.getAttribute('href') || '')
 })
 
 // ------------------------------------------------------- fils enregistrés
@@ -1393,7 +1437,7 @@ document.addEventListener('click', (e) => {
  * Le reste — ce que l'utilisateur a demandé, qui a travaillé, ce qui a été publié — se
  * retrouve exactement à sa place.
  */
-function restaurer(evenements) {
+function restaurer(evenements: EvenementFil[]): void {
   permsEnAttente.length = 0
   enFile = []
   toolEls = new Map()
@@ -1447,34 +1491,34 @@ function restaurer(evenements) {
 
 // -------------------------------------------------------- barre latérale
 
-function barreVisible(v) {
+function barreVisible(v: boolean): void {
   document.body.classList.toggle('barre-cachee', !v)
   api.setConfig({ barreVisible: v })
 }
 
-function montrerBarre() {
+function montrerBarre(): void {
   if (document.body.classList.contains('barre-cachee')) barreVisible(true)
 }
 
 /** Ce qu'on veut voir d'un coup d'œil : ce qui tourne, et ce qui est resté en plan. */
-const ETATS = {
+const ETATS: Partial<Record<string, { texte: string, cls: string }>> = {
   en_cours: { texte: 'en cours', cls: 'vif' },
   en_attente: { texte: 'en attente', cls: 'calme' },
   interrompu: { texte: 'interrompue', cls: 'tiede' },
   incomplet: { texte: 'inachevée', cls: 'tiede' },
 }
 
-function dateCourte(iso) {
+function dateCourte(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(+d)) return ''
-  const jours = Math.floor((Date.now() - d) / 86400000)
+  const jours = Math.floor((Date.now() - +d) / 86400000)
   if (jours <= 0) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   if (jours === 1) return 'hier'
   if (jours < 7) return `il y a ${jours} j`
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
 
-function renderMissions() {
+function renderMissions(): void {
   listeMissions.replaceChildren()
   if (!missions.length) {
     listeMissions.appendChild(el('div', 'vide', recherche.value.trim()
@@ -1489,7 +1533,7 @@ function renderMissions() {
     const meta = el('div', 'm')
     meta.appendChild(el('span', null, dateCourte(c.maj_le)))
     if (c.livrables) meta.appendChild(el('span', 'docs-n', `${c.livrables} livrable${c.livrables > 1 ? 's' : ''}`))
-    const badge = ETATS[c.statut]
+    const badge = ETATS[c.statut ?? '']
     if (badge) meta.appendChild(el('span', `etat ${badge.cls}`, badge.texte))
     infos.append(titre, meta)
 
@@ -1503,9 +1547,9 @@ function renderMissions() {
       titre.focus()
       document.getSelection()?.selectAllChildren(titre)
     })
-    const finEdition = async (garder) => {
+    const finEdition = async (garder: boolean) => {
       if (!titre.isContentEditable) return
-      const valeur = titre.textContent.trim()
+      const valeur = (titre.textContent || '').trim()
       titre.contentEditable = 'false'
       if (garder && valeur && valeur !== c.titre) {
         missions = await api.mission.rename(c.id, valeur)
@@ -1542,19 +1586,19 @@ function renderMissions() {
   }
 }
 
-async function ouvrirMission(id) {
+async function ouvrirMission(id: string): Promise<void> {
   missionCourante = await api.mission.open(id)
   input.focus()
 }
 
-async function nouvelleMission() {
+async function nouvelleMission(): Promise<void> {
   montrerBarre()
   recherche.value = ''
   missionCourante = await api.mission.create()
   input.focus()
 }
 
-let minuteurRecherche = null
+let minuteurRecherche: ReturnType<typeof setTimeout> | undefined
 recherche.addEventListener('input', () => {
   clearTimeout(minuteurRecherche)
   minuteurRecherche = setTimeout(async () => {
@@ -1570,8 +1614,8 @@ recherche.addEventListener('keydown', (e) => {
   }
 })
 
-document.getElementById('btn-new-barre').addEventListener('click', nouvelleMission)
-document.getElementById('btn-barre').addEventListener('click', () => {
+$('btn-new-barre').addEventListener('click', nouvelleMission)
+$('btn-barre').addEventListener('click', () => {
   barreVisible(document.body.classList.contains('barre-cachee'))
 })
 
@@ -1695,8 +1739,8 @@ document.body.classList.toggle('panneau-cache', state.config.panneauVisible === 
 appliquerLargeur(barre, state.config.largeurBarre)
 appliquerLargeur(panneau, state.config.largeurPanneau)
 porteeLivrables = state.config.porteeLivrables || 'mission'
-document.getElementById('portee-tous').classList.toggle('actif', porteeLivrables === 'tous')
-document.getElementById('portee-mission').classList.toggle('actif', porteeLivrables !== 'tous')
+$('portee-tous').classList.toggle('actif', porteeLivrables === 'tous')
+$('portee-mission').classList.toggle('actif', porteeLivrables !== 'tous')
 changerOnglet(state.config.onglet || 'equipe')
 renderEquipe()
 renderPieces()

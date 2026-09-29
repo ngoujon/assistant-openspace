@@ -1,4 +1,7 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
+import type {
+  CanUseTool, EffortLevel, Options, PermissionResult, Query, SDKMessage, SDKUserMessage,
+} from '@anthropic-ai/claude-agent-sdk'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -7,11 +10,46 @@ import { buildSystemPrompt } from './prompt.mjs'
 import { GardeEquipe } from './gardes.mjs'
 import { resumerPermission } from './resume.mjs'
 import { serveurOpenspace } from './outils.mjs'
+import type { DemandeValidation } from './outils.mjs'
 import { definitionsAgents } from './equipe.mjs'
 import { chargerEquipe, membre, ORCHESTRATEUR } from '../espace/equipe.mjs'
 import { listerLivrables } from '../espace/livrables.mjs'
 import { P } from '../espace/paths.mjs'
-import { tracer } from '../espace/journal.mjs'
+import { tracer, messageDe, pileDe } from '../espace/journal.mjs'
+import type { EvenementSession, Membre, ReponsePermission, ResumePermission } from '../contrat.mjs'
+
+/** Les réglages qu'une session relit à chaque démarrage. */
+export interface ConfigSession {
+  model: string
+  modeleEquipe?: string
+  ampleur?: string
+  langue?: string
+  autonomie?: string
+}
+
+/** Une validation à faire trancher dans la fenêtre. */
+export interface DemandePermissionSession {
+  toolName: string
+  input: Record<string, unknown>
+  summary: ResumePermission | null
+  title?: string
+  hint?: string
+  displayName?: string
+  subtitle?: string
+  reason?: string
+  allowAlways: boolean
+  signal?: AbortSignal
+}
+
+export interface DependancesSession {
+  emit: (evt: EvenementSession) => void
+  askPermission: (req: DemandePermissionSession) => Promise<ReponsePermission | null | undefined>
+  getConfig: () => ConfigSession
+  ouvrirFichier?: (chemin: string) => void
+  envoyerCorbeille?: (chemin: string) => Promise<boolean>
+}
+
+type OptionsOutil = Parameters<CanUseTool>[2]
 
 const HOME = os.homedir()
 const require = createRequire(import.meta.url)
@@ -24,7 +62,7 @@ const PATH_SUP = [
 
 // Le SDK embarque son binaire Claude Code et le résout par chemin de module.
 // Ce repli ne sert que si le paquet natif manque (installation partielle).
-function claudeExecutable() {
+function claudeExecutable(): string | undefined {
   try {
     require.resolve('@anthropic-ai/claude-agent-sdk-darwin-arm64/package.json')
     return undefined
@@ -42,11 +80,11 @@ const PREFIXE = 'mcp__openspace__'
  * cette valeur qui part au SDK, qui s'affiche sous le titre et qui se retrouve au
  * générique du livrable. Niveaux possibles : low, medium, high, xhigh, max.
  */
-export const EFFORT = 'high'
+export const EFFORT: EffortLevel = 'high'
 
 /**
  * Les outils OpenSpace portent eux-mêmes leur politique de validation (voir
- * outils.mjs) : ils savent quel livrable est en jeu et n'interrompent l'utilisateur que
+ * outils.mts) : ils savent quel livrable est en jeu et n'interrompent l'utilisateur que
  * pour une suppression. On ne les double pas d'une confirmation générique —
  * publier un livrable, c'est exactement ce qu'on leur demande.
  */
@@ -56,9 +94,14 @@ const BUILTIN_SUR = new Set([
   'Skill', 'AskUserQuestion', 'TaskOutput',
 ])
 
-function fileEntree() {
-  const attente = []
-  let dormeur = null
+interface FileEntree extends AsyncIterable<SDKUserMessage> {
+  push(msg: SDKUserMessage): void
+  close(): void
+}
+
+function fileEntree(): FileEntree {
+  const attente: SDKUserMessage[] = []
+  let dormeur: ((r: IteratorResult<SDKUserMessage, undefined>) => void) | null = null
   let ferme = false
   return {
     push(msg) {
@@ -67,13 +110,13 @@ function fileEntree() {
     },
     close() {
       ferme = true
-      if (dormeur) { const d = dormeur; dormeur = null; d({ done: true }) }
+      if (dormeur) { const d = dormeur; dormeur = null; d({ done: true, value: undefined }) }
     },
     async *[Symbol.asyncIterator]() {
       while (true) {
-        if (attente.length) { yield attente.shift(); continue }
+        if (attente.length) { yield attente.shift()!; continue }
         if (ferme) return
-        const r = await new Promise((res) => { dormeur = res })
+        const r = await new Promise<IteratorResult<SDKUserMessage, undefined>>((res) => { dormeur = res })
         if (r.done) return
         yield r.value
       }
@@ -82,31 +125,40 @@ function fileEntree() {
 }
 
 export class AgentSession {
-  constructor({ emit, askPermission, getConfig, ouvrirFichier, envoyerCorbeille }) {
+  emit: DependancesSession['emit']
+  askPermission: DependancesSession['askPermission']
+  getConfig: DependancesSession['getConfig']
+  ouvrirFichier: (chemin: string) => void
+  envoyerCorbeille: (chemin: string) => Promise<boolean>
+  q: Query | null = null
+  queue: FileEntree | null = null
+  abort: AbortController | null = null
+  sessionId: string | null = null
+  resumeId: string | null = null
+  busy = false
+  streamed = new Set<string>()
+  toolNames = new Map<string, string>()
+  /** tool_use_id -> identifiant du membre convoqué : de quoi rendre son travail. */
+  convocations = new Map<string, string>()
+  membres: Membre[]
+  garde: GardeEquipe
+  minuteurConnexion: ReturnType<typeof setTimeout> | undefined = undefined
+  /** Nombre de rebranchements automatiques déjà tentés. */
+  repriseAuto = 0
+
+  constructor({ emit, askPermission, getConfig, ouvrirFichier, envoyerCorbeille }: DependancesSession) {
     this.emit = emit
     this.askPermission = askPermission
     this.getConfig = getConfig
     this.ouvrirFichier = ouvrirFichier || (() => {})
     this.envoyerCorbeille = envoyerCorbeille || (async () => false)
-    this.q = null
-    this.queue = null
-    this.abort = null
-    this.sessionId = null
-    this.busy = false
-    this.streamed = new Set()
-    this.toolNames = new Map()
-    /** tool_use_id -> identifiant du membre convoqué : de quoi rendre son travail. */
-    this.convocations = new Map()
     this.membres = chargerEquipe()
     this.garde = new GardeEquipe(this.membres)
-    this.minuteurConnexion = null
-    /** Nombre de rebranchements automatiques déjà tentés. */
-    this.repriseAuto = 0
   }
 
-  get running() { return this.q !== null }
+  get running(): boolean { return this.q !== null }
 
-  buildOptions(resume) {
+  buildOptions(resume?: string | null): Options {
     const cfg = this.getConfig()
     const bin = claudeExecutable()
     const orchestrateur = membre(ORCHESTRATEUR, this.membres)
@@ -141,16 +193,16 @@ export class AgentSession {
       strictMcpConfig: true,
       mcpServers: {
         openspace: serveurOpenspace({
-          confirmer: (d) => this.confirmerAction(d),
-          signaler: (evt) => {
+          confirmer: (d: DemandeValidation) => this.confirmerAction(d),
+          signaler: (evt: EvenementSession) => {
             // La garde a besoin de savoir qu'un document est sorti : c'est ce qui
             // distingue une mission finie d'une mission abandonnée en route.
             if (evt.k === 'livrable') this.garde.noterLivrable()
             this.emit(evt)
           },
-          ouvrir: (chemin) => this.ouvrirFichier(chemin),
-          titrer: (titre) => this.emit({ k: 'titre', titre }),
-          corbeille: (chemin) => this.envoyerCorbeille(chemin),
+          ouvrir: (chemin: string) => this.ouvrirFichier(chemin),
+          titrer: (titre: string) => this.emit({ k: 'titre', titre }),
+          corbeille: (chemin: string) => this.envoyerCorbeille(chemin),
           modele: () => this.getConfig()?.model,
           effort: () => EFFORT,
           contributeurs: () => [...this.garde.contributions.values()].map((c) => c.label),
@@ -162,7 +214,7 @@ export class AgentSession {
       permissionMode: 'default',
       hooks: this.garde.hooks(),
       includePartialMessages: true,
-      abortController: this.abort,
+      abortController: this.abort ?? undefined,
       resume: resume || undefined,
       title: 'Assistant OpenSpace',
       env: {
@@ -173,7 +225,7 @@ export class AgentSession {
       ...(bin ? { pathToClaudeCodeExecutable: bin } : {}),
       // La sortie d'erreur de Claude Code va au journal : c'est là qu'on lit pourquoi
       // une session ne démarre pas quand l'app est lancée depuis le Dock.
-      stderr: (d) => {
+      stderr: (d: string) => {
         tracer('[claude]', String(d).trimEnd().slice(0, 500))
         if (process.env.OPENSPACE_DEBUG) process.stderr.write(`[claude] ${d}`)
       },
@@ -181,7 +233,7 @@ export class AgentSession {
     }
   }
 
-  start({ resume } = {}) {
+  start({ resume }: { resume?: string | null } = {}): void {
     this.stop()
     this.abort = new AbortController()
     this.queue = fileEntree()
@@ -205,8 +257,9 @@ export class AgentSession {
     this.pump()
   }
 
-  async pump() {
+  async pump(): Promise<void> {
     const courant = this.q
+    if (!courant) return
     try {
       for await (const msg of courant) {
         if (this.q !== courant) break
@@ -216,7 +269,7 @@ export class AgentSession {
       if (this.q !== courant) return
       if (this.abort?.signal.aborted) return
       this.busy = false
-      tracer('session erreur', String(err?.stack || err?.message || err).slice(0, 700))
+      tracer('session erreur', pileDe(err).slice(0, 700))
 
       if (this.resumeId) {
         this.resumeId = null
@@ -238,7 +291,7 @@ export class AgentSession {
         return
       }
 
-      this.emit({ k: 'error', message: String(err?.message || err) })
+      this.emit({ k: 'error', message: messageDe(err) })
       this.emit({ k: 'status', state: 'idle' })
     }
   }
@@ -249,7 +302,7 @@ export class AgentSession {
    * répond pas, rien n'arrive. La boîte de dialogue passe souvent derrière la
    * fenêtre : mieux vaut le dire que laisser tourner « Connexion… ».
    */
-  armerAttente() {
+  armerAttente(): void {
     if (this.sessionId) return
     clearTimeout(this.minuteurConnexion)
     this.minuteurConnexion = setTimeout(() => {
@@ -264,7 +317,7 @@ export class AgentSession {
     }, 30000)
   }
 
-  stop() {
+  stop(): void {
     clearTimeout(this.minuteurConnexion)
     try { this.queue?.close() } catch {}
     try { this.abort?.abort() } catch {}
@@ -278,7 +331,7 @@ export class AgentSession {
    * d'entrée : le SDK le remet au modèle à la prochaine respiration, qui refait son
    * plan avec. On ne bloque donc jamais la saisie.
    */
-  send(text) {
+  send(text: string): void {
     this.repriseAuto = 0
     this.garde.nouveauTour()
     if (!this.q) this.start({})
@@ -292,8 +345,8 @@ export class AgentSession {
     this.pousser(text)
   }
 
-  pousser(text) {
-    this.queue.push({
+  pousser(text: string): void {
+    this.queue?.push({
       type: 'user',
       message: { role: 'user', content: [{ type: 'text', text }] },
       parent_tool_use_id: null,
@@ -301,7 +354,7 @@ export class AgentSession {
     })
   }
 
-  async interrupt() {
+  async interrupt(): Promise<void> {
     if (!this.q || !this.busy) return
     try { await this.q.interrupt() } catch {}
     this.busy = false
@@ -309,13 +362,13 @@ export class AgentSession {
     this.emit({ k: 'status', state: 'idle' })
   }
 
-  async setModel(model) {
+  async setModel(model: string): Promise<void> {
     if (this.q) { try { await this.q.setModel(model) } catch {} }
   }
 
   // ---------------------------------------------------------------- routage
 
-  route(msg) {
+  route(msg: SDKMessage): void {
     switch (msg.type) {
       case 'system':
         if (msg.subtype === 'init') {
@@ -367,7 +420,7 @@ export class AgentSession {
           if (bloc.type === 'tool_use') {
             this.toolNames.set(bloc.id, bloc.name)
             if (bloc.name === 'Agent') this.noterConvocation(bloc)
-            this.emit({ k: 'tool-use', id: bloc.id, name: bloc.name, input: bloc.input })
+            this.emit({ k: 'tool-use', id: bloc.id, name: bloc.name, input: bloc.input as Record<string, unknown> })
           } else if (bloc.type === 'text' && !dejaVu && bloc.text?.trim()) {
             this.emit({ k: 'text-start' })
             this.emit({ k: 'text-delta', text: bloc.text })
@@ -408,8 +461,9 @@ export class AgentSession {
   // ------------------------------------------------------------- l'équipe
 
   /** Un membre part au travail : la colonne de droite l'allume tout de suite. */
-  noterConvocation(bloc) {
-    const type = String(bloc.input?.subagent_type || '')
+  noterConvocation(bloc: { id: string, input: unknown }): void {
+    const entree = (bloc.input || {}) as Record<string, unknown>
+    const type = String(entree.subagent_type || '')
     const m = membre(type, this.membres)
     if (!m) return
     this.convocations.set(bloc.id, m.id)
@@ -418,7 +472,7 @@ export class AgentSession {
       id: m.id,
       label: m.label,
       etat: 'travaille',
-      brief: String(bloc.input?.description || bloc.input?.prompt || '').slice(0, 200),
+      brief: String(entree.description || entree.prompt || '').slice(0, 200),
     })
   }
 
@@ -427,7 +481,7 @@ export class AgentSession {
    * trace de ce que chaque pôle a réellement produit, et c'est ce que la garde mesure
    * pour vérifier qu'un directeur reçoit bien le travail de ses spécialistes.
    */
-  noterRetour(toolUseId, brut, ok) {
+  noterRetour(toolUseId: string, brut: string, ok: boolean): void {
     const id = this.convocations.get(toolUseId)
     if (!id) return
     this.convocations.delete(toolUseId)
@@ -449,9 +503,8 @@ export class AgentSession {
   /**
    * Validation demandée par un outil OpenSpace, une fois qu'il sait exactement quel
    * livrable est en jeu.
-   * @returns {Promise<boolean>}
    */
-  async confirmerAction(demande) {
+  async confirmerAction(demande: DemandeValidation): Promise<boolean> {
     if (this.autonome()) {
       tracer('autonomie — action menée sans demander :', demande.outil, demande.titre)
       return true
@@ -477,11 +530,11 @@ export class AgentSession {
    * après ses spécialistes, pas de livrable sans l'équipe — sont des règles, pas des
    * permissions : elles s'appliquent dans les deux modes.
    */
-  autonome() {
+  autonome(): boolean {
     return (this.getConfig()?.autonomie || 'auto') === 'auto'
   }
 
-  async handlePermission(toolName, input, opts) {
+  async handlePermission(toolName: string, input: Record<string, unknown>, opts?: OptionsOutil): Promise<PermissionResult> {
     // Une convocation part en arrière-plan par défaut : le tour se terminerait avant
     // que le membre ait rendu, et l'orchestrateur enchaînerait sur un pôle qui n'a
     // rien reçu. Une mission se mène dans l'ordre — on ramène donc chaque convocation
@@ -508,14 +561,14 @@ export class AgentSession {
       summary,
       title: summary?.title || opts?.title,
       displayName: opts?.displayName,
-      subtitle: opts?.subtitle,
+      subtitle: opts?.description,
       reason: opts?.decisionReason,
       allowAlways: true,
       signal: opts?.signal,
     })
 
     if (reponse?.behavior === 'allow') {
-      const res = { behavior: 'allow', updatedInput: input }
+      const res: PermissionResult = { behavior: 'allow', updatedInput: input }
       if (reponse.always && opts?.suggestions?.length) res.updatedPermissions = opts.suggestions
       return res
     }
@@ -528,13 +581,13 @@ export class AgentSession {
  * Les libellés bruts du SDK sont anglais et techniques : ils n'ont rien à faire dans
  * la fenêtre.
  */
-const ARRETS = {
+const ARRETS: Record<string, string> = {
   error_max_turns: "J'ai atteint la limite d'étapes pour ce message — la mission n'est pas terminée.",
   error_max_tokens: 'La réponse est devenue trop longue pour tenir en une fois.',
   error_during_execution: "Le tour s'est interrompu avant la fin.",
 }
 
-function raisonArret(msg) {
+function raisonArret(msg: { subtype: string, result?: string }): string {
   const connu = ARRETS[msg.subtype]
   if (connu) return `${connu} Clique « Reprendre » ou écris « continue » : je reprends où j'en étais.`
   const brut = String(msg.result || msg.subtype || '').trim()
@@ -544,21 +597,22 @@ function raisonArret(msg) {
 }
 
 /** Un aperçu d'entrée d'outil pour le journal : une ligne, pas un déversement. */
-function argLisible(input) {
+function argLisible(input: Record<string, unknown> | null | undefined): string {
   if (!input || typeof input !== 'object') return ''
   for (const cle of ['command', 'file_path', 'nom', 'url', 'titre', 'subagent_type']) {
-    if (typeof input[cle] === 'string' && input[cle]) return input[cle].slice(0, 160)
+    const v = input[cle]
+    if (typeof v === 'string' && v) return v.slice(0, 160)
   }
   return ''
 }
 
-function textOf(contenu) {
+function textOf(contenu: unknown): string {
   if (typeof contenu === 'string') return contenu
   if (Array.isArray(contenu)) return contenu.filter((b) => b?.type === 'text').map((b) => b.text).join('\n')
   return ''
 }
 
-function tronquer(s, n = 700) {
+function tronquer(s: string, n = 700): string {
   if (!s) return ''
   const t = String(s).trim()
   return t.length > n ? `${t.slice(0, n)}…` : t

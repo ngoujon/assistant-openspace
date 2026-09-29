@@ -4,6 +4,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import type { EvenementSession, LivrableInfo } from '../src/contrat.mjs'
 
 const bac = fs.mkdtempSync(path.join(os.tmpdir(), 'openspace-selftest-'))
 process.env.OPENSPACE_DATA_DIR = path.join(bac, 'donnees')
@@ -39,7 +40,17 @@ E.enregistrerEquipe([
   },
 ])
 
-const vu = { ready: null, texte: '', outils: [], membres: [], livrables: [], perms: [], fini: false }
+type Evenement<K extends EvenementSession['k']> = Extract<EvenementSession, { k: K }>
+
+const vu = {
+  ready: null as Evenement<'ready'> | null,
+  texte: '',
+  outils: [] as string[],
+  membres: [] as Evenement<'contribution'>[],
+  livrables: [] as LivrableInfo[],
+  perms: [] as string[],
+  fini: false,
+}
 
 const session = new AgentSession({
   emit: (e) => {

@@ -46,7 +46,7 @@ this morning. The `+` button starts from scratch.
 ## The order of work
 
 This is the whole point of the tool, and it is not a suggestion: it is **enforced** by
-`PreToolUse` hooks (`src/agent/gardes.mjs`), because the prompt alone was not enough — the
+`PreToolUse` hooks (`src/agent/gardes.mts`), because the prompt alone was not enough — the
 model always ended up writing the document by itself, summarising what it "imagined" each
 department would have said.
 
@@ -175,7 +175,7 @@ is marked *taken into account at the next step*.
 The button stays **send** as long as there is text; it only turns into **stop** when the
 field is empty (otherwise use `esc` or `⌘.`).
 
-**Two missions can run at the same time** (`src/agent/pool.mjs`). Switching missions in the
+**Two missions can run at the same time** (`src/agent/pool.mts`). Switching missions in the
 left-hand column **interrupts nothing**: it only changes what you are looking at. A third
 request waits its turn, and starts as soon as a slot frees up.
 
@@ -207,30 +207,36 @@ deliverable's credits keep it in writing: *Produit par l'Assistant OpenSpace
 the same document are not equally good.
 
 The **effort** (`high`) cannot be changed from the window: it is a single constant,
-`EFFORT` in `src/agent/session.mjs`, which feeds the SDK call, the display and the credits
+`EFFORT` in `src/agent/session.mts`, which feeds the SDK call, the display and the credits
 alike.
 
 ## Architecture
 
+The code is strict TypeScript: `.mts` for the Node side, `.cts` for the preload (which
+Electron loads as CommonJS), `.ts` for the window. `tsc -b` compiles it into `dist/`, which
+is what Electron runs.
+
 ```
-src/main.mjs              Electron main process: window, IPC, permissions, config
-src/preload.cjs           contextIsolation bridge (no Node access from the page)
-src/agent/session.mjs     Claude Agent SDK session: options, routing, permissions, contribution measurement
-src/agent/prompt.mjs      the orchestrator's six rules (bump PROMPT_VERSION when they change)
-src/agent/equipe.mjs      turns the org chart into subagents (AgentDefinition, one soul per prompt)
-src/agent/gardes.mjs      PreToolUse hooks: calling order and a deliverable fed by the team
-src/agent/outils.mjs      in-process MCP server: deliverables, versions, title, org chart
-src/agent/pool.mjs        two missions at once, the queue, navigation that interrupts nothing
-src/agent/ame.mjs         "Suggest a soul": an isolated call, one turn, no tools
-src/agent/resume.mjs      approval requests, in readable French
-src/espace/equipe.mjs     named teams, their org charts and souls; which one is active
-src/espace/pieces.mjs     attachments: copy, type detection, paths handed to the agent
-src/espace/livrables.mjs  the .md files, table of contents, credits, versions
-src/espace/missions.mjs   one file per mission: the replayable thread and the session to resume
-src/espace/paths.mjs      where data and deliverables live
-src/espace/journal.mjs    technical log (an app launched from the Dock has no terminal)
-src/renderer/             the window: index.html, app.js, style.css, markdown.js
+src/contrat.d.mts         the IPC contract: data shapes, events and the preload API, shared by all three sides
+src/main.mts              Electron main process: window, IPC, permissions, config
+src/preload.cts           contextIsolation bridge (no Node access from the page)
+src/agent/session.mts     Claude Agent SDK session: options, routing, permissions, contribution measurement
+src/agent/prompt.mts      the orchestrator's six rules (bump PROMPT_VERSION when they change)
+src/agent/equipe.mts      turns the org chart into subagents (AgentDefinition, one soul per prompt)
+src/agent/gardes.mts      PreToolUse hooks: calling order and a deliverable fed by the team
+src/agent/outils.mts      in-process MCP server: deliverables, versions, title, org chart
+src/agent/pool.mts        two missions at once, the queue, navigation that interrupts nothing
+src/agent/ame.mts         "Suggest a soul": an isolated call, one turn, no tools
+src/agent/resume.mts      approval requests, in readable French
+src/espace/equipe.mts     named teams, their org charts and souls; which one is active
+src/espace/pieces.mts     attachments: copy, type detection, paths handed to the agent
+src/espace/livrables.mts  the .md files, table of contents, credits, versions
+src/espace/missions.mts   one file per mission: the replayable thread and the session to resume
+src/espace/paths.mts      where data and deliverables live
+src/espace/journal.mts    technical log (an app launched from the Dock has no terminal)
+src/renderer/             the window: index.html, app.ts, style.css, markdown.ts
 scripts/                  icon, build, install, tests
+tsconfig.*.json           two projects: Node (main, preload, tests) and the window (DOM)
 ```
 
 Where things live:
@@ -250,8 +256,10 @@ and its archived line-ups: each one becomes a team in the library.
 
 ```bash
 npm install
-npm start           # run the app from source
-npm test            # teams, guards, deliverables, missions, attachments — no network
+npm start           # compile, then run the app
+npm run compile     # TypeScript → dist/ (plus index.html and style.css)
+npm run typecheck   # type-check both projects without writing anything
+npm test            # compile, then teams, guards, deliverables, missions, attachments — no network
 npm run selftest    # a real end-to-end mission, in a temporary folder
 npm run build       # "Assistant OpenSpace.app" in build/
 npm run install-app # rebuild, install in /Applications, pin to the Dock

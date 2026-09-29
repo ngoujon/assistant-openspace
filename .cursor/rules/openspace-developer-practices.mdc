@@ -17,9 +17,9 @@ produit un livrable Markdown versionné. Voir `README.md` pour le fonctionnement
 ## Règles métier
 
 - Ce qui compte doit être **imposé, pas demandé** : une règle d'organisation vit dans
-  `src/agent/gardes.mjs` (hooks `PreToolUse`), pas seulement dans le prompt. Le prompt dit
+  `src/agent/gardes.mts` (hooks `PreToolUse`), pas seulement dans le prompt. Le prompt dit
   pourquoi, le hook garantit.
-- Toucher aux règles de `src/agent/prompt.mjs` : **incrémenter `PROMPT_VERSION`**, sinon des
+- Toucher aux règles de `src/agent/prompt.mts` : **incrémenter `PROMPT_VERSION`**, sinon des
   missions enregistrées sous d'anciennes règles seraient reprises telles quelles.
 - Une contribution d'équipe se **mesure** à la sortie de l'outil `Agent` ; elle ne se déclare
   pas par le modèle. Le générique du livrable ne doit jamais pouvoir mentir.
@@ -28,7 +28,10 @@ produit un livrable Markdown versionné. Voir `README.md` pour le fonctionnement
 
 ## Style de code
 
-- JavaScript ES modules, pas de TypeScript, pas de framework côté fenêtre : DOM à la main.
+- TypeScript strict, modules ES (`.mts` côté Node, `.cts` pour le preload, `.ts` côté fenêtre),
+  compilé par `tsc -b` dans `dist/`. Pas de framework côté fenêtre : DOM à la main.
+- Ce qui traverse l'IPC est typé une seule fois, dans `src/contrat.d.mts` : le processus
+  principal, le preload et la fenêtre s'y réfèrent tous les trois.
 - **Commentaires en français**, et ils disent *pourquoi*, jamais *quoi*. Un commentaire qui
   paraphrase la ligne suivante est du bruit.
 - Nommage du domaine en français (`membres`, `livrable`, `mission`, `ame`) ; les identifiants
@@ -42,11 +45,11 @@ produit un livrable Markdown versionné. Voir `README.md` pour le fonctionnement
 - Respecter la grille : missions (gauche) · fil (centre) · équipe et livrables (droite).
 - Les variables CSS de `src/renderer/style.css` portent le thème clair et sombre : ne pas
   écrire de couleur en dur.
-- Aucun accès Node depuis la page : tout passe par `src/preload.cjs` (contextIsolation).
+- Aucun accès Node depuis la page : tout passe par `src/preload.cts` (contextIsolation).
 
 ## Tests
 
 - `npm test` doit rester **hors réseau et hors Electron**, dans un dossier temporaire
   (`OPENSPACE_DATA_DIR`, `OPENSPACE_LIVRABLES`). Toute règle métier ajoutée vient avec son cas.
 - `npm run selftest` couvre la chaîne réelle (spécialiste → pôle → livrable) : le lancer après
-  une modification de `session.mjs`, `equipe.mjs` (agent) ou `gardes.mjs`.
+  une modification de `session.mts`, `equipe.mts` (agent) ou `gardes.mts`.

@@ -6,7 +6,8 @@
 // session de mission : ni contexte, ni équipe, ni livrable.
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { ORCHESTRATEUR, enfantsDe, membre } from '../espace/equipe.mjs'
-import { tracer } from '../espace/journal.mjs'
+import { tracer, messageDe } from '../espace/journal.mjs'
+import type { Membre } from '../contrat.mjs'
 
 const SYSTEME = `Tu écris la fiche d'un membre d'une équipe virtuelle, telle qu'elle sera donnée au modèle
 qui jouera ce rôle. Elle tient en trois paragraphes courts, en français, au tutoiement :
@@ -22,12 +23,13 @@ pas de commentaire avant ou après. Pas de superlatif creux (« expert de renomm
 promesse marketing. Ce qui compte, c'est ce que ce membre regarde que personne d'autre ne
 regarde dans cette équipe-là.`
 
-/**
- * Propose une âme pour un membre.
- * @param {{id: string, label: string, membres: Array, model?: string}} demande
- * @returns {Promise<string>}
- */
-export async function proposerAme({ id, label, membres, model = 'claude-sonnet-5' }) {
+/** Propose une âme pour un membre. */
+export async function proposerAme({ id, label, membres, model = 'claude-sonnet-5' }: {
+  id: string
+  label: string
+  membres: Membre[]
+  model?: string
+}): Promise<string> {
   const m = membre(id, membres)
   const nom = String(label || m?.label || '').trim()
   if (!nom) throw new Error('Ce membre n\'a pas encore de nom.')
@@ -60,7 +62,7 @@ export async function proposerAme({ id, label, membres, model = 'claude-sonnet-5
       strictMcpConfig: true,
       maxTurns: 1,
       permissionMode: 'default',
-      canUseTool: async () => ({ behavior: 'deny', message: 'Pas d\'outil pour écrire une fiche.' }),
+      canUseTool: async () => ({ behavior: 'deny' as const, message: 'Pas d\'outil pour écrire une fiche.' }),
     },
   })
   try {
@@ -73,8 +75,8 @@ export async function proposerAme({ id, label, membres, model = 'claude-sonnet-5
       if (msg.type === 'result') break
     }
   } catch (err) {
-    tracer('âme — échec', String(err?.message || err).slice(0, 300))
-    throw new Error(`Impossible d'écrire la fiche : ${err?.message || err}`)
+    tracer('âme — échec', messageDe(err).slice(0, 300))
+    throw new Error(`Impossible d'écrire la fiche : ${messageDe(err)}`)
   }
 
   const propre = texte

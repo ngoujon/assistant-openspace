@@ -11,13 +11,13 @@
 // pièces même si l'original a bougé.
 import fs from 'node:fs'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import { P } from './paths.mjs'
+import type { GenrePiece, Piece } from '../contrat.mjs'
 
 /** Au-delà, on ne copie pas : un fichier de cette taille se travaille sur place. */
 export const TAILLE_MAX = 512 * 1024 * 1024
 
-const GENRES = [
+const GENRES: [GenrePiece, string, string[]][] = [
   ['image', 'image', ['png', 'jpg', 'jpeg', 'gif', 'webp', 'heic', 'heif', 'tif', 'tiff', 'bmp', 'svg', 'avif']],
   ['video', 'vidéo', ['mp4', 'mov', 'm4v', 'avi', 'mkv', 'webm', 'mpg', 'mpeg', 'wmv']],
   ['audio', 'audio', ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'oga', 'aiff', 'aif', 'caf', 'wma', 'opus']],
@@ -29,7 +29,7 @@ const GENRES = [
 ]
 
 /** Ce qu'est ce fichier, en un mot — pour l'afficher et pour le dire à l'agent. */
-export function genreDe(nom) {
+export function genreDe(nom: unknown): Pick<Piece, 'genre' | 'libelle' | 'ext'> {
   const ext = path.extname(String(nom || '')).slice(1).toLowerCase()
   for (const [genre, libelle, exts] of GENRES) {
     if (exts.includes(ext)) return { genre, libelle: ext ? `${libelle} ${ext.toUpperCase()}` : libelle, ext }
@@ -37,7 +37,7 @@ export function genreDe(nom) {
   return { genre: 'fichier', libelle: ext ? `fichier ${ext.toUpperCase()}` : 'fichier', ext }
 }
 
-export function tailleLisible(octets) {
+export function tailleLisible(octets: unknown): string {
   const n = Number(octets) || 0
   if (n < 1024) return `${n} o`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} ko`
@@ -46,12 +46,12 @@ export function tailleLisible(octets) {
 }
 
 /** Un nom de fichier sain, qui reste reconnaissable dans une liste. */
-function nomSain(nom) {
+function nomSain(nom: unknown): string {
   const base = path.basename(String(nom || 'piece')).replace(/[/\\:]/g, '-').trim()
   return base.slice(0, 120) || 'piece'
 }
 
-function cheminLibre(dossier, nom) {
+function cheminLibre(dossier: string, nom: string): string {
   const ext = path.extname(nom)
   const base = nom.slice(0, nom.length - ext.length) || 'piece'
   let candidat = path.join(dossier, nom)
@@ -61,7 +61,7 @@ function cheminLibre(dossier, nom) {
   return candidat
 }
 
-function decrire(chemin) {
+function decrire(chemin: string): Piece {
   const stat = fs.statSync(chemin)
   const nom = path.basename(chemin)
   return { ...genreDe(nom), nom, chemin, octets: stat.size, taille: tailleLisible(stat.size) }
@@ -69,10 +69,9 @@ function decrire(chemin) {
 
 /**
  * Copie un fichier dans les pièces de la mission.
- * @param {string} missionId
- * @param {string} source chemin absolu du fichier déposé ou choisi
+ * @param source chemin absolu du fichier déposé ou choisi
  */
-export function joindre(missionId, source) {
+export function joindre(missionId: string | null | undefined, source: string): Piece {
   const stat = fs.statSync(source)
   if (!stat.isFile()) throw new Error(`« ${path.basename(source)} » n'est pas un fichier.`)
   if (stat.size > TAILLE_MAX) {
@@ -89,7 +88,7 @@ export function joindre(missionId, source) {
  * Enregistre des octets bruts — une image collée depuis le presse-papiers, qui n'a
  * pas de fichier d'origine.
  */
-export function joindreDonnees(missionId, { nom, base64 }) {
+export function joindreDonnees(missionId: string | null | undefined, { nom, base64 }: { nom?: string, base64?: string }): Piece {
   const octets = Buffer.from(String(base64 || ''), 'base64')
   if (!octets.length) throw new Error('Presse-papiers vide.')
   if (octets.length > TAILLE_MAX) throw new Error('Contenu trop gros pour être joint.')
@@ -106,7 +105,7 @@ export function joindreDonnees(missionId, { nom, base64 }) {
  * que dans le dossier des pièces : une erreur de chemin ne doit pas effacer ses
  * fichiers à lui.
  */
-export function oublier(chemin) {
+export function oublier(chemin: unknown): boolean {
   const racine = P.pieces('')
   const cible = path.resolve(String(chemin || ''))
   if (!cible.startsWith(path.dirname(racine) + path.sep)) return false
@@ -114,7 +113,7 @@ export function oublier(chemin) {
 }
 
 /** Le bloc ajouté au message : des chemins absolus, et ce qu'ils contiennent. */
-export function blocPieces(pieces) {
+export function blocPieces(pieces: Pick<Piece, 'nom' | 'libelle' | 'taille' | 'chemin'>[] | null | undefined): string {
   if (!pieces?.length) return ''
   const lignes = pieces.map((p) => `- « ${p.nom} » — ${p.libelle}, ${p.taille} : ${p.chemin}`)
   return [
@@ -126,12 +125,12 @@ export function blocPieces(pieces) {
 }
 
 /** Les adresses http(s) trouvées dans un message : ce sont des sources, pas du décor. */
-export function liensDuTexte(texte) {
+export function liensDuTexte(texte: unknown): string[] {
   const trouves = String(texte || '').match(/https?:\/\/[^\s<>()"']+/gi) || []
   return [...new Set(trouves.map((u) => u.replace(/[.,;:!?]+$/, '')))]
 }
 
-export function blocLiens(liens) {
+export function blocLiens(liens: string[]): string {
   if (!liens.length) return ''
   return [
     '',

@@ -8,6 +8,17 @@
 // finir dans le générique du livrable.
 import { chargerEquipe, ORCHESTRATEUR, enfantsDe, membre, profondeur } from '../espace/equipe.mjs'
 import { existe, nomFichier } from '../espace/livrables.mjs'
+import type { HookCallbackMatcher, HookEvent, HookInput, HookJSONOutput } from '@anthropic-ai/claude-agent-sdk'
+import type { Membre } from '../contrat.mjs'
+
+/** Ce qu'un membre a réellement rendu pendant la session. */
+export interface Contribution {
+  label: string
+  taille: number
+  apercu: string
+}
+
+type Entree = Record<string, unknown>
 
 const PREFIXE = 'mcp__openspace__'
 
@@ -27,36 +38,38 @@ const PLANCHER_BRIEF = 700
 const MAX_RELANCES = 4
 
 export class GardeEquipe {
-  constructor(membres) {
+  membres: Membre[]
+  /** Ce que chaque membre a réellement rendu ici, par identifiant. */
+  contributions = new Map<string, Contribution>()
+  /** Un livrable est-il sorti depuis le début de la session ? */
+  livrablePublie = false
+  relances = 0
+
+  constructor(membres?: Membre[]) {
     this.membres = membres || chargerEquipe()
-    /** id -> { label, taille, apercu } : ce que chaque membre a réellement rendu ici. */
-    this.contributions = new Map()
-    /** Un livrable est-il sorti depuis le début de la session ? */
-    this.livrablePublie = false
-    this.relances = 0
   }
 
   /** Nouvelle demande de l'utilisateur : le budget de relances repart à zéro. */
-  nouveauTour() {
+  nouveauTour(): void {
     this.relances = 0
   }
 
   /** Un livrable vient d'être écrit : la mission a produit quelque chose. */
-  noterLivrable() {
+  noterLivrable(): void {
     this.livrablePublie = true
   }
 
   /** L'équipe a pu changer entre deux tours : on repart de l'organigramme en place. */
-  rafraichir(membres) {
+  rafraichir(membres?: Membre[]): void {
     this.membres = membres || chargerEquipe()
   }
 
   /** Un membre vient de rendre son travail. Mesuré à la sortie de l'outil Agent. */
-  noteContribution(id, texte) {
+  noteContribution(id: string, texte: unknown): Contribution | null {
     const m = membre(id, this.membres)
     if (!m) return null
     const contenu = String(texte || '')
-    const entree = {
+    const entree: Contribution = {
       label: m.label,
       taille: contenu.length,
       apercu: contenu.trim().slice(0, 600),
@@ -65,18 +78,18 @@ export class GardeEquipe {
     return entree
   }
 
-  aContribue(id) {
+  aContribue(id: string): boolean {
     return this.contributions.has(id)
   }
 
   /** Les pôles qui n'ont pas encore rendu leur intégration. */
-  polesManquants() {
+  polesManquants(): Membre[] {
     return enfantsDe(ORCHESTRATEUR, this.membres).filter((p) => !this.aContribue(p.id))
   }
 
   // ------------------------------------------------------------- vérifications
 
-  #verifierAgent(i) {
+  #verifierAgent(i: Entree): string | null {
     const type = String(i.subagent_type || '').trim()
     if (!type) return null
     const cible = membre(type, this.membres)
@@ -110,11 +123,11 @@ export class GardeEquipe {
     return null
   }
 
-  #verifierRedaction(i) {
+  #verifierRedaction(i: Entree): string | null {
     const markdown = String(i.markdown || '')
     if (!markdown.trim()) return 'Le livrable est vide.'
 
-    const nouveau = !existe(i.nom || nomFichier(i.titre || ''))
+    const nouveau = !existe(i.nom || nomFichier(String(i.titre || '')))
     if (!nouveau) return null
 
     const poles = enfantsDe(ORCHESTRATEUR, this.membres)
@@ -138,9 +151,9 @@ export class GardeEquipe {
    * liste de ce qui manque. Rien ne commence ici : si personne n'a été convoqué, il
    * n'y a pas de mission en cours, et une simple discussion se termine normalement.
    *
-   * @returns {null|string} la raison de le relancer, ou null pour le laisser partir
+   * @returns la raison de le relancer, ou null pour le laisser partir
    */
-  raisonDeRelancer() {
+  raisonDeRelancer(): string | null {
     if (this.relances >= MAX_RELANCES) return null
     if (!this.contributions.size) return null
     if (this.livrablePublie) return null
@@ -158,7 +171,7 @@ export class GardeEquipe {
       + 'Ne rends pas la main en annonçant que tu attends : chaque convocation te répond dans la foulée.'
   }
 
-  verifier(toolName, input) {
+  verifier(toolName: string, input: Entree | null | undefined): string | null {
     const i = input || {}
     if (toolName === 'Agent') return this.#verifierAgent(i)
     if (!toolName.startsWith(PREFIXE)) return null
@@ -167,16 +180,17 @@ export class GardeEquipe {
   }
 
   /** Configuration `hooks` passée à query(). */
-  hooks() {
-    const refuser = (raison) => ({
+  hooks(): Partial<Record<HookEvent, HookCallbackMatcher[]>> {
+    const refuser = (raison: string): HookJSONOutput => ({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: 'deny',
         permissionDecisionReason: raison,
       },
     })
-    const verifier = async (entree) => {
-      const raison = this.verifier(entree?.tool_name, entree?.tool_input)
+    const verifier = async (entree: HookInput): Promise<HookJSONOutput> => {
+      if (entree.hook_event_name !== 'PreToolUse') return { continue: true }
+      const raison = this.verifier(entree.tool_name, entree.tool_input as Entree)
       return raison ? refuser(raison) : { continue: true }
     }
     return {
@@ -188,7 +202,7 @@ export class GardeEquipe {
       // l'orchestrateur au travail avec la liste de ce qui manque.
       Stop: [
         {
-          hooks: [async () => {
+          hooks: [async (): Promise<HookJSONOutput> => {
             const raison = this.raisonDeRelancer()
             return raison ? { decision: 'block', reason: raison } : { continue: true }
           }],

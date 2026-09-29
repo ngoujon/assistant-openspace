@@ -7,29 +7,57 @@
 // lui seul.
 import { z } from 'zod'
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
+import type { McpSdkServerConfigWithInstance, SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk'
 import {
   ecrireLivrable, listerLivrables, lireLivrable, supprimerLivrable, nomFichier,
   versionsLivrable, lireVersion, restaurerVersion,
 } from '../espace/livrables.mjs'
 import { chargerEquipe, arbre, ORCHESTRATEUR, enfantsDe } from '../espace/equipe.mjs'
 import { P } from '../espace/paths.mjs'
+import { messageDe } from '../espace/journal.mjs'
+import type { EvenementSession } from '../contrat.mjs'
 
-const texte = (data) => ({ content: [{ type: 'text', text: typeof data === 'string' ? data : JSON.stringify(data, null, 2) }] })
-const erreur = (m) => ({ content: [{ type: 'text', text: `ERREUR : ${m}` }], isError: true })
+type ResultatOutil = Awaited<ReturnType<SdkMcpToolDefinition['handler']>>
+
+/** Une validation demandée par un outil, qui sait exactement ce qui est en jeu. */
+export interface DemandeValidation {
+  outil: string
+  entree: Record<string, unknown>
+  titre: string
+  lignes: string[]
+  indice?: string
+  danger?: boolean
+  refus?: string
+}
+
+/** Ce que la session branche sur les outils : de quoi valider, prévenir, ouvrir. */
+export interface ContexteOutils {
+  confirmer?: (demande: DemandeValidation) => Promise<boolean>
+  signaler?: (evt: EvenementSession) => void
+  ouvrir?: (chemin: string) => void
+  corbeille?: (chemin: string) => Promise<boolean>
+  titrer?: (titre: string) => void
+  modele?: () => string | null | undefined
+  effort?: () => string | null | undefined
+  contributeurs?: () => string[]
+}
+
+const texte = (data: unknown): ResultatOutil => ({ content: [{ type: 'text', text: typeof data === 'string' ? data : JSON.stringify(data, null, 2) }] })
+const erreur = (m: string): ResultatOutil => ({ content: [{ type: 'text', text: `ERREUR : ${m}` }], isError: true })
 
 class Refus extends Error {}
 
 /** Enveloppe commune : une panne revient au modèle en clair, jamais en exception. */
-const sur = (fn) => async (args, extra) => {
+const sur = <A,>(fn: (args: A, extra: unknown) => Promise<unknown>) => async (args: A, extra: unknown): Promise<ResultatOutil> => {
   try {
     return texte(await fn(args, extra))
   } catch (err) {
     if (err instanceof Refus) return texte({ execute: false, refuse: true, message: err.message })
-    return erreur(err?.message || String(err))
+    return erreur(messageDe(err))
   }
 }
 
-export function serveurOpenspace(contexte = {}) {
+export function serveurOpenspace(contexte: ContexteOutils = {}): McpSdkServerConfigWithInstance {
   const confirmer = contexte.confirmer || (async () => true)
   const signaler = contexte.signaler || (() => {})
   const ouvrir = contexte.ouvrir || (() => {})
@@ -37,12 +65,12 @@ export function serveurOpenspace(contexte = {}) {
   // décide doit rester rattrapable.
   const corbeille = contexte.corbeille || (async () => false)
   const titrer = contexte.titrer || (() => {})
-  const modele = contexte.modele || (() => null)
-  const effort = contexte.effort || (() => null)
+  const modele = contexte.modele || ((): string | null => null)
+  const effort = contexte.effort || ((): string | null => null)
   /** Qui a réellement travaillé sur cette mission — mesuré, pas déclaré. */
-  const contributeurs = contexte.contributeurs || (() => [])
+  const contributeurs = contexte.contributeurs || ((): string[] => [])
 
-  async function valider(demande) {
+  async function valider(demande: DemandeValidation): Promise<void> {
     const ok = await confirmer(demande)
     if (!ok) throw new Refus(demande.refus || "Refusé par l'utilisateur — rien n'a été fait.")
   }

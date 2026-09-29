@@ -5,6 +5,9 @@ cd "$(dirname "$0")/.."
 
 [ -f assets/icon.icns ] || bash scripts/make-icon.sh
 
+# L'app tourne sur le JavaScript compilé dans dist/ : on le régénère à chaque build.
+npm run compile
+
 rm -rf build
 npx @electron/packager . "Assistant OpenSpace" \
   --platform=darwin \
@@ -15,7 +18,7 @@ npx @electron/packager . "Assistant OpenSpace" \
   --app-category-type=public.app-category.productivity \
   --app-version="$(node -p "require('./package.json').version")" \
   --prune=true \
-  --ignore="^/(scripts|build|assets/icon-1024\.png|assets/AppIcon\.iconset)" \
+  --ignore="^/(scripts|build|src|dist/scripts|tsconfig[^/]*\.json|assets/icon-1024\.png|assets/AppIcon\.iconset)" \
   --out=build \
   --overwrite
 

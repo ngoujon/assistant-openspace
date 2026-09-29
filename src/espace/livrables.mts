@@ -4,10 +4,36 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { P, ensureDirs, VERSIONS } from './paths.mjs'
+import type { LivrableInfo, VersionLivrable } from '../contrat.mjs'
+
+/** Les métadonnées rangées en fin de fichier, dans un commentaire HTML. */
+export interface MetaLivrable {
+  titre?: string
+  mission?: string
+  cree_le?: string
+  mis_a_jour_le?: string
+  version?: number
+  equipe?: string[]
+  mots?: number
+  modele?: string
+  effort?: string
+  restaure_depuis?: number
+}
+
+export interface Livrable extends LivrableInfo {
+  entete: MetaLivrable
+  markdown: string
+}
+
+export interface VersionLue extends VersionLivrable {
+  nom: string
+  entete: MetaLivrable
+  markdown: string
+}
 
 export const LISEZ_MOI = 'LISEZ-MOI.md'
 
-export function slug(titre) {
+export function slug(titre: unknown): string {
   return String(titre || 'livrable')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase()
@@ -17,24 +43,24 @@ export function slug(titre) {
     .slice(0, 70) || 'livrable'
 }
 
-function aujourdhui() {
+function aujourdhui(): string {
   const d = new Date()
-  const p = (n) => String(n).padStart(2, '0')
+  const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-export function jolieDate(iso) {
-  const d = new Date(iso)
+export function jolieDate(iso: string | undefined): string {
+  const d = new Date(iso ?? '')
   if (Number.isNaN(+d)) return String(iso || '')
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-export function nomFichier(titre) {
+export function nomFichier(titre: string): string {
   return `${aujourdhui()}-${slug(titre)}.md`
 }
 
 /** Un nom de fichier qui reste dans le dossier des livrables, quoi qu'on lui donne. */
-function nomSur(nom) {
+function nomSur(nom: unknown): string {
   const base = path.basename(String(nom || '').trim())
   if (!base || base === '.' || base === '..') throw new Error('Nom de livrable invalide.')
   return base.endsWith('.md') ? base : `${base}.md`
@@ -51,17 +77,17 @@ const MARQUEUR = 'openspace:'
 const RE_META = /\n?<!--\s*openspace:\s*(\{[\s\S]*?\})\s*-->\s*$/
 const RE_APROPOS = /\n+(?:---\n+)?##\s+À propos de ce livrable[\s\S]*$/
 
-export function separerMeta(brut) {
+export function separerMeta(brut: unknown): { meta: MetaLivrable, corps: string } {
   const texte = String(brut)
   const m = texte.match(RE_META)
   if (!m) return { meta: {}, corps: texte }
-  let meta = {}
+  let meta: MetaLivrable = {}
   try { meta = JSON.parse(m[1]) } catch {}
   return { meta, corps: texte.slice(0, m.index).replace(RE_APROPOS, '').trimEnd() }
 }
 
 /** L'ancre d'un titre, à la façon de GitHub : c'est ce que suivent les liseuses. */
-export function ancre(titre) {
+export function ancre(titre: string): string {
   return String(titre)
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s-]/gu, '')
@@ -73,8 +99,8 @@ export function ancre(titre) {
  * Le sommaire, construit à partir des titres réellement présents. Composé ici et
  * non par le modèle : une table des matières qui ment est pire que pas de table.
  */
-export function composerSommaire(corps) {
-  const titres = []
+export function composerSommaire(corps: string): string {
+  const titres: { niveau: number, texte: string }[] = []
   let dansCode = false
   for (const ligne of String(corps).split('\n')) {
     if (/^\s*```/.test(ligne)) { dansCode = !dansCode; continue }
@@ -92,7 +118,7 @@ export function composerSommaire(corps) {
  * document d'un texte sorti d'un seul modèle, et c'est ce que l'utilisateur relit quand il
  * veut savoir quel pôle a couvert quoi.
  */
-function blocAPropos(meta) {
+function blocAPropos(meta: MetaLivrable): string {
   const lignes = [
     '## À propos de ce livrable',
     '',
@@ -113,11 +139,11 @@ function blocAPropos(meta) {
 
 // ----------------------------------------------------------------- lecture
 
-export function compterMots(texte) {
+export function compterMots(texte: unknown): number {
   return (String(texte).match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length
 }
 
-function infoDepuisFichier(nom) {
+function infoDepuisFichier(nom: string): LivrableInfo {
   const chemin = P.livrable(nom)
   const stat = fs.statSync(chemin)
   const brut = fs.readFileSync(chemin, 'utf8')
@@ -138,11 +164,11 @@ function infoDepuisFichier(nom) {
   }
 }
 
-export function listerLivrables() {
+export function listerLivrables(): LivrableInfo[] {
   ensureDirs()
-  let noms = []
+  let noms: string[] = []
   try { noms = fs.readdirSync(P.livrables()) } catch { return [] }
-  const out = []
+  const out: LivrableInfo[] = []
   for (const nom of noms) {
     if (!nom.endsWith('.md') || nom.startsWith('.') || nom === VERSIONS) continue
     // Le mot d'accueil posé à la première ouverture n'est pas un livrable.
@@ -154,11 +180,11 @@ export function listerLivrables() {
   return out.sort((a, b) => b.modifie_a.localeCompare(a.modifie_a) || b.nom.localeCompare(a.nom))
 }
 
-export function existe(nom) {
+export function existe(nom: unknown): boolean {
   try { return fs.statSync(P.livrable(nomSur(nom))).isFile() } catch { return false }
 }
 
-export function lireLivrable(nom) {
+export function lireLivrable(nom: unknown): Livrable {
   const fichier = nomSur(nom)
   if (!existe(fichier)) throw new Error(`Aucun livrable « ${fichier} » dans le dossier.`)
   const brut = fs.readFileSync(P.livrable(fichier), 'utf8')
@@ -166,7 +192,7 @@ export function lireLivrable(nom) {
   return { ...infoDepuisFichier(fichier), entete, markdown: corps }
 }
 
-export function supprimerLivrable(nom) {
+export function supprimerLivrable(nom: unknown): string {
   const fichier = nomSur(nom)
   fs.rmSync(P.livrable(fichier), { force: true })
   supprimerVersions(fichier)
@@ -176,16 +202,16 @@ export function supprimerLivrable(nom) {
 // -------------------------------------------------------------- écriture
 
 /** Retire un sommaire ou un bloc « À propos » que le modèle aurait écrit lui-même. */
-function sansSommaire(markdown) {
+function sansSommaire(markdown: string): string {
   return String(markdown).replace(/^#{2,3}\s*(Sommaire|Table des mati[eè]res)\s*\n[\s\S]*?(?=\n#{1,3}\s)/im, '')
 }
 
-function sansAPropos(markdown) {
+function sansAPropos(markdown: string): string {
   return String(markdown).replace(/\n+(?:---\n+)?#{2,3}\s+À propos de ce livrable[\s\S]*$/i, '\n').trimEnd()
 }
 
 /** Glisse le sommaire juste avant la première section : après le titre et le résumé. */
-function avecSommaire(corps) {
+function avecSommaire(corps: string): string {
   const sommaire = composerSommaire(corps)
   if (!sommaire) return corps
   const lignes = corps.split('\n')
@@ -198,7 +224,15 @@ function avecSommaire(corps) {
  * Enregistre un livrable. Le corps vient de l'orchestrateur ; le sommaire et le
  * générique sont composés ici.
  */
-export function ecrireLivrable({ titre, mission, markdown, equipe = [], nom, modele, effort }) {
+export function ecrireLivrable({ titre, mission, markdown, equipe = [], nom, modele, effort }: {
+  titre: string
+  markdown: string
+  mission?: string
+  equipe?: string[]
+  nom?: string
+  modele?: string | null
+  effort?: string | null
+}): LivrableInfo {
   ensureDirs()
   if (!titre?.trim()) throw new Error('Un livrable a besoin d\'un titre.')
   if (!markdown?.trim()) throw new Error('Le livrable est vide.')
@@ -209,13 +243,13 @@ export function ecrireLivrable({ titre, mission, markdown, equipe = [], nom, mod
   // Réécrire ne détruit rien : la version en place part d'abord aux archives.
   // C'est ce qui permet de retoucher un livrable en discussion sans jamais avoir à
   // demander « tu confirmes ? ».
-  const ancien = dejaLa ? separerMeta(fs.readFileSync(chemin, 'utf8')).meta : {}
+  const ancien: MetaLivrable = dejaLa ? separerMeta(fs.readFileSync(chemin, 'utf8')).meta : {}
   if (dejaLa) archiver(fichier)
 
   let corps = sansSommaire(sansAPropos(String(markdown).trim()))
   if (!/^#\s+/.test(corps.split('\n')[0] || '')) corps = `# ${titre.trim()}\n\n${corps}`
 
-  const meta = {
+  const meta: MetaLivrable = {
     titre: titre.trim(),
     mission: mission?.trim() || ancien.mission || undefined,
     cree_le: ancien.cree_le || aujourdhui(),
@@ -236,11 +270,11 @@ export function ecrireLivrable({ titre, mission, markdown, equipe = [], nom, mod
 // Un livrable se retouche en discussion : chaque écriture pousse la précédente
 // dans « Versions/ », numérotée. Rien ne se perd, donc rien ne se valide.
 
-function dossierVersions(nom) {
+function dossierVersions(nom: string): string {
   return P.versions(nom)
 }
 
-function compterVersions(nom) {
+function compterVersions(nom: string): number {
   try {
     return fs.readdirSync(dossierVersions(nom)).filter((f) => /^v\d+\.md$/.test(f)).length
   } catch {
@@ -249,9 +283,9 @@ function compterVersions(nom) {
 }
 
 /** Range la version en place dans les archives, sous son propre numéro. */
-function archiver(fichier) {
+function archiver(fichier: string): string | null {
   const chemin = P.livrable(fichier)
-  let brut
+  let brut: string
   try { brut = fs.readFileSync(chemin, 'utf8') } catch { return null }
   const { meta: entete } = separerMeta(brut)
   const n = Number(entete.version || compterVersions(fichier) + 1) || 1
@@ -263,9 +297,9 @@ function archiver(fichier) {
 }
 
 /** L'historique d'un livrable : la version en place, puis les précédentes. */
-export function versionsLivrable(nom) {
+export function versionsLivrable(nom: unknown): VersionLivrable[] {
   const fichier = nomSur(nom)
-  const out = []
+  const out: VersionLivrable[] = []
   if (existe(fichier)) {
     const info = infoDepuisFichier(fichier)
     out.push({
@@ -273,7 +307,7 @@ export function versionsLivrable(nom) {
       mots: info.mots, equipe: info.equipe, date: info.mis_a_jour_le, modifie_a: info.modifie_a,
     })
   }
-  let noms = []
+  let noms: string[] = []
   try { noms = fs.readdirSync(dossierVersions(fichier)) } catch { noms = [] }
   for (const f of noms) {
     const m = f.match(/^v(\d+)\.md$/)
@@ -294,7 +328,7 @@ export function versionsLivrable(nom) {
   return out.sort((a, b) => b.numero - a.numero)
 }
 
-export function lireVersion(nom, numero) {
+export function lireVersion(nom: unknown, numero: unknown): VersionLue {
   const v = versionsLivrable(nom).find((x) => x.numero === Number(numero))
   if (!v) throw new Error(`Le livrable « ${nomSur(nom)} » n'a pas de version ${numero}.`)
   const brut = fs.readFileSync(v.chemin, 'utf8')
@@ -307,7 +341,7 @@ export function lireVersion(nom, numero) {
  * nouveau numéro : revenir en arrière est aussi un pas en avant, et l'état d'où
  * l'on revient reste consultable.
  */
-export function restaurerVersion(nom, numero) {
+export function restaurerVersion(nom: unknown, numero: unknown): LivrableInfo {
   const fichier = nomSur(nom)
   const v = lireVersion(fichier, numero)
   if (v.courante) throw new Error(`La version ${numero} est déjà celle en place.`)
@@ -315,7 +349,7 @@ export function restaurerVersion(nom, numero) {
   archiver(fichier)
   // Le texte revient tel quel ; seules les métadonnées avancent d'un cran, avec la
   // trace de ce qu'on a restauré.
-  const meta = {
+  const meta: MetaLivrable = {
     ...v.entete,
     mis_a_jour_le: aujourdhui(),
     version: Number(enPlace.version || 1) + 1,
@@ -325,6 +359,6 @@ export function restaurerVersion(nom, numero) {
   return { ...infoDepuisFichier(fichier), restaure_depuis: Number(numero) }
 }
 
-export function supprimerVersions(nom) {
+export function supprimerVersions(nom: unknown): void {
   try { fs.rmSync(dossierVersions(nomSur(nom)), { recursive: true, force: true }) } catch {}
 }

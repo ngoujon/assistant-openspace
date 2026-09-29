@@ -50,17 +50,17 @@ assert.equal(M.lister('dépendances')[0].id, a.id, 'on retrouve une mission par 
 // 4. Un titre posé à la main ne se fait plus recouvrir.
 M.renommer(a.id, 'Refonte — comité de mars')
 M.ajouter(a.id, { k: 'livrable', nom: '2026-08-31-refonte.md', titre: 'Autre titre', mots: 3100, version: 2 })
-assert.equal(M.lire(a.id).titre, 'Refonte — comité de mars')
+assert.equal(M.lire(a.id)!.titre, 'Refonte — comité de mars')
 assert.equal(M.livrablesDe(a.id).length, 1, 'republier ne duplique pas le livrable')
 
 // 5. Le statut du dernier tour, et la session à reprendre.
 M.marquerStatut(a.id, 'interrompu')
 M.memoriserSession(a.id, 'sess-123')
-assert.equal(M.fil(a.id).statut, 'interrompu')
-assert.equal(M.fil(a.id).sessionId, 'sess-123')
+assert.equal(M.fil(a.id)!.statut, 'interrompu')
+assert.equal(M.fil(a.id)!.sessionId, 'sess-123')
 
 // 6. Le fil se rejoue : tout ce qui a été affiché est là, dans l'ordre.
-const fil = M.fil(a.id)
+const fil = M.fil(a.id)!
 assert.deepEqual(
   fil.evenements.map((e) => e.k),
   ['user', 'contribution', 'contribution', 'texte', 'livrable', 'livrable'],

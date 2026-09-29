@@ -5,14 +5,16 @@
   "private": true,
   "type": "module",
   "description": "Une équipe virtuelle — orchestrateur, directeurs, spécialistes — qui produit un livrable Markdown (Claude Agent SDK)",
-  "main": "src/main.mjs",
+  "main": "dist/src/main.mjs",
   "scripts": {
-    "start": "electron .",
+    "compile": "tsc -b && cp src/renderer/index.html src/renderer/style.css dist/src/renderer/",
+    "typecheck": "tsc -b --noEmit",
+    "start": "npm run compile && electron .",
     "icon": "bash scripts/make-icon.sh",
     "build": "bash scripts/build-app.sh",
     "install-app": "bash scripts/install-app.sh",
-    "test": "node scripts/test-equipe.mjs && node scripts/test-gardes.mjs && node scripts/test-livrables.mjs && node scripts/test-conversations.mjs && node scripts/test-pieces.mjs",
-    "selftest": "node scripts/selftest.mjs"
+    "test": "npm run compile && node dist/scripts/test-equipe.mjs && node dist/scripts/test-gardes.mjs && node dist/scripts/test-livrables.mjs && node dist/scripts/test-conversations.mjs && node dist/scripts/test-pieces.mjs",
+    "selftest": "npm run compile && node dist/scripts/selftest.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.250",
@@ -20,6 +22,8 @@
   },
   "devDependencies": {
     "@electron/packager": "^18.4.4",
-    "electron": "^44.0.0"
+    "@types/node": "^24.19.0",
+    "electron": "^44.0.0",
+    "typescript": "^7.0.2"
   }
 }

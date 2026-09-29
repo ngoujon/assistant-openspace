@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2024"],
+    "types": ["node"],
+    "tsBuildInfoFile": "dist/.node.tsbuildinfo"
+  },
+  "include": ["src/**/*.mts", "src/**/*.cts", "scripts/**/*.mts"],
+  "exclude": ["src/renderer"]
+}

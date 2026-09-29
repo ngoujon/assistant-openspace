@@ -4,11 +4,20 @@ export const PROMPT_VERSION = 4
 
 import { AMPLEURS, organigrammeTexte } from './equipe.mjs'
 import { ORCHESTRATEUR, enfantsDe } from '../espace/equipe.mjs'
+import type { Ampleur, LivrableInfo, Membre } from '../contrat.mjs'
 
 export function buildSystemPrompt({
   dossier, timezone, ampleur = 'document', langue = 'français', membres = [], livrables = [], ame = '',
-}) {
-  const a = AMPLEURS[ampleur] || AMPLEURS.document
+}: {
+  dossier: string
+  timezone: string
+  ampleur?: string
+  langue?: string
+  membres?: Membre[]
+  livrables?: LivrableInfo[]
+  ame?: string
+}): string {
+  const a = AMPLEURS[ampleur as Ampleur] || AMPLEURS.document
   const maintenant = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const poles = enfantsDe(ORCHESTRATEUR, membres)
   const recents = livrables.length

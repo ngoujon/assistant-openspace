@@ -1,9 +1,11 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, nativeTheme, screen } from 'electron'
+import type { IpcMainEvent, IpcMainInvokeEvent, MessageBoxOptions, Rectangle } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { setDataRoot, setLivrables, livrablesParDefaut, P } from './espace/paths.mjs'
 import { AgentSession, EFFORT } from './agent/session.mjs'
+import type { DemandePermissionSession } from './agent/session.mjs'
 import { Pool, MAX_EN_PARALLELE } from './agent/pool.mjs'
 import { PROMPT_VERSION } from './agent/prompt.mjs'
 import { proposerAme } from './agent/ame.mjs'
@@ -13,15 +15,49 @@ import {
 import * as Equipe from './espace/equipe.mjs'
 import * as Missions from './espace/missions.mjs'
 import * as Pieces from './espace/pieces.mjs'
-import { tracer, cheminJournal } from './espace/journal.mjs'
+import { tracer, cheminJournal, messageDe, pileDe } from './espace/journal.mjs'
+import type {
+  Ampleur, Autonomie, EtatEquipe, EtatInitial, EvenementFenetre, EvenementFil, EvenementSession, LivrableInfo,
+  Membre, MissionResume, Onglet, PatchConfig, Piece, PorteeLivrables, ReponsePermission, ResultatPieces,
+  StatutVisible,
+} from './contrat.mjs'
+
+/** Les réglages enregistrés dans reglages.json. */
+interface Config {
+  model: string
+  modeleEquipe: string
+  ampleur: Ampleur
+  langue: string
+  autonomie: Autonomie
+  livrables: string | null
+  barreVisible: boolean
+  panneauVisible: boolean
+  largeurBarre: number | null
+  largeurPanneau: number | null
+  onglet: Onglet
+  porteeLivrables: PorteeLivrables
+  bounds: Partial<Rectangle> | null
+  zoom: number
+  mission: string | null
+  promptVersion: number
+}
+
+/** La mission regardée : ce que la fenêtre a besoin d'en savoir. */
+interface Courante {
+  id: string
+  titre: string | null
+  statut?: StatutVisible | null
+}
+
+type ReponseFenetre = (reponse: ReponsePermission) => void
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const CONFIG_DEFAUT = {
+const CONFIG_DEFAUT: Config = {
   model: 'claude-opus-5',
   // Le modèle des sous-agents. « inherit » : la même finesse pour toute l'équipe.
   modeleEquipe: 'inherit',
-  // Longueur visée du livrable. Voir agent/equipe.mjs.
+  // Longueur visée du livrable. Voir agent/equipe.mts.
   ampleur: 'document',
   langue: 'français',
   // « auto » : l'équipe mène la mission seule, sans rien faire valider.
@@ -45,23 +81,24 @@ const CONFIG_DEFAUT = {
   promptVersion: 0,
 }
 
-let config = { ...CONFIG_DEFAUT }
+let config: Config = { ...CONFIG_DEFAUT }
 let configPath = ''
-let win = null
-let pool = null
+let win: BrowserWindow | null = null
+// Créé une fois l'app prête, avant que la fenêtre puisse envoyer quoi que ce soit.
+let pool!: Pool
 let quitting = false
 
 /** La mission regardée dans la fenêtre. Les autres continuent sans elle. */
-let courante = null
+let courante: Courante | null = null
 /** Les règles ont changé : on n'essaie pas de reprendre les fils d'avant. */
 let resumeInterdit = false
 
-const permissionsEnAttente = new Map()
+const permissionsEnAttente = new Map<string, ReponseFenetre>()
 let seqPermission = 0
 
 // ------------------------------------------------------------------ config
 
-function loadConfig() {
+function loadConfig(): void {
   configPath = path.join(app.getPath('userData'), 'reglages.json')
   try {
     config = { ...CONFIG_DEFAUT, ...JSON.parse(fs.readFileSync(configPath, 'utf8')) }
@@ -70,11 +107,12 @@ function loadConfig() {
   }
   // Des dimensions enregistrées incomplètes donneraient une fenêtre minuscule.
   const voulue = boundsParDefaut()
-  if (config.bounds && !(config.bounds.width > 0 && config.bounds.height > 0)) {
+  const b = config.bounds
+  if (b && !((b.width ?? 0) > 0 && (b.height ?? 0) > 0)) {
     config.bounds = {
-      ...config.bounds,
-      width: config.bounds.width > 0 ? config.bounds.width : voulue.width,
-      height: config.bounds.height > 0 ? config.bounds.height : voulue.height,
+      ...b,
+      width: (b.width ?? 0) > 0 ? b.width : voulue.width,
+      height: (b.height ?? 0) > 0 ? b.height : voulue.height,
     }
   }
   saveConfig()
@@ -85,7 +123,7 @@ function loadConfig() {
  * missions, fil, équipe — et l'organigramme a besoin d'air. Plancher à 560 px pour un
  * petit écran, où les colonnes latérales se replient de toute façon.
  */
-function boundsParDefaut() {
+function boundsParDefaut(): { width: number, height: number } {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
   return {
     width: Math.max(560, Math.round(width * 0.44)),
@@ -93,8 +131,8 @@ function boundsParDefaut() {
   }
 }
 
-let saveTimer = null
-function saveConfig() {
+let saveTimer: ReturnType<typeof setTimeout> | undefined
+function saveConfig(): void {
   clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     try {
@@ -104,7 +142,7 @@ function saveConfig() {
   }, 300)
 }
 
-function ensureDossier() {
+function ensureDossier(): void {
   setLivrables(config.livrables || livrablesParDefaut())
   const lisezMoi = path.join(P.livrables(), LISEZ_MOI)
   if (!fs.existsSync(lisezMoi) && !listerLivrables().length) {
@@ -124,9 +162,9 @@ function ensureDossier() {
 
 // ----------------------------------------------------------------- fenêtre
 
-function createWindow() {
-  const { width, height, x, y } = config.bounds || boundsParDefaut()
-  win = new BrowserWindow({
+function createWindow(): void {
+  const { width, height, x, y }: Partial<Rectangle> = config.bounds || boundsParDefaut()
+  const w = new BrowserWindow({
     width, height, x, y,
     minWidth: 460,
     minHeight: 540,
@@ -145,24 +183,26 @@ function createWindow() {
     },
   })
 
-  win.webContents.on('did-start-loading', () => { rendererPret = false })
-  // Un changement de page remet le zoom à zéro : on le repose à chaque chargement.
-  win.webContents.on('did-finish-load', () => win.webContents.setZoomLevel(config.zoom || 0))
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'))
-  win.once('ready-to-show', () => win.show())
+  win = w
 
-  win.on('close', (e) => {
-    if (!quitting) { e.preventDefault(); win.hide() }
+  w.webContents.on('did-start-loading', () => { rendererPret = false })
+  // Un changement de page remet le zoom à zéro : on le repose à chaque chargement.
+  w.webContents.on('did-finish-load', () => w.webContents.setZoomLevel(config.zoom || 0))
+  w.loadFile(path.join(__dirname, 'renderer', 'index.html'))
+  w.once('ready-to-show', () => w.show())
+
+  w.on('close', (e) => {
+    if (!quitting) { e.preventDefault(); w.hide() }
   })
   const memoriser = () => {
-    if (!win || win.isDestroyed() || win.isMinimized()) return
-    config.bounds = win.getBounds()
+    if (w.isDestroyed() || w.isMinimized()) return
+    config.bounds = w.getBounds()
     saveConfig()
   }
-  win.on('resize', memoriser)
-  win.on('move', memoriser)
+  w.on('resize', memoriser)
+  w.on('move', memoriser)
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  w.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
   })
@@ -175,23 +215,23 @@ function createWindow() {
 const ZOOM_MIN = -4
 const ZOOM_MAX = 6
 
-function appliquerZoom(crans) {
+function appliquerZoom(crans: number): void {
   const n = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(crans)))
   config.zoom = n
   if (win && !win.isDestroyed()) win.webContents.setZoomLevel(n)
   saveConfig()
 }
 
-function zoomer(delta) {
+function zoomer(delta: number): void {
   appliquerZoom((config.zoom || 0) + delta)
 }
 
 // Le renderer n'écoute qu'après son chargement : on met les événements de démarrage
 // en attente pour ne pas perdre l'état de connexion.
 let rendererPret = false
-const enAttente = []
+const enAttente: EvenementFenetre[] = []
 
-function emit(evt) {
+function emit(evt: EvenementFenetre): void {
   if (!rendererPret) {
     enAttente.push(evt)
     if (enAttente.length > 200) enAttente.shift()
@@ -200,7 +240,7 @@ function emit(evt) {
   if (win && !win.isDestroyed()) win.webContents.send('agent', evt)
 }
 
-function viderAttente() {
+function viderAttente(): void {
   rendererPret = true
   for (const evt of enAttente.splice(0, enAttente.length)) {
     if (win && !win.isDestroyed()) win.webContents.send('agent', evt)
@@ -213,9 +253,9 @@ function viderAttente() {
 // reprendre le contexte du modèle, pas ce qu'on avait sous les yeux.
 
 /** Le texte en cours de frappe du modèle, par fil : plusieurs écrivent à la fois. */
-const tampons = new Map()
+const tampons = new Map<string, string>()
 
-function viderTampon(missionId) {
+function viderTampon(missionId: string): void {
   const t = (tampons.get(missionId) || '').trim()
   tampons.delete(missionId)
   if (t) majListe(Missions.ajouter(missionId, { k: 'texte', texte: t }))
@@ -227,14 +267,14 @@ function viderTampon(missionId) {
  * Un livrable appartient à la mission qui l'a produit. Voir ceux des autres fils en
  * travaillant sur un sujet n'aide personne — d'où le tri par défaut.
  */
-function livrablesAffiches(portee = config.porteeLivrables, missionId = courante?.id) {
+function livrablesAffiches(portee: PorteeLivrables = config.porteeLivrables, missionId = courante?.id): LivrableInfo[] {
   const tous = listerLivrables()
   if (portee === 'tous' || !missionId) return tous
   const siens = new Set(Missions.livrablesDe(missionId))
   return tous.filter((d) => siens.has(d.nom))
 }
 
-function diffuserLivrables() {
+function diffuserLivrables(): void {
   emit({
     k: 'livrables',
     livrables: livrablesAffiches(),
@@ -243,12 +283,12 @@ function diffuserLivrables() {
   })
 }
 
-function diffuserEquipe() {
+function diffuserEquipe(): void {
   emit({ k: 'equipe', ...etatEquipe() })
 }
 
 /** Ce que la colonne de droite a besoin de savoir : l'organigramme en service, et les autres. */
-function etatEquipe() {
+function etatEquipe(): EtatEquipe {
   const membres = Equipe.chargerEquipe()
   const active = Equipe.equipeActive()
   return {
@@ -260,27 +300,27 @@ function etatEquipe() {
 }
 
 /** La liste des missions, chacune portant son état réel : en cours, en attente, en plan. */
-const ETAT_VISIBLE = { travaille: 'en_cours', attend: 'en_attente' }
+const ETAT_VISIBLE: Partial<Record<string, StatutVisible>> = { travaille: 'en_cours', attend: 'en_attente' }
 
-function listeMissions(recherche) {
-  const etats = pool ? pool.etats() : new Map()
+function listeMissions(recherche?: string): MissionResume[] {
+  const etats = pool ? pool.etats() : new Map<string, string>()
   return Missions.lister(recherche).map((m) => {
-    const vif = ETAT_VISIBLE[etats.get(m.id)]
+    const vif = ETAT_VISIBLE[etats.get(m.id) ?? '']
     return vif ? { ...m, statut: vif } : m
   })
 }
 
-function majListe(resume) {
+function majListe(resume: MissionResume | null): void {
   if (!resume) return
   if (resume.id === courante?.id) courante = { ...courante, ...resume }
   diffuserListe()
 }
 
-function diffuserListe() {
+function diffuserListe(): void {
   emit({ k: 'missions', liste: listeMissions(), courante: courante?.id || null })
 }
 
-function noterUtilisateur(missionId, texte, pieces) {
+function noterUtilisateur(missionId: string, texte: string, pieces: Piece[]): void {
   viderTampon(missionId)
   majListe(Missions.ajouter(missionId, {
     k: 'user',
@@ -290,15 +330,16 @@ function noterUtilisateur(missionId, texte, pieces) {
 }
 
 /** Un argument d'outil lisible en une ligne, pour rejouer le fil plus tard. */
-function argOutil(input) {
+function argOutil(input: Record<string, unknown>): string {
   if (!input || typeof input !== 'object') return ''
   for (const k of ['subagent_type', 'titre', 'nom', 'url', 'query', 'command', 'pattern', 'file_path']) {
-    if (typeof input[k] === 'string' && input[k]) return input[k].slice(0, 200)
+    const v = input[k]
+    if (typeof v === 'string' && v) return v.slice(0, 200)
   }
   return ''
 }
 
-function noterEvenement(missionId, evt) {
+function noterEvenement(missionId: string, evt: EvenementSession): void {
   switch (evt.k) {
     case 'text-start':
       viderTampon(missionId)
@@ -353,7 +394,7 @@ function noterEvenement(missionId, evt) {
  * enregistré dans SON fil ; il n'est affiché que s'il vient du fil ouvert. C'est ce
  * qui permet à deux missions de tourner sans se mélanger.
  */
-function routerEvenement(missionId, evt) {
+function routerEvenement(missionId: string, evt: EvenementSession): void {
   if (evt.k === 'ready' || evt.k === 'error') tracer('agent', missionId, evt.k, evt)
 
   if (evt.k === 'ready' && evt.sessionId) Missions.memoriserSession(missionId, evt.sessionId)
@@ -376,7 +417,7 @@ function routerEvenement(missionId, evt) {
 
 // --------------------------------------------------------------- permission
 
-function askPermission(req) {
+function askPermission(req: DemandePermissionSession & { missionId: string }): Promise<ReponsePermission> {
   return new Promise((resolve) => {
     const id = `perm-${++seqPermission}`
     permissionsEnAttente.set(id, resolve)
@@ -405,14 +446,14 @@ function askPermission(req) {
   })
 }
 
-function resolvePermission(id, reponse) {
+function resolvePermission(id: string, reponse: ReponsePermission): void {
   const resolve = permissionsEnAttente.get(id)
   if (!resolve) return
   permissionsEnAttente.delete(id)
   resolve(reponse)
 }
 
-function refuserToutes(message) {
+function refuserToutes(message: string): void {
   for (const [id, resolve] of permissionsEnAttente) {
     permissionsEnAttente.delete(id)
     resolve({ behavior: 'deny', message })
@@ -427,7 +468,7 @@ function refuserToutes(message) {
  * Ce qui travaille dans les autres fils continue de travailler — c'est tout l'intérêt
  * d'avoir plusieurs sessions. Naviguer ne coûte rien et n'annule rien.
  */
-function ouvrirMission(id, { neuve = false } = {}) {
+function ouvrirMission(id: string | null, { neuve = false } = {}): Courante {
   if (!neuve && id && id === courante?.id) {
     peindreMission()
     return courante
@@ -437,22 +478,24 @@ function ouvrirMission(id, { neuve = false } = {}) {
   if (id) viderTampon(id)
 
   const m = (id && Missions.fil(id)) || null
-  courante = m || Missions.creer()
-  config.mission = courante.id
+  const ouverte: Courante = m || Missions.creer()
+  courante = ouverte
+  config.mission = ouverte.id
   saveConfig()
 
-  pool.afficher(courante.id)
+  pool.afficher(ouverte.id)
   peindreMission(m?.evenements || [])
-  return courante
+  return ouverte
 }
 
 /** L'identifiant de session à reprendre pour ce fil, s'il en a un d'exploitable. */
-function repriseDe(missionId) {
+function repriseDe(missionId: string): string | undefined {
   if (resumeInterdit) return undefined
   return Missions.fil(missionId)?.sessionId || undefined
 }
 
-function peindreMission(evenements) {
+function peindreMission(evenements?: EvenementFil[]): void {
+  if (!courante) return
   diffuserLivrables()
   emit({
     k: 'mission',
@@ -468,7 +511,7 @@ function peindreMission(evenements) {
  * Reprend une mission laissée en plan : on rebranche la session sur son contexte et on
  * demande la suite. C'est la sortie de secours quand un tour s'arrête tout seul.
  */
-function reprendreMission(id) {
+function reprendreMission(id: string | null): string | null {
   const cible = id || courante?.id
   if (!cible) return null
   const consigne = "Reprends exactement où tu t'étais arrêté, sans refaire ce qui est déjà fait. "
@@ -482,7 +525,7 @@ function reprendreMission(id) {
  * Achemine une demande vers son fil. Si deux missions travaillent déjà, elle attend
  * son tour — et on le dit, plutôt que de laisser croire qu'il ne se passe rien.
  */
-function demander(missionId, texte, pieces = []) {
+function demander(missionId: string, texte: string, pieces: Piece[] = []): string {
   noterUtilisateur(missionId, texte, pieces)
   // Ce que le modèle reçoit n'est pas tout à fait ce que l'utilisateur a tapé : les
   // pièces jointes deviennent des chemins à ouvrir, les adresses collées des
@@ -506,14 +549,14 @@ function demander(missionId, texte, pieces = []) {
  * route laisserait des sessions branchées sur une équipe qui n'existe plus. On les
  * arrête donc, et on le dit — le contexte de chaque mission, lui, est enregistré.
  */
-function equipeModifiee(membres) {
+function equipeModifiee(membres: unknown): Membre[] {
   Equipe.enregistrerEquipe(membres)
   equipeChangee('Équipe modifiée : la suite repart sur un contexte neuf.')
   return Equipe.chargerEquipe()
 }
 
 /** L'organigramme en service n'est plus le même : on le diffuse et on repart à neuf. */
-function equipeChangee(note) {
+function equipeChangee(note: string): EtatEquipe {
   diffuserEquipe()
   emit({ k: 'note', text: note })
   pool.toutArreter()
@@ -523,14 +566,26 @@ function equipeChangee(note) {
 
 // ---------------------------------------------------------------------- IPC
 
-function ouvrirFichier(chemin) {
+/**
+ * La fenêtre, pour y rattacher une boîte de dialogue. Toute demande qui en ouvre une
+ * vient d'elle : elle existe forcément à ce moment-là.
+ */
+function fenetre(): BrowserWindow {
+  if (!win) throw new Error('Fenêtre indisponible.')
+  return win
+}
+
+function confirmer(options: MessageBoxOptions): Promise<{ response: number }> {
+  return dialog.showMessageBox(fenetre(), options)
+}
+
+function ouvrirFichier(chemin: string): void {
   if (chemin && fs.existsSync(chemin)) shell.openPath(chemin)
 }
 
-function wireIpc() {
-  ipcMain.handle('app:init', () => {
+function wireIpc(): void {
+  ipcMain.handle('app:init', (): EtatInitial => {
     setImmediate(viderAttente)
-    const membres = Equipe.chargerEquipe()
     return {
       config: {
         model: config.model,
@@ -551,13 +606,12 @@ function wireIpc() {
       livrables: livrablesAffiches(),
       totalLivrables: listerLivrables().length,
       missions: listeMissions(),
-      membres,
       ...etatEquipe(),
       version: app.getVersion(),
     }
   })
 
-  ipcMain.on('chat:send', (_e, { texte, pieces } = {}) => {
+  ipcMain.on('chat:send', (_e: IpcMainEvent, { texte, pieces }: { texte?: string, pieces?: Piece[] } = {}) => {
     const propre = String(texte || '').trim()
     if (!courante) return
     // Une pièce jointe seule est une demande en soi : « regarde ça ».
@@ -565,7 +619,7 @@ function wireIpc() {
     demander(courante.id, propre || 'Analyse la ou les pièces jointes.', pieces || [])
   })
   ipcMain.on('chat:interrupt', () => { if (courante) pool.interrompre(courante.id) })
-  ipcMain.on('chat:config', (_e, patch) => {
+  ipcMain.on('chat:config', (_e: IpcMainEvent, patch: PatchConfig) => {
     Object.assign(config, patch)
     saveConfig()
     if (patch.model) pool.setModel(patch.model)
@@ -577,18 +631,18 @@ function wireIpc() {
       diffuserListe()
     }
   })
-  ipcMain.on('perm:reply', (_e, { id, answer }) => resolvePermission(id, answer))
+  ipcMain.on('perm:reply', (_e: IpcMainEvent, { id, answer }: { id: string, answer: ReponsePermission }) => resolvePermission(id, answer))
 
-  ipcMain.handle('mission:list', (_e, recherche) => listeMissions(recherche))
+  ipcMain.handle('mission:list', (_e: IpcMainInvokeEvent, recherche?: string) => listeMissions(recherche))
   ipcMain.handle('mission:new', () => ouvrirMission(null, { neuve: true }).id)
-  ipcMain.handle('mission:open', (_e, id) => ouvrirMission(id).id)
-  ipcMain.handle('mission:resume', (_e, id) => reprendreMission(id))
-  ipcMain.handle('mission:rename', (_e, { id, titre }) => {
+  ipcMain.handle('mission:open', (_e: IpcMainInvokeEvent, id: string) => ouvrirMission(id).id)
+  ipcMain.handle('mission:resume', (_e: IpcMainInvokeEvent, id: string | null) => reprendreMission(id))
+  ipcMain.handle('mission:rename', (_e: IpcMainInvokeEvent, { id, titre }: { id: string, titre: string }) => {
     const r = Missions.renommer(id, titre)
     if (r && courante?.id === id) courante = { ...courante, ...r }
     return listeMissions()
   })
-  ipcMain.handle('mission:delete', (_e, id) => {
+  ipcMain.handle('mission:delete', (_e: IpcMainInvokeEvent, id: string) => {
     pool.oublier(id)
     Missions.supprimer(id)
     if (courante?.id === id) {
@@ -601,29 +655,29 @@ function wireIpc() {
   // ---------------------------------------------------------------- équipe
 
   ipcMain.handle('equipe:get', () => etatEquipe())
-  ipcMain.handle('equipe:ajouter', (_e, { parentId, label }) => {
+  ipcMain.handle('equipe:ajouter', (_e: IpcMainInvokeEvent, { parentId, label }: { parentId: string, label: string }) => {
     const membres = Equipe.ajouterMembre(Equipe.chargerEquipe(), parentId, label)
     return equipeModifiee(membres)
   })
-  ipcMain.handle('equipe:renommer', (_e, { id, label }) => (
+  ipcMain.handle('equipe:renommer', (_e: IpcMainInvokeEvent, { id, label }: { id: string, label: string }) => (
     equipeModifiee(Equipe.renommerMembre(Equipe.chargerEquipe(), id, label))
   ))
-  ipcMain.handle('equipe:ame', (_e, { id, ame }) => (
+  ipcMain.handle('equipe:ame', (_e: IpcMainInvokeEvent, { id, ame }: { id: string, ame: string }) => (
     equipeModifiee(Equipe.definirAme(Equipe.chargerEquipe(), id, ame))
   ))
-  ipcMain.handle('equipe:rattacher', (_e, { id, parentId }) => {
+  ipcMain.handle('equipe:rattacher', (_e: IpcMainInvokeEvent, { id, parentId }: { id: string, parentId: string }) => {
     const membres = Equipe.chargerEquipe()
     if (!Equipe.peutRattacher(id, parentId, membres)) {
       return { membres, refus: "Ce rattachement casserait l'organigramme : trois niveaux au maximum, et un pôle qui encadre reste un pôle." }
     }
     return equipeModifiee(Equipe.rattacher(membres, id, parentId))
   })
-  ipcMain.handle('equipe:supprimer', async (_e, id) => {
+  ipcMain.handle('equipe:supprimer', async (_e: IpcMainInvokeEvent, id: string) => {
     const membres = Equipe.chargerEquipe()
     const m = Equipe.membre(id, membres)
     if (!m || id === Equipe.ORCHESTRATEUR) return membres
     const emportes = Equipe.sousArbre(id, membres).size - 1
-    const { response } = await dialog.showMessageBox(win, {
+    const { response } = await confirmer({
       type: 'warning',
       buttons: ['Retirer', 'Annuler'],
       defaultId: 1,
@@ -643,27 +697,27 @@ function wireIpc() {
   // Changer d'équipe, c'est changer les sous-agents branchés sur la session : on
   // repart donc sur un contexte neuf, comme pour toute modification d'organigramme.
 
-  ipcMain.handle('equipes:activer', (_e, id) => {
+  ipcMain.handle('equipes:activer', (_e: IpcMainInvokeEvent, id: string) => {
     Equipe.activerEquipe(id)
     return equipeChangee(`Équipe « ${Equipe.equipeActive().nom} » : la suite repart sur un contexte neuf.`)
   })
-  ipcMain.handle('equipes:creer', (_e, { nom, depuis } = {}) => {
+  ipcMain.handle('equipes:creer', (_e: IpcMainInvokeEvent, { nom, depuis }: { nom?: string, depuis?: string } = {}) => {
     Equipe.creerEquipe(nom, depuis === 'actuelle' ? Equipe.chargerEquipe() : undefined)
     return equipeChangee(`Nouvelle équipe « ${Equipe.equipeActive().nom} » : la suite repart sur un contexte neuf.`)
   })
-  ipcMain.handle('equipes:dupliquer', (_e, id) => {
+  ipcMain.handle('equipes:dupliquer', (_e: IpcMainInvokeEvent, id: string) => {
     Equipe.dupliquerEquipe(id)
     return equipeChangee(`Copie « ${Equipe.equipeActive().nom} » : la suite repart sur un contexte neuf.`)
   })
-  ipcMain.handle('equipes:renommer', (_e, { id, nom }) => {
+  ipcMain.handle('equipes:renommer', (_e: IpcMainInvokeEvent, { id, nom }: { id: string, nom: string }) => {
     Equipe.renommerEquipe(id, nom)
     diffuserEquipe()
     return etatEquipe()
   })
-  ipcMain.handle('equipes:supprimer', async (_e, id) => {
+  ipcMain.handle('equipes:supprimer', async (_e: IpcMainInvokeEvent, id: string) => {
     const cible = Equipe.equipes().find((x) => x.id === id)
     if (!cible) return etatEquipe()
-    const { response } = await dialog.showMessageBox(win, {
+    const { response } = await confirmer({
       type: 'warning',
       buttons: ['Supprimer', 'Annuler'],
       defaultId: 1,
@@ -675,21 +729,21 @@ function wireIpc() {
     try {
       Equipe.supprimerEquipe(id)
     } catch (err) {
-      return { ...etatEquipe(), refus: String(err?.message || err) }
+      return { ...etatEquipe(), refus: messageDe(err) }
     }
     // Supprimer celle qui travaillait bascule sur une autre : les sessions suivent.
     return cible.actif
       ? equipeChangee(`Équipe « ${Equipe.equipeActive().nom} » : la suite repart sur un contexte neuf.`)
       : etatEquipe()
   })
-  ipcMain.handle('equipe:proposer-ame', async (_e, { id, label }) => {
+  ipcMain.handle('equipe:proposer-ame', async (_e: IpcMainInvokeEvent, { id, label }: { id: string, label: string }) => {
     try {
       const ame = await proposerAme({
         id, label, membres: Equipe.chargerEquipe(), model: config.model,
       })
       return { ame }
     } catch (err) {
-      return { erreur: String(err?.message || err) }
+      return { erreur: messageDe(err) }
     }
   })
   ipcMain.on('equipe:ouvrir-fichier', () => ouvrirFichier(P.equipes()))
@@ -700,21 +754,21 @@ function wireIpc() {
   // travaille sur une copie stable, et le fil retrouve ses pièces des semaines plus
   // tard même si l'original a bougé.
 
-  const joindreTout = (chemins) => {
-    const pieces = []
-    const refus = []
+  const joindreTout = (chemins: string[] | null | undefined): ResultatPieces => {
+    const pieces: Piece[] = []
+    const refus: string[] = []
     for (const chemin of chemins || []) {
       try {
         pieces.push(Pieces.joindre(courante?.id, chemin))
       } catch (err) {
-        refus.push(String(err?.message || err))
+        refus.push(messageDe(err))
       }
     }
     return { pieces, refus }
   }
 
   ipcMain.handle('pieces:choisir', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    const { canceled, filePaths } = await dialog.showOpenDialog(fenetre(), {
       title: 'Joindre des fichiers à la mission',
       buttonLabel: 'Joindre',
       properties: ['openFile', 'multiSelections'],
@@ -722,34 +776,34 @@ function wireIpc() {
     if (canceled || !filePaths?.length) return { pieces: [], refus: [] }
     return joindreTout(filePaths)
   })
-  ipcMain.handle('pieces:deposer', (_e, chemins) => joindreTout(chemins))
-  ipcMain.handle('pieces:coller', (_e, { nom, base64 }) => {
+  ipcMain.handle('pieces:deposer', (_e: IpcMainInvokeEvent, chemins: string[]) => joindreTout(chemins))
+  ipcMain.handle('pieces:coller', (_e: IpcMainInvokeEvent, { nom, base64 }: { nom: string, base64: string }): ResultatPieces => {
     try {
       return { pieces: [Pieces.joindreDonnees(courante?.id, { nom, base64 })], refus: [] }
     } catch (err) {
-      return { pieces: [], refus: [String(err?.message || err)] }
+      return { pieces: [], refus: [messageDe(err)] }
     }
   })
-  ipcMain.on('pieces:oublier', (_e, chemin) => Pieces.oublier(chemin))
-  ipcMain.on('pieces:ouvrir', (_e, chemin) => ouvrirFichier(chemin))
+  ipcMain.on('pieces:oublier', (_e: IpcMainEvent, chemin: string) => Pieces.oublier(chemin))
+  ipcMain.on('pieces:ouvrir', (_e: IpcMainEvent, chemin: string) => ouvrirFichier(chemin))
 
   // -------------------------------------------------------------- livrables
 
-  ipcMain.handle('livrables:list', (_e, portee) => livrablesAffiches(portee))
-  ipcMain.handle('livrables:versions', (_e, nom) => {
+  ipcMain.handle('livrables:list', (_e: IpcMainInvokeEvent, portee: PorteeLivrables) => livrablesAffiches(portee))
+  ipcMain.handle('livrables:versions', (_e: IpcMainInvokeEvent, nom: string) => {
     try { return versionsLivrable(nom) } catch { return [] }
   })
-  ipcMain.on('livrables:open-version', (_e, { nom, numero }) => {
+  ipcMain.on('livrables:open-version', (_e: IpcMainEvent, { nom, numero }: { nom: string, numero: number }) => {
     try { ouvrirFichier(lireVersion(nom, numero).chemin) } catch {}
   })
 
   // Exporter, c'est sortir une copie du dossier : l'original ne bouge pas.
-  ipcMain.handle('livrables:export', async (_e, { nom, numero } = {}) => {
+  ipcMain.handle('livrables:export', async (_e: IpcMainInvokeEvent, { nom, numero }: { nom?: string, numero?: number } = {}) => {
     try {
       const doc = lireLivrable(nom)
       const source = numero ? lireVersion(nom, numero).chemin : doc.chemin
       const base = doc.nom.replace(/\.md$/, '')
-      const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      const { canceled, filePath } = await dialog.showSaveDialog(fenetre(), {
         title: 'Exporter le livrable',
         defaultPath: path.join(app.getPath('downloads'), numero ? `${base}-v${numero}.md` : `${base}.md`),
         filters: [{ name: 'Markdown', extensions: ['md'] }],
@@ -759,19 +813,19 @@ function wireIpc() {
       shell.showItemInFolder(filePath)
       return { chemin: filePath }
     } catch (err) {
-      return { erreur: String(err?.message || err) }
+      return { erreur: messageDe(err) }
     }
   })
-  ipcMain.on('livrables:open', (_e, nom) => {
+  ipcMain.on('livrables:open', (_e: IpcMainEvent, nom: string) => {
     try { ouvrirFichier(lireLivrable(nom).chemin) } catch {}
   })
-  ipcMain.on('livrables:reveal', (_e, nom) => {
+  ipcMain.on('livrables:reveal', (_e: IpcMainEvent, nom: string) => {
     try { shell.showItemInFolder(lireLivrable(nom).chemin) } catch {}
   })
-  ipcMain.handle('livrables:delete', async (_e, nom) => {
+  ipcMain.handle('livrables:delete', async (_e: IpcMainInvokeEvent, nom: string) => {
     try {
       const doc = lireLivrable(nom)
-      const { response } = await dialog.showMessageBox(win, {
+      const { response } = await confirmer({
         type: 'warning',
         buttons: ['Supprimer', 'Annuler'],
         defaultId: 1,
@@ -788,33 +842,34 @@ function wireIpc() {
   })
 
   ipcMain.handle('app:choisir-dossier', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    const { canceled, filePaths } = await dialog.showOpenDialog(fenetre(), {
       title: 'Où ranger les livrables ?',
       properties: ['openDirectory', 'createDirectory'],
       defaultPath: P.livrables(),
     })
     if (canceled || !filePaths?.[0]) return { dossier: P.livrables(), livrables: listerLivrables() }
-    config.livrables = filePaths[0]
+    const choisi = filePaths[0]
+    config.livrables = choisi
     saveConfig()
-    setLivrables(filePaths[0])
+    setLivrables(choisi)
     emit({ k: 'note', text: 'Dossier des livrables déplacé : la suite repart sur un contexte neuf.' })
     pool.toutArreter()
     diffuserListe()
     return { dossier: P.livrables(), livrables: listerLivrables() }
   })
 
-  ipcMain.on('app:zoom', (_e, delta) => {
+  ipcMain.on('app:zoom', (_e: IpcMainEvent, delta: number) => {
     if (delta === 0) appliquerZoom(0)
     else zoomer(delta > 0 ? +1 : -1)
   })
 
   ipcMain.on('app:open-dossier', () => shell.openPath(P.livrables()))
-  ipcMain.on('app:open-external', (_e, url) => {
+  ipcMain.on('app:open-external', (_e: IpcMainEvent, url: string) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url)
   })
 }
 
-function buildMenu() {
+function buildMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     {
       label: 'Assistant OpenSpace',
@@ -872,7 +927,7 @@ function buildMenu() {
     {
       label: 'Affichage',
       submenu: [
-        // ⌘= et le pavé numérique passent par l'interface (voir renderer/app.js) :
+        // ⌘= et le pavé numérique passent par l'interface (voir renderer/app.ts) :
         // un menu ne porte qu'un raccourci, et « + » demande Maj sur un clavier français.
         { label: 'Agrandir', accelerator: 'CmdOrCtrl+Plus', click: () => zoomer(+1) },
         { label: 'Réduire', accelerator: 'CmdOrCtrl+-', click: () => zoomer(-1) },
@@ -909,11 +964,11 @@ if (!app.requestSingleInstanceLock()) {
 
     pool = new Pool({
       creerSession: (missionId) => new AgentSession({
-        emit: (evt) => routerEvenement(missionId, evt),
-        askPermission: (req) => askPermission({ ...req, missionId }),
+        emit: (evt: EvenementSession) => routerEvenement(missionId, evt),
+        askPermission: (req: DemandePermissionSession) => askPermission({ ...req, missionId }),
         getConfig: () => config,
         ouvrirFichier,
-        envoyerCorbeille: async (chemin) => {
+        envoyerCorbeille: async (chemin: string) => {
           try { await shell.trashItem(chemin); return true } catch { return false }
         },
       }),
@@ -922,23 +977,23 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     process.on('unhandledRejection', (err) => {
-      tracer('promesse non rattrapée', String(err?.stack || err?.message || err).slice(0, 800))
-      emit({ k: 'error', message: `Équipe indisponible : ${String(err?.message || err)}` })
+      tracer('promesse non rattrapée', pileDe(err).slice(0, 800))
+      emit({ k: 'error', message: `Équipe indisponible : ${messageDe(err)}` })
       emit({ k: 'status', state: 'idle' })
     })
 
     // Un bogue dans l'application ne doit pas la laisser à moitié démarrée sans rien
     // dire : on l'écrit au journal et on l'affiche dans le fil.
     process.on('uncaughtException', (err) => {
-      tracer('exception non rattrapée', String(err?.stack || err?.message || err).slice(0, 900))
-      emit({ k: 'error', message: `Erreur interne : ${String(err?.message || err)}` })
+      tracer('exception non rattrapée', pileDe(err).slice(0, 900))
+      emit({ k: 'error', message: `Erreur interne : ${messageDe(err)}` })
       emit({ k: 'status', state: 'idle' })
     })
 
     // Le dossier des livrables et l'agent démarrent une fois la fenêtre à l'écran :
     // lire un dossier peut demander une autorisation à macOS, qui fige le processus le
     // temps de la réponse — sans fenêtre, l'app paraîtrait plantée.
-    win.once('ready-to-show', () => {
+    win?.once('ready-to-show', () => {
       tracer('fenêtre affichée')
       try {
         ensureDossier()

@@ -7,37 +7,57 @@
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { P, ensureDonnees } from './paths.mjs'
+import type { EvenementFil, MissionResume, StatutMission } from '../contrat.mjs'
+
+/** Ce qu'on enregistre d'une mission : ses métadonnées, et le fil à rejouer. */
+export interface Mission {
+  id: string
+  titre: string | null
+  titreManuel?: boolean
+  cree_le: string
+  maj_le: string
+  sessionId: string | null
+  livrables: string[]
+  equipe: string[]
+  statut?: StatutMission
+  evenements: EvenementFil[]
+}
+
+export interface Fil extends MissionResume {
+  sessionId: string | null
+  evenements: EvenementFil[]
+}
 
 /** Au-delà, un fil très long est tronqué par le début : seul l'affichage y perd. */
 const MAX_EVENEMENTS = 500
 
 const maintenant = () => new Date().toISOString()
 
-export function nouvelId() {
+export function nouvelId(): string {
   return `m${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`
 }
 
-function chemin(id) {
+function chemin(id: string): string {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(id || ''))) throw new Error('Identifiant de mission invalide.')
   return P.mission(id)
 }
 
-export function lire(id) {
+export function lire(id: string): Mission | null {
   try {
-    const m = JSON.parse(fs.readFileSync(chemin(id), 'utf8'))
+    const m: Mission | null = JSON.parse(fs.readFileSync(chemin(id), 'utf8'))
     return m && m.id ? m : null
   } catch {
     return null
   }
 }
 
-function ecrire(mission) {
+function ecrire(mission: Mission): Mission {
   ensureDonnees()
   fs.writeFileSync(chemin(mission.id), JSON.stringify(mission))
   return mission
 }
 
-export function creer({ titre } = {}) {
+export function creer({ titre }: { titre?: string } = {}): Mission {
   return ecrire({
     id: nouvelId(),
     titre: titre || null,
@@ -52,7 +72,7 @@ export function creer({ titre } = {}) {
 }
 
 /** Les métadonnées seules : de quoi peindre la liste sans charger les fils. */
-const resume = (m) => ({
+const resume = (m: Mission): MissionResume => ({
   id: m.id,
   titre: m.titre || 'Nouvelle mission',
   sansTitre: !m.titre,
@@ -67,7 +87,7 @@ const resume = (m) => ({
 })
 
 /** Le texte où l'on cherche : titre, messages, livrables, membres mobilisés. */
-function corpusDeRecherche(m) {
+function corpusDeRecherche(m: Mission): string {
   const bouts = [m.titre || '']
   for (const e of m.evenements || []) {
     if (e.k === 'user' || e.k === 'texte') bouts.push(e.texte || '')
@@ -78,12 +98,12 @@ function corpusDeRecherche(m) {
   return bouts.join('\n').toLowerCase()
 }
 
-export function lister(recherche) {
+export function lister(recherche?: string): MissionResume[] {
   ensureDonnees()
-  let noms = []
+  let noms: string[] = []
   try { noms = fs.readdirSync(P.missions()) } catch { return [] }
   const q = String(recherche || '').trim().toLowerCase()
-  const out = []
+  const out: MissionResume[] = []
   for (const nom of noms) {
     if (!nom.endsWith('.json')) continue
     const m = lire(nom.slice(0, -5))
@@ -97,7 +117,7 @@ export function lister(recherche) {
   return out.sort((a, b) => b.maj_le.localeCompare(a.maj_le) || b.id.localeCompare(a.id))
 }
 
-export function supprimer(id) {
+export function supprimer(id: string): true {
   try { fs.rmSync(chemin(id), { force: true }) } catch {}
   return true
 }
@@ -106,7 +126,7 @@ export function supprimer(id) {
  * Renomme une mission. Un titre posé à la main est définitif : ni le modèle ni le
  * titre d'un livrable ne le recouvrent ensuite.
  */
-export function renommer(id, titre, { manuel = true } = {}) {
+export function renommer(id: string, titre: string, { manuel = true } = {}): MissionResume | null {
   const m = lire(id)
   if (!m) return null
   if (!manuel && m.titreManuel) return resume(m)
@@ -117,14 +137,14 @@ export function renommer(id, titre, { manuel = true } = {}) {
 }
 
 /** Où en est le dernier tour : c'est ce qui distingue « fini » de « en plan ». */
-export function marquerStatut(id, statut) {
+export function marquerStatut(id: string, statut: StatutMission): MissionResume | null {
   const m = lire(id)
   if (!m || m.statut === statut) return null
   m.statut = statut
   return resume(ecrire(m))
 }
 
-export function memoriserSession(id, sessionId) {
+export function memoriserSession(id: string, sessionId: string): void {
   const m = lire(id)
   if (!m || m.sessionId === sessionId) return
   m.sessionId = sessionId
@@ -136,7 +156,7 @@ export function memoriserSession(id, sessionId) {
  * de l'utilisateur, puis le titre du livrable dès qu'il en sort un — c'est ce qu'on
  * cherche des semaines plus tard, pas « Nouvelle mission ».
  */
-export function ajouter(id, evenement) {
+export function ajouter(id: string, evenement: EvenementFil): MissionResume | null {
   const m = lire(id)
   if (!m) return null
   m.evenements.push({ ...evenement, t: maintenant() })
@@ -154,7 +174,7 @@ export function ajouter(id, evenement) {
   return resume(m)
 }
 
-export function titreDepuisTexte(texte) {
+export function titreDepuisTexte(texte: unknown): string | null {
   const t = String(texte || '').replace(/\s+/g, ' ').trim()
   if (!t) return null
   if (t.length <= 60) return t
@@ -169,19 +189,19 @@ export function titreDepuisTexte(texte) {
  * À ne pas confondre avec le `livrables` du résumé, qui en est le **nombre** : ce
  * sont deux réponses à deux questions différentes, et les mélanger casse.
  */
-export function livrablesDe(id) {
+export function livrablesDe(id: string): string[] {
   const m = lire(id)
   return Array.isArray(m?.livrables) ? [...m.livrables] : []
 }
 
 /** Les membres qui ont déjà travaillé sur cette mission. */
-export function equipeDe(id) {
+export function equipeDe(id: string): string[] {
   const m = lire(id)
   return Array.isArray(m?.equipe) ? [...m.equipe] : []
 }
 
 /** Le fil complet, prêt à être rejoué par l'interface. */
-export function fil(id) {
+export function fil(id: string): Fil | null {
   const m = lire(id)
   return m ? { ...resume(m), sessionId: m.sessionId, evenements: m.evenements } : null
 }

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import type { HookCallbackMatcher, HookInput } from '@anthropic-ai/claude-agent-sdk'
 
 const bac = fs.mkdtempSync(path.join(os.tmpdir(), 'openspace-gardes-'))
 process.env.OPENSPACE_DATA_DIR = path.join(bac, 'donnees')
@@ -13,14 +14,18 @@ const { GardeEquipe } = await import('../src/agent/gardes.mjs')
 const E = await import('../src/espace/equipe.mjs')
 const L = await import('../src/espace/livrables.mjs')
 
+/** Appelle un hook comme le SDK le ferait ; ceux de la garde n'en lisent que l'entrée. */
+const appeler = async (m: HookCallbackMatcher | undefined): Promise<{ continue?: boolean }> =>
+  m!.hooks[0]!({} as HookInput, undefined, { signal: new AbortController().signal }) as Promise<{ continue?: boolean }>
+
 const membres = E.chargerEquipe()
-const texteLong = (n) => 'x'.repeat(n)
+const texteLong = (n: number) => 'x'.repeat(n)
 
 // 1. Un pôle ne passe pas avant ses spécialistes.
 let garde = new GardeEquipe(membres)
 let raison = garde.verifier('Agent', { subagent_type: 'cto', prompt: texteLong(2000) })
-assert.match(raison, /APRÈS ses spécialistes/)
-assert.match(raison, /cto-dev/, 'la garde dit qui convoquer d\'abord')
+assert.match(raison!, /APRÈS ses spécialistes/)
+assert.match(raison!, /cto-dev/, 'la garde dit qui convoquer d\'abord')
 
 // 2. Un spécialiste, lui, part quand il veut.
 assert.equal(garde.verifier('Agent', { subagent_type: 'cto-dev', prompt: 'Ton angle technique.' }), null)
@@ -29,21 +34,21 @@ assert.equal(garde.verifier('Agent', { subagent_type: 'cto-dev', prompt: 'Ton an
 assert.equal(garde.verifier('Agent', { subagent_type: 'general-purpose', prompt: 'cherche' }), null)
 
 // 4. L'orchestrateur ne se convoque pas lui-même.
-assert.match(garde.verifier('Agent', { subagent_type: 'orchestrateur', prompt: 'vas-y' }), /toi/)
+assert.match(garde.verifier('Agent', { subagent_type: 'orchestrateur', prompt: 'vas-y' })!, /toi/)
 
 // 5. Le spécialiste a rendu : le pôle peut passer — mais avec le travail, pas un résumé.
 garde.noteContribution('cto-dev', texteLong(4000))
 raison = garde.verifier('Agent', { subagent_type: 'cto', prompt: 'Intègre le travail de ton spécialiste.' })
-assert.match(raison, /texte entier/, 'un brief famélique est refusé')
+assert.match(raison!, /texte entier/, 'un brief famélique est refusé')
 assert.equal(garde.verifier('Agent', { subagent_type: 'cto', prompt: texteLong(2000) }), null)
 
 // 6. Un livrable neuf a besoin de tous les pôles.
-assert.match(garde.verifier('mcp__openspace__rediger_livrable', { titre: 'Plan', markdown: '' }), /vide/)
+assert.match(garde.verifier('mcp__openspace__rediger_livrable', { titre: 'Plan', markdown: '' })!, /vide/)
 garde.noteContribution('cto', texteLong(3000))
 raison = garde.verifier('mcp__openspace__rediger_livrable', { titre: 'Plan produit', markdown: '# Plan\n\nDu texte.' })
-assert.match(raison, /`da`/)
-assert.match(raison, /`juridique`/)
-assert.doesNotMatch(raison, /`cto`/, 'le pôle qui a rendu n\'est pas réclamé')
+assert.match(raison!, /`da`/)
+assert.match(raison!, /`juridique`/)
+assert.doesNotMatch(raison!, /`cto`/, 'le pôle qui a rendu n\'est pas réclamé')
 
 garde.noteContribution('da', texteLong(3000))
 garde.noteContribution('juridique', texteLong(3000))
@@ -76,14 +81,14 @@ assert.equal(arret.raisonDeRelancer(), null, 'une simple discussion se termine n
 
 arret.noteContribution('cto-dev', texteLong(1200))
 let relance = arret.raisonDeRelancer()
-assert.match(relance, /`da`/, 'on dit quel pôle manque')
-assert.match(relance, /`cto`/)
+assert.match(relance!, /`da`/, 'on dit quel pôle manque')
+assert.match(relance!, /`cto`/)
 
 arret.noteContribution('cto', texteLong(1200))
 arret.noteContribution('da', texteLong(1200))
 arret.noteContribution('juridique', texteLong(1200))
 relance = arret.raisonDeRelancer()
-assert.match(relance, /rediger_livrable/, 'tous rentrés, rien publié : on réclame le document')
+assert.match(relance!, /rediger_livrable/, 'tous rentrés, rien publié : on réclame le document')
 
 arret.noterLivrable()
 assert.equal(arret.raisonDeRelancer(), null, 'le livrable est sorti : il peut rendre la main')
@@ -98,11 +103,11 @@ assert.ok(teigneux.raisonDeRelancer(), "un nouveau message de l'utilisateur redo
 
 // 10. Les hooks passés au SDK couvrent bien les deux familles d'outils, et l'arrêt.
 const hooks = arret.hooks()
-assert.equal(hooks.PreToolUse.length, 2)
-assert.deepEqual(hooks.PreToolUse.map((h) => h.matcher), ['mcp__openspace__.*', 'Agent'])
-assert.equal(hooks.Stop.length, 1)
-assert.deepEqual(await hooks.Stop[0].hooks[0]({}), { continue: true }, 'mission finie : on laisse partir')
-assert.equal((await new GardeEquipe(membres).hooks().Stop[0].hooks[0]({})).continue, true)
+assert.equal(hooks.PreToolUse!.length, 2)
+assert.deepEqual(hooks.PreToolUse!.map((h) => h.matcher), ['mcp__openspace__.*', 'Agent'])
+assert.equal(hooks.Stop!.length, 1)
+assert.deepEqual(await appeler(hooks.Stop![0]), { continue: true }, 'mission finie : on laisse partir')
+assert.equal((await appeler(new GardeEquipe(membres).hooks().Stop![0])).continue, true)
 
 fs.rmSync(bac, { recursive: true, force: true })
 console.log('test-gardes OK')

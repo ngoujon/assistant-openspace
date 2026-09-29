@@ -1,13 +1,14 @@
 // Traduit une demande d'autorisation en français lisible : on doit comprendre ce
 // qu'on valide sans lire du JSON.
 //
-// Les outils OpenSpace, eux, composent leur propre carte (voir outils.mjs) : ils
+// Les outils OpenSpace, eux, composent leur propre carte (voir outils.mts) : ils
 // connaissent le livrable exact et son volume, ce qu'une lecture des paramètres ne
 // donnerait pas.
+import type { ResumePermission } from '../contrat.mjs'
 
-const nomDe = (chemin) => String(chemin).split('/').pop()
+const nomDe = (chemin: unknown) => String(chemin).split('/').pop()
 
-export function resumerPermission(toolName, input) {
+export function resumerPermission(toolName: string, input: Record<string, unknown> | null | undefined): ResumePermission | null {
   const i = input || {}
   switch (toolName) {
     case 'Bash': {

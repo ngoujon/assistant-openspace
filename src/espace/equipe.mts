@@ -14,11 +14,29 @@
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { P, ensureDonnees } from './paths.mjs'
+import type { EquipeResume, Membre, NoeudArbre } from '../contrat.mjs'
+
+/** Une équipe rangée dans la bibliothèque, avec son organigramme complet. */
+export interface Equipe {
+  id: string
+  nom: string
+  cree_le: string
+  maj_le: string
+  membres: Membre[]
+}
+
+interface Bibliotheque {
+  actif: string
+  equipes: Equipe[]
+}
+
+/** Ce qu'on accepte de relire d'un fichier : n'importe quoi, qu'on valide avant usage. */
+type Brut = Record<string, any> | null | undefined
 
 export const ORCHESTRATEUR = 'orchestrateur'
 export const PROFONDEUR_MAX = 2
 
-const EQUIPE_PAR_DEFAUT = [
+const EQUIPE_PAR_DEFAUT: Membre[] = [
   {
     id: ORCHESTRATEUR,
     label: 'Orchestrateur',
@@ -100,13 +118,13 @@ Rôle : veiller au respect du RGPD et des bonnes pratiques vie privée : bases l
 
 // ------------------------------------------------------------------ lecture
 
-function valide(liste) {
+function valide(liste: unknown): Membre[] | null {
   if (!Array.isArray(liste)) return null
-  const orch = liste.find((m) => m?.id === ORCHESTRATEUR && !m.parentId)
+  const orch = liste.find((m: Brut) => m?.id === ORCHESTRATEUR && !m.parentId)
   if (!orch) return null
   return liste
-    .filter((m) => m && typeof m.id === 'string' && typeof m.label === 'string')
-    .map((m, i) => ({
+    .filter((m: Brut) => m && typeof m.id === 'string' && typeof m.label === 'string')
+    .map((m: Record<string, any>, i: number): Membre => ({
       id: m.id,
       label: m.label,
       parentId: m.id === ORCHESTRATEUR ? null : (m.parentId || ORCHESTRATEUR),
@@ -115,7 +133,7 @@ function valide(liste) {
     }))
 }
 
-export function equipeParDefaut() {
+export function equipeParDefaut(): Membre[] {
   return structuredClone(EQUIPE_PAR_DEFAUT)
 }
 
@@ -128,13 +146,13 @@ export function equipeParDefaut() {
 const NOM_PAR_DEFAUT = 'Équipe par défaut'
 const maintenant = () => new Date().toISOString()
 
-function nouvelIdEquipe() {
+function nouvelIdEquipe(): string {
   return `e${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`
 }
 
-function equipeValide(brute, i = 0) {
+function equipeValide(brute: Brut, i = 0): Equipe | null {
   const membres = valide(brute?.membres)
-  if (!membres?.length) return null
+  if (!brute || !membres?.length) return null
   return {
     id: typeof brute.id === 'string' && brute.id ? brute.id : nouvelIdEquipe(),
     nom: String(brute.nom || '').trim().slice(0, 80) || `Équipe ${i + 1}`,
@@ -149,8 +167,8 @@ function equipeValide(brute, i = 0) {
  * première de la bibliothèque, et chaque composition mise de côté devient une
  * équipe à part entière. Personne ne perd son organigramme en mettant à jour.
  */
-function migrer() {
-  const equipes = []
+function migrer(): Bibliotheque {
+  const equipes: Equipe[] = []
   try {
     const brut = JSON.parse(fs.readFileSync(P.equipe(), 'utf8'))
     const e = equipeValide({ nom: NOM_PAR_DEFAUT, membres: brut?.membres || brut })
@@ -163,33 +181,33 @@ function migrer() {
     }
   } catch {}
   if (!equipes.length) {
-    equipes.push(equipeValide({ nom: NOM_PAR_DEFAUT, membres: equipeParDefaut() }))
+    equipes.push(equipeValide({ nom: NOM_PAR_DEFAUT, membres: equipeParDefaut() })!)
   }
   return { actif: equipes[0].id, equipes }
 }
 
-function lireBibliotheque() {
+function lireBibliotheque(): Bibliotheque {
   try {
     const brut = JSON.parse(fs.readFileSync(P.equipes(), 'utf8'))
     const equipes = (Array.isArray(brut?.equipes) ? brut.equipes : [])
-      .map(equipeValide)
-      .filter(Boolean)
+      .map((e: Brut, i: number) => equipeValide(e, i))
+      .filter((e: Equipe | null): e is Equipe => e !== null)
     if (equipes.length) {
-      const actif = equipes.some((e) => e.id === brut.actif) ? brut.actif : equipes[0].id
+      const actif: string = equipes.some((e: Equipe) => e.id === brut.actif) ? brut.actif : equipes[0].id
       return { actif, equipes }
     }
   } catch {}
   return ecrireBibliotheque(migrer())
 }
 
-function ecrireBibliotheque(biblio) {
+function ecrireBibliotheque(biblio: Bibliotheque): Bibliotheque {
   ensureDonnees()
   fs.writeFileSync(P.equipes(), JSON.stringify(biblio, null, 2))
   return biblio
 }
 
 /** Les équipes rangées, la plus récemment touchée d'abord, avec celle qui est active. */
-export function equipes() {
+export function equipes(): EquipeResume[] {
   const { actif, equipes: liste } = lireBibliotheque()
   return liste
     .map((e) => ({
@@ -204,17 +222,17 @@ export function equipes() {
     .sort((a, b) => Number(b.actif) - Number(a.actif) || b.maj_le.localeCompare(a.maj_le))
 }
 
-export function equipeActive() {
+export function equipeActive(): Equipe {
   const { actif, equipes: liste } = lireBibliotheque()
   return liste.find((e) => e.id === actif) || liste[0]
 }
 
 /** L'organigramme en service. C'est tout ce que le reste de l'application connaît. */
-export function chargerEquipe() {
+export function chargerEquipe(): Membre[] {
   return structuredClone(equipeActive().membres)
 }
 
-export function enregistrerEquipe(membres) {
+export function enregistrerEquipe(membres: unknown): Membre[] {
   const liste = valide(membres)
   if (!liste) throw new Error("Équipe invalide : l'orchestrateur est obligatoire.")
   const biblio = lireBibliotheque()
@@ -226,7 +244,7 @@ export function enregistrerEquipe(membres) {
 }
 
 /** Bascule sur une autre équipe. C'est elle, ensuite, que les missions font travailler. */
-export function activerEquipe(id) {
+export function activerEquipe(id: string): Membre[] {
   const biblio = lireBibliotheque()
   if (!biblio.equipes.some((e) => e.id === id)) throw new Error('Équipe inconnue.')
   biblio.actif = id
@@ -236,10 +254,9 @@ export function activerEquipe(id) {
 
 /**
  * Ajoute une équipe et bascule dessus : on la crée pour s'en servir.
- * @param {string} nom
- * @param {Array} [membres] par défaut, l'équipe fournie avec l'application
+ * @param membres par défaut, l'équipe fournie avec l'application
  */
-export function creerEquipe(nom, membres) {
+export function creerEquipe(nom: string | undefined, membres?: Membre[]): string {
   const biblio = lireBibliotheque()
   const e = equipeValide({ nom, membres: membres || equipeParDefaut() }, biblio.equipes.length)
   if (!e) throw new Error("Équipe invalide : l'orchestrateur est obligatoire.")
@@ -250,14 +267,14 @@ export function creerEquipe(nom, membres) {
 }
 
 /** Copie une équipe pour la faire évoluer sans toucher à l'original. */
-export function dupliquerEquipe(id, nom) {
+export function dupliquerEquipe(id: string, nom?: string): string {
   const biblio = lireBibliotheque()
   const source = biblio.equipes.find((e) => e.id === id)
   if (!source) throw new Error('Équipe inconnue.')
   return creerEquipe(nom || `${source.nom} (copie)`, structuredClone(source.membres))
 }
 
-export function renommerEquipe(id, nom) {
+export function renommerEquipe(id: string, nom: string): EquipeResume[] {
   const biblio = lireBibliotheque()
   const cible = biblio.equipes.find((e) => e.id === id)
   if (!cible) throw new Error('Équipe inconnue.')
@@ -274,7 +291,7 @@ export function renommerEquipe(id, nom) {
  * Retire une équipe. La dernière ne se supprime pas — il en faut toujours une pour
  * travailler — et supprimer celle qui est active bascule sur la suivante.
  */
-export function supprimerEquipe(id) {
+export function supprimerEquipe(id: string): EquipeResume[] {
   const biblio = lireBibliotheque()
   if (biblio.equipes.length <= 1) throw new Error('Il faut au moins une équipe.')
   const reste = biblio.equipes.filter((e) => e.id !== id)
@@ -287,20 +304,20 @@ export function supprimerEquipe(id) {
 
 // ---------------------------------------------------------------- structure
 
-export function membre(id, membres = chargerEquipe()) {
+export function membre(id: string | null | undefined, membres: Membre[] = chargerEquipe()): Membre | null {
   return membres.find((m) => m.id === id) || null
 }
 
-export function enfantsDe(id, membres) {
+export function enfantsDe(id: string, membres: Membre[]): Membre[] {
   return membres.filter((m) => m.parentId === id).sort((a, b) => a.order - b.order)
 }
 
 /** Les pôles : les directeurs rattachés directement à l'orchestrateur. */
-export function poles(membres) {
+export function poles(membres: Membre[]): Membre[] {
   return enfantsDe(ORCHESTRATEUR, membres)
 }
 
-export function profondeur(id, membres) {
+export function profondeur(id: string, membres: Membre[]): number {
   let d = 0
   let cur = membre(id, membres)
   const vus = new Set()
@@ -313,11 +330,11 @@ export function profondeur(id, membres) {
   return d
 }
 
-export function sousArbre(racine, membres) {
+export function sousArbre(racine: string, membres: Membre[]): Set<string> {
   const out = new Set([racine])
   let front = [racine]
   while (front.length) {
-    const suivant = []
+    const suivant: string[] = []
     for (const pid of front) {
       for (const m of membres) {
         if (m.parentId === pid && !out.has(m.id)) {
@@ -332,8 +349,8 @@ export function sousArbre(racine, membres) {
 }
 
 /** L'arbre prêt à peindre : chaque membre avec ses enfants, dans l'ordre. */
-export function arbre(membres = chargerEquipe()) {
-  const noeud = (m) => ({
+export function arbre(membres: Membre[] = chargerEquipe()): NoeudArbre | null {
+  const noeud = (m: Membre): NoeudArbre => ({
     id: m.id,
     label: m.label,
     parentId: m.parentId,
@@ -348,7 +365,7 @@ export function arbre(membres = chargerEquipe()) {
 // ---------------------------------------------------------------- édition
 
 /** Sous l'orchestrateur, ou sous un pôle. Un spécialiste n'encadre personne. */
-export function peutRattacher(id, nouveauParent, membres) {
+export function peutRattacher(id: string, nouveauParent: string, membres: Membre[]): boolean {
   if (id === ORCHESTRATEUR) return false
   if (!membre(id, membres) || !membre(nouveauParent, membres)) return false
   if (nouveauParent === id) return false
@@ -360,7 +377,7 @@ export function peutRattacher(id, nouveauParent, membres) {
   return !membres.some((m) => m.parentId === id)
 }
 
-export function rattacher(membres, id, nouveauParent) {
+export function rattacher(membres: Membre[], id: string, nouveauParent: string): Membre[] {
   if (!peutRattacher(id, nouveauParent, membres)) return membres
   const ordreMax = membres
     .filter((m) => m.parentId === nouveauParent && m.id !== id)
@@ -370,7 +387,7 @@ export function rattacher(membres, id, nouveauParent) {
 
 const ACCENTS = /[̀-ͯ]/g
 
-export function identifiant(label, membres) {
+export function identifiant(label: string, membres: Membre[]): string {
   const base = String(label || 'membre')
     .normalize('NFD').replace(ACCENTS, '')
     .toLowerCase()
@@ -385,7 +402,7 @@ export function identifiant(label, membres) {
   return `${base}-${crypto.randomBytes(2).toString('hex')}`
 }
 
-export function ajouterMembre(membres, parentId, label = 'Nouveau membre') {
+export function ajouterMembre(membres: Membre[], parentId: string, label = 'Nouveau membre'): Membre[] {
   const parent = membre(parentId, membres)
   if (!parent) throw new Error('Parent inconnu.')
   if (profondeur(parentId, membres) >= PROFONDEUR_MAX) {
@@ -407,7 +424,7 @@ const ID_PROVISOIRE = /^nouveau-(pole|specialiste)(-\d+)?$/
  * On ne le change que tant que le membre n'a pas d'âme — après, il est en service, et
  * un identifiant en service ne bouge plus sous les pieds d'une mission.
  */
-export function renommerMembre(membres, id, label) {
+export function renommerMembre(membres: Membre[], id: string, label: string): Membre[] {
   const propre = String(label || '').trim().slice(0, 60)
   const cible = membre(id, membres)
   if (!cible || !propre) return membres
@@ -424,18 +441,18 @@ export function renommerMembre(membres, id, label) {
   })
 }
 
-export function definirAme(membres, id, ame) {
+export function definirAme(membres: Membre[], id: string, ame: string): Membre[] {
   return membres.map((m) => (m.id === id ? { ...m, ame: String(ame || '').slice(0, 8000) } : m))
 }
 
-export function supprimerMembre(membres, id) {
+export function supprimerMembre(membres: Membre[], id: string): Membre[] {
   if (id === ORCHESTRATEUR) return membres
   const partent = sousArbre(id, membres)
   return membres.filter((m) => !partent.has(m.id))
 }
 
 /** Le résumé d'un membre pour les prompts : qui il est, qui il encadre. */
-export function descriptionMembre(m, membres) {
+export function descriptionMembre(m: Membre, membres: Membre[]): string {
   const enfants = enfantsDe(m.id, membres)
   const encadre = enfants.length ? ` — encadre ${enfants.map((e) => e.label).join(', ')}` : ''
   return `${m.label}${encadre}`

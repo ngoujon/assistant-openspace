@@ -10,13 +10,13 @@ import { dataRoot } from './paths.mjs'
 
 const MAX_OCTETS = 120_000
 
-let fichier = null
-function chemin() {
+let fichier: string | null = null
+function chemin(): string {
   if (!fichier) fichier = path.join(dataRoot(), 'journal.log')
   return fichier
 }
 
-export function tracer(...morceaux) {
+export function tracer(...morceaux: unknown[]): void {
   const ligne = `${new Date().toISOString()} ${morceaux
     .map((m) => (typeof m === 'string' ? m : safe(m)))
     .join(' ')}\n`
@@ -32,8 +32,19 @@ export function tracer(...morceaux) {
   try { fs.appendFileSync(chemin(), ligne) } catch {}
 }
 
-export function cheminJournal() { return chemin() }
+export function cheminJournal(): string { return chemin() }
 
-function safe(v) {
+/** Le message lisible d'une erreur, quelle que soit sa forme. */
+export function messageDe(err: unknown): string {
+  return String((err as { message?: unknown } | null)?.message || err)
+}
+
+/** La pile d'une erreur quand elle en a une, pour le journal. */
+export function pileDe(err: unknown): string {
+  const e = err as { stack?: unknown, message?: unknown } | null
+  return String(e?.stack || e?.message || err)
+}
+
+function safe(v: unknown): string {
   try { return JSON.stringify(v).slice(0, 600) } catch { return String(v) }
 }

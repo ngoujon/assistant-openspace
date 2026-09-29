@@ -21,12 +21,12 @@ assert.ok(membres.every((m) => m.ame.trim()), 'chaque membre par défaut a une �
 
 // 2. Ajouter : un pôle sous l'orchestrateur, un spécialiste sous un pôle.
 membres = E.ajouterMembre(membres, E.ORCHESTRATEUR, 'Directeur financier')
-const cfo = membres.at(-1)
+const cfo = membres.at(-1)!
 assert.equal(cfo.id, 'directeur-financier', 'l\'identifiant vient du nom')
 assert.equal(E.profondeur(cfo.id, membres), 1)
 
 membres = E.ajouterMembre(membres, cfo.id, 'Contrôleur de gestion')
-const controleur = membres.at(-1)
+const controleur = membres.at(-1)!
 assert.equal(E.profondeur(controleur.id, membres), 2)
 
 // 3. Le quatrième niveau n'existe pas.
@@ -34,29 +34,29 @@ assert.throws(() => E.ajouterMembre(membres, controleur.id, 'Stagiaire'), /spéc
 
 // 4. Deux membres du même nom ne partagent pas un identifiant : ce sont deux sous-agents.
 membres = E.ajouterMembre(membres, E.ORCHESTRATEUR, 'Directeur financier')
-assert.equal(membres.at(-1).id, 'directeur-financier-2')
+assert.equal(membres.at(-1)!.id, 'directeur-financier-2')
 membres = E.supprimerMembre(membres, 'directeur-financier-2')
 
 // 4 bis. Un membre qu'on vient de créer prend l'identifiant de son vrai nom : c'est
 //        celui que l'orchestrateur emploiera pour le convoquer.
 let neufs = E.ajouterMembre(membres, E.ORCHESTRATEUR, 'Nouveau pôle')
-assert.equal(neufs.at(-1).id, 'nouveau-pole')
+assert.equal(neufs.at(-1)!.id, 'nouveau-pole')
 neufs = E.ajouterMembre(neufs, 'nouveau-pole', 'Nouveau spécialiste')
 neufs = E.renommerMembre(neufs, 'nouveau-pole', 'Direction financière')
 assert.equal(E.membre('nouveau-pole', neufs), null, "l'identifiant provisoire ne reste pas")
-assert.equal(E.membre('direction-financiere', neufs).label, 'Direction financière')
-assert.equal(neufs.find((m) => m.id === 'nouveau-specialiste').parentId, 'direction-financiere',
+assert.equal(E.membre('direction-financiere', neufs)!.label, 'Direction financière')
+assert.equal(neufs.find((m) => m.id === 'nouveau-specialiste')!.parentId, 'direction-financiere',
   'ses spécialistes suivent leur pôle')
 
 // Un membre en service, lui, garde son identifiant : une mission le convoque peut-être.
 const enService = E.renommerMembre(neufs, 'cto', 'Directrice technique')
-assert.equal(E.membre('cto', enService).label, 'Directrice technique')
+assert.equal(E.membre('cto', enService)!.label, 'Directrice technique')
 const avecAme = E.renommerMembre(
   E.definirAme(neufs, 'nouveau-specialiste', 'Tu es le contrôleur de gestion.'),
   'nouveau-specialiste',
   'Contrôleur de gestion',
 )
-assert.equal(E.membre('nouveau-specialiste', avecAme).label, 'Contrôleur de gestion',
+assert.equal(E.membre('nouveau-specialiste', avecAme)!.label, 'Contrôleur de gestion',
   "une âme écrite fige l'identifiant")
 
 // 5. Rattachement : sous l'orchestrateur ou sous un pôle, jamais sous un spécialiste,
@@ -67,7 +67,7 @@ assert.equal(E.peutRattacher(cfo.id, controleur.id, membres), false, 'pas dans s
 assert.equal(E.peutRattacher(E.ORCHESTRATEUR, 'cto', membres), false)
 
 const deplacee = E.rattacher(membres, controleur.id, 'cto')
-assert.equal(E.membre(controleur.id, deplacee).parentId, 'cto')
+assert.equal(E.membre(controleur.id, deplacee)!.parentId, 'cto')
 
 // 6. Un pôle qui encadre ne devient pas spécialiste : ses enfants tomberaient au quatrième niveau.
 assert.equal(E.peutRattacher('cto', 'da', membres), false)
@@ -95,7 +95,7 @@ assert.equal(E.chargerEquipe().length, membres.length)
 // L'équipe active est celle qu'on modifie — les autres ne bougent pas.
 const [premiere] = E.equipes().filter((e) => !e.actif)
 E.enregistrerEquipe(E.supprimerMembre(E.chargerEquipe(), 'cto'))
-assert.equal(E.equipes().find((e) => e.id === idProduit).membres, membres.length - 2, 'le pôle et son spécialiste sont partis')
+assert.equal(E.equipes().find((e) => e.id === idProduit)!.membres, membres.length - 2, 'le pôle et son spécialiste sont partis')
 E.activerEquipe(premiere.id)
 assert.equal(E.chargerEquipe().some((m) => m.id === 'cto'), true, "l'autre équipe est intacte")
 
@@ -104,13 +104,13 @@ const idCopie = E.dupliquerEquipe(idProduit)
 assert.equal(E.equipeActive().id, idCopie)
 assert.match(E.equipeActive().nom, /copie/)
 E.renommerEquipe(idCopie, 'Appel d\'offres')
-assert.equal(E.equipes().find((e) => e.id === idCopie).nom, "Appel d'offres")
+assert.equal(E.equipes().find((e) => e.id === idCopie)!.nom, "Appel d'offres")
 
 // Supprimer celle qui travaille bascule sur une autre ; la dernière ne part pas.
 E.supprimerEquipe(idCopie)
 assert.equal(E.equipes().length, 2)
 assert.ok(E.equipes().some((e) => e.actif), 'il reste toujours une équipe au travail')
-E.supprimerEquipe(E.equipes().find((e) => !e.actif).id)
+E.supprimerEquipe(E.equipes().find((e) => !e.actif)!.id)
 assert.throws(() => E.supprimerEquipe(E.equipeActive().id), /au moins une équipe/)
 
 // 10. L'équipe devient des sous-agents : un par membre, sauf l'orchestrateur.
@@ -122,7 +122,7 @@ assert.ok(agents.cto.prompt.includes('deuxième passe'), 'un pôle intègre, il 
 assert.ok(!agents['cto-dev'].prompt.includes('deuxième passe'), 'un spécialiste défriche')
 assert.ok(agents['cto-dev'].prompt.includes('Points ouverts'), 'chacun finit par ses trous')
 for (const [id, def] of Object.entries(agents)) {
-  assert.ok(def.disallowedTools.includes('mcp__openspace'), `${id} ne publie pas le livrable`)
+  assert.ok(def.disallowedTools!.includes('mcp__openspace'), `${id} ne publie pas le livrable`)
   assert.ok(def.description.trim().length > 10, `${id} a une description utilisable`)
 }
 

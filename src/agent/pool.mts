@@ -9,63 +9,82 @@
 // que changer ce qu'on regarde ; ce qui tourne continue de tourner, et son fil se
 // remplit en arrière-plan.
 import { tracer } from '../espace/journal.mjs'
+import type { AgentSession } from './session.mjs'
+
+/** `travaille` (un tour est en cours), `attend` (une place se libère), ou `libre`. */
+export type EtatFil = 'travaille' | 'attend' | 'libre'
+
+interface EntreeFil {
+  session: AgentSession | null
+  occupe: boolean
+  enAttente: string[]
+}
 
 export const MAX_EN_PARALLELE = 2
 
 export class Pool {
-  /**
-   * @param {object} o
-   * @param {(missionId: string) => object} o.creerSession fabrique une session branchée sur ce fil
-   * @param {(missionId: string) => string|undefined} o.repriseDe identifiant de session à reprendre
-   * @param {(missionId: string, etat: string) => void} o.surEtat prévient d'un changement d'état
-   * @param {number} [o.max]
-   */
-  constructor({ creerSession, repriseDe, surEtat, max = MAX_EN_PARALLELE }) {
+  /** Fabrique une session branchée sur ce fil. */
+  creerSession: (missionId: string) => AgentSession
+  /** L'identifiant de session à reprendre, s'il y en a un. */
+  repriseDe: (missionId: string) => string | undefined
+  /** Prévient d'un changement d'état. */
+  surEtat: (missionId: string, etat: EtatFil) => void
+  max: number
+  fils = new Map<string, EntreeFil>()
+  /** Ordre d'arrivée des fils qui attendent une place. */
+  file: string[] = []
+  /** Le fil affiché : sa session reste chaude, pour que la frappe réponde tout de suite. */
+  affiche: string | null = null
+
+  constructor({ creerSession, repriseDe, surEtat, max = MAX_EN_PARALLELE }: {
+    creerSession: (missionId: string) => AgentSession
+    repriseDe?: (missionId: string) => string | undefined
+    surEtat?: (missionId: string, etat: EtatFil) => void
+    max?: number
+  }) {
     this.creerSession = creerSession
     this.repriseDe = repriseDe || (() => undefined)
     this.surEtat = surEtat || (() => {})
     this.max = max
-    /** missionId -> { session, occupe, enAttente: string[] } */
-    this.fils = new Map()
-    /** Ordre d'arrivée des fils qui attendent une place. */
-    this.file = []
-    /** Le fil affiché : sa session reste chaude, pour que la frappe réponde tout de suite. */
-    this.affiche = null
   }
 
   // ------------------------------------------------------------------ états
 
-  /** `travaille` (un tour est en cours), `attend` (une place se libère), ou `libre`. */
-  etat(missionId) {
+  etat(missionId: string): EtatFil {
     const f = this.fils.get(missionId)
     if (f?.occupe) return 'travaille'
     if (f?.enAttente.length) return 'attend'
     return 'libre'
   }
 
-  etats() {
-    const out = new Map()
+  etats(): Map<string, EtatFil> {
+    const out = new Map<string, EtatFil>()
     for (const [id] of this.fils) out.set(id, this.etat(id))
     return out
   }
 
-  occupes() {
+  occupes(): number {
     let n = 0
     for (const f of this.fils.values()) if (f.occupe) n += 1
     return n
   }
 
-  #entree(missionId) {
-    if (!this.fils.has(missionId)) this.fils.set(missionId, { session: null, occupe: false, enAttente: [] })
-    return this.fils.get(missionId)
+  #entree(missionId: string): EntreeFil {
+    let f = this.fils.get(missionId)
+    if (!f) {
+      f = { session: null, occupe: false, enAttente: [] }
+      this.fils.set(missionId, f)
+    }
+    return f
   }
 
-  #demarrer(missionId) {
+  #demarrer(missionId: string): AgentSession {
     const f = this.#entree(missionId)
     if (f.session?.running) return f.session
-    f.session = this.creerSession(missionId)
-    f.session.start({ resume: this.repriseDe(missionId) })
-    return f.session
+    const session = this.creerSession(missionId)
+    f.session = session
+    session.start({ resume: this.repriseDe(missionId) })
+    return session
   }
 
   // ------------------------------------------------------------------ envoi
@@ -74,13 +93,12 @@ export class Pool {
    * Envoie une demande. Trois cas : le fil travaille déjà (le message rejoint sa file
    * d'entrée et il en tiendra compte), une place est libre (on part tout de suite), ou
    * tout est pris (on attend son tour).
-   * @returns {'envoye'|'attente'}
    */
-  envoyer(missionId, texte) {
+  envoyer(missionId: string, texte: string): 'envoye' | 'attente' {
     const f = this.#entree(missionId)
 
     if (f.occupe) {
-      f.session.send(texte)
+      f.session?.send(texte)
       return 'envoye'
     }
 
@@ -96,17 +114,17 @@ export class Pool {
     return 'envoye'
   }
 
-  #lancer(missionId, texte) {
+  #lancer(missionId: string, texte: string): void {
     const f = this.#entree(missionId)
-    this.#demarrer(missionId)
+    const session = this.#demarrer(missionId)
     f.occupe = true
     this.file = this.file.filter((id) => id !== missionId)
-    f.session.send(texte)
+    session.send(texte)
     this.surEtat(missionId, 'travaille')
   }
 
   /** Un tour vient de se terminer : on libère la place et on fait avancer la file. */
-  finDeTour(missionId) {
+  finDeTour(missionId: string): void {
     const f = this.fils.get(missionId)
     if (!f) return
     f.occupe = false
@@ -126,7 +144,7 @@ export class Pool {
     this.#promouvoir()
   }
 
-  #promouvoir() {
+  #promouvoir(): void {
     while (this.occupes() < this.max && this.file.length) {
       const suivant = this.file[0]
       const f = this.fils.get(suivant)
@@ -137,7 +155,7 @@ export class Pool {
     }
   }
 
-  #liberer(missionId) {
+  #liberer(missionId: string): void {
     const f = this.fils.get(missionId)
     if (!f) return
     try { f.session?.stop() } catch {}
@@ -152,25 +170,25 @@ export class Pool {
    * Change le fil regardé. Ne touche à rien d'autre : ce qui travaille continue.
    * L'ancien fil, s'il ne fait rien, rend son processus.
    */
-  afficher(missionId) {
+  afficher(missionId: string | null): void {
     const ancien = this.affiche
     this.affiche = missionId
     if (ancien && ancien !== missionId && this.etat(ancien) === 'libre') this.#liberer(ancien)
     if (missionId) this.#entree(missionId)
   }
 
-  session(missionId) {
+  session(missionId: string): AgentSession | null {
     return this.fils.get(missionId)?.session || null
   }
 
-  interrompre(missionId) {
+  interrompre(missionId: string): void {
     const f = this.fils.get(missionId)
     if (!f?.occupe) return
     f.session?.interrupt()
   }
 
   /** Le fil est supprimé : on arrête tout et on oublie. */
-  oublier(missionId) {
+  oublier(missionId: string): void {
     const f = this.fils.get(missionId)
     if (!f) return
     f.enAttente.length = 0
@@ -178,12 +196,12 @@ export class Pool {
     this.#promouvoir()
   }
 
-  setModel(model) {
+  setModel(model: string): void {
     for (const f of this.fils.values()) f.session?.setModel(model)
   }
 
   /** Redémarre tout le monde : l'équipe ou les règles ont changé sous leurs pieds. */
-  toutArreter() {
+  toutArreter(): void {
     for (const id of [...this.fils.keys()]) this.#liberer(id)
     this.file = []
   }
